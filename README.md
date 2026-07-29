@@ -4,7 +4,7 @@ Welcome! ANSI/IES TM-30-20 colour fidelity & gamut metrics implemented from
 the spec in C++20 with zero runtime dependencies, and Python bindings via
 nanobind.
 
-**Status:** 191 tests · 5966 assertions · Green
+VIBECODE-ALERT!!! Opencode and Claude did help me.
 
 > **What is TM-30-20?** ANSI/IES TM-30-20 is the modern replacement for CRI
 > (Ra) for evaluating how a light source renders colour. It scores a source
@@ -202,7 +202,7 @@ const auto& colorimetry = m.colorimetry_result();    // full raw result
 ### Python
 
 ```bash
-git clone https://github.com/…/pytm30.git
+git clone https://github.com/xylophoneengine/PyTM30.git
 cd pytm30
 
 pip install .
