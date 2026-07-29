@@ -1,0 +1,17 @@
+{
+  "spd_name": "F12",
+  "cri_type": "ies-tm30-20",
+  "colour_science_version": "0.4.7",
+  "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
+  "generated": "2026-07-29",
+  "stage": "17_rf_skin",
+  "Rf_skin": 85.50047574945533,
+  "Rf_CES15": 86.76380294163928,
+  "Rf_CES18": 84.23714855727138,
+  "ces_indices_0_indexed": [
+    14,
+    17
+  ],
+  "ces15": 86.76380294163928,
+  "ces18": 84.23714855727138
+}

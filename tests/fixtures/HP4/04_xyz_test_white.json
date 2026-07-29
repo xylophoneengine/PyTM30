@@ -1,0 +1,11 @@
+{
+  "spd_name": "HP4",
+  "cri_type": "ies-tm30-20",
+  "colour_science_version": "0.4.7",
+  "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
+  "generated": "2026-07-29",
+  "stage": "04_xyz_test_white",
+  "X": 104.59386509377312,
+  "Y": 100.0,
+  "Z": 66.94186493249019
+}

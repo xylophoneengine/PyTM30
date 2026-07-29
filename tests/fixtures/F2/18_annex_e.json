@@ -1,0 +1,23 @@
+{
+  "spd_name": "F2",
+  "cri_type": "ies-tm30-20",
+  "colour_science_version": "0.4.7",
+  "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
+  "generated": "2026-07-29",
+  "stage": "18_annex_e",
+  "P1": [
+    "Rf",
+    "Rg",
+    "CVG"
+  ],
+  "P2": [
+    "Rcs_hj",
+    "Rhs_hj",
+    "Rf_hj"
+  ],
+  "P3": [
+    "Rf_CESi"
+  ],
+  "source": "TM-30-20 Annex E",
+  "description": "Priority levels for specifying light source color rendition. P1 = preferred/highest, P2 = secondary (local measures), P3 = ancillary (sample-specific). Static per the TM-30-20 spec; not a function of the test SPD. Confirmed NOT read by the C++ test suite (which only asserts the static AnnexE::P1/P2/P3 int constants == 1/2/3 in slice_10_sample_test.cpp)."
+}

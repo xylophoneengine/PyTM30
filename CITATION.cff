@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "pytm30"
+abstract: >-
+  ANSI/IES TM-30-20 colour fidelity & gamut metrics implemented from the
+  spec in C++20 with zero runtime dependencies, and Python bindings via
+  nanobind.
+type: software
+version: "0.1.0"
+license: MIT
+authors:
+  - family-names: "Zwenger"
+    given-names: "Adrian"
+    affiliation: >-
+      Laboratory of Adaptive Lighting Systems and Visual Processing
+      (ALSVV), Technical University of Darmstadt

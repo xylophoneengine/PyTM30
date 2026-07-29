@@ -1,0 +1,6 @@
+# check_constants.py whitelist - maintainer-controlled
+# Format: filepath:lineno (one per line)
+# Lines starting with # are comments.
+#
+# Currently empty - no exemptions granted yet.
+# Add entries only after careful review.

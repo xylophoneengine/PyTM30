@@ -1,0 +1,17 @@
+{
+  "spd_name": "LED_RGB1",
+  "cri_type": "ies-tm30-20",
+  "colour_science_version": "0.4.7",
+  "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
+  "generated": "2026-07-29",
+  "stage": "17_rf_skin",
+  "Rf_skin": 75.15874778117539,
+  "Rf_CES15": 76.2249562746464,
+  "Rf_CES18": 74.09253928770438,
+  "ces_indices_0_indexed": [
+    14,
+    17
+  ],
+  "ces15": 76.2249562746464,
+  "ces18": 74.09253928770438
+}

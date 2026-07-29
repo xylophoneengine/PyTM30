@@ -1,0 +1,25 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pytm30"
+version = "0.1.0"
+description = "ANSI/IES TM-30-20 color rendition metrics - C++20 core with Python bindings"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Adrian Zwenger" },
+]
+requires-python = ">=3.10"
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+notebook = ["matplotlib", "jupyter"]
+
+[tool.scikit-build]
+cmake.version = ">=3.20"
+cmake.source-dir = "python"
+cmake.args = ["-DCMAKE_BUILD_TYPE=Release"]
+wheel.packages = []

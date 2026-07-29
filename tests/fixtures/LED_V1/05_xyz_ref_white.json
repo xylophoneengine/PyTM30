@@ -1,0 +1,11 @@
+{
+  "spd_name": "LED_V1",
+  "cri_type": "ies-tm30-20",
+  "colour_science_version": "0.4.7",
+  "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
+  "generated": "2026-07-29",
+  "stage": "05_xyz_ref_white",
+  "X": 112.97425947069401,
+  "Y": 100.00000000000001,
+  "Z": 31.749000970070696
+}
