@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "tm30/chromaticity.hpp" // YuvTriple
+#include "tm30/reference.hpp"    // DaylightBasis, generate_reference_spd
 #include "tm30/resample.hpp"     // CesData, CmfData
 
 #include <optional>
@@ -177,5 +178,99 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
                  std::optional<double> K = std::nullopt,
                  std::optional<double> lambda_min = std::nullopt,
                  std::optional<double> lambda_max = std::nullopt);
+
+/// Convert multiple XYZ tristimulus triples to CIE 1976 Y,u′,v′.
+///
+/// A plain per-row loop over the existing xyz_to_Yuv() scalar function -
+/// there's no CMF or wavelength dependency to resample or cache here, so
+/// this exists purely so a batch of XYZ triples can cross the Python/C++
+/// boundary once instead of once per row.
+///
+/// @param xyzs  XYZ tristimulus triples to convert.
+/// @return      Vector of YuvTriple (one per input triple).
+std::vector<YuvTriple> xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs);
+
+/// Compute XYZ tristimulus values for the TM-30-20 §3.3 reference
+/// illuminant at a given CCT.
+///
+/// Chains generate_reference_spd() (TM-30-20 §3.3 Eq. (13)-(16):
+/// Planckian for Tt<=4000K, CIE D-series for Tt>=5000K, proportional blend
+/// between) with the same tristimulus-integration logic spd_to_xyz() uses.
+/// The same cmf_data is used both for the reference SPD's internal
+/// Y-normalization blend step and the final XYZ integration, resampled
+/// exactly once.
+///
+/// There is no lambda_min/lambda_max here (unlike spd_to_xyz) - the
+/// reference SPD is synthetic data over the full requested grid, not a
+/// real measured spectrum with a sensor-limited valid band, so
+/// integration-bound clipping doesn't have the same motivating use case.
+///
+/// @param cct          Correlated color temperature (K).
+/// @param wavelengths  Wavelength grid (nm) to generate the reference SPD
+///                     on and integrate over.
+/// @param basis        Daylight basis vectors (S0, S1, S2).
+/// @param cmf_data     CMF data (will be resampled to `wavelengths`).
+/// @param K            Normalisation constant - see spd_to_xyz(). nullopt
+///                     (default): auto-normalize Y=100.
+/// @return             XyzTriple for the reference illuminant at this CCT.
+XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
+                     const DaylightBasis &basis, const CmfData &cmf_data,
+                     std::optional<double> K = std::nullopt);
+
+/// Compute XYZ for the reference illuminant at each of several CCTs,
+/// sharing one wavelength grid and one resampled CMF across the batch.
+///
+/// @param ccts         Correlated color temperatures (K).
+/// @param wavelengths  Wavelength grid shared by every CCT in the batch.
+/// @param basis        Daylight basis vectors.
+/// @param cmf_data     CMF data (resampled once, reused for every CCT).
+/// @param K            Normalisation constant - see spd_to_xyz().
+/// @return             Vector of XyzTriple, one per input CCT.
+std::vector<XyzTriple>
+cct_to_xyz_batch(const std::vector<double> &ccts,
+                 const std::vector<double> &wavelengths,
+                 const DaylightBasis &basis, const CmfData &cmf_data,
+                 std::optional<double> K = std::nullopt);
+
+/// Compute the total power of an SPD - radiometric (unweighted) or
+/// photometric (CIE luminous-efficiency-weighted).
+///
+/// Radiometric (photometric=false): integral_st = ∫ S(λ) dλ over
+/// [lambda_min, lambda_max] - no CMF weighting at all; units follow
+/// whatever units the SPD's own values are in (e.g. W if S is in W/nm).
+///
+/// Photometric (photometric=true): Km · ∫ S(λ) · ȳ(λ) dλ, where ȳ is
+/// cmf_data's y-bar (resampled to the clipped grid) and Km = 683.0 lm/W is
+/// the CIE/SI maximum luminous efficacy constant (matches this codebase's
+/// existing K=683.0 "photometric absolute" convention on spd_to_xyz).
+///
+/// @param wavelengths  SPD wavelength grid (nm).
+/// @param values       SPD spectral power values.
+/// @param cmf_data     CMF data (only used, and resampled, when
+///                     photometric=true).
+/// @param photometric  false: radiometric (W). true: photometric (lm).
+/// @param lambda_min   Lower integration bound (nm). nullopt: from the
+///                     first wavelength in the SPD.
+/// @param lambda_max   Upper integration bound (nm). nullopt: to the last
+///                     wavelength in the SPD.
+/// @return             Total power (W or lm depending on `photometric`).
+double spd_to_power(const std::vector<double> &wavelengths,
+                    const std::vector<double> &values, const CmfData &cmf_data,
+                    bool photometric,
+                    std::optional<double> lambda_min = std::nullopt,
+                    std::optional<double> lambda_max = std::nullopt);
+
+/// Compute spd_to_power() for multiple SPDs sharing one wavelength grid.
+///
+/// @return  Vector of power values (W or lm), one per input SPD - unlike
+///          every other *_batch function in this file, this returns a
+///          flat scalar per row, not an XyzTriple: power is a single
+///          number, not a tristimulus triple.
+std::vector<double>
+spd_to_power_batch(const std::vector<double> &wavelengths,
+                   const std::vector<std::vector<double>> &spd_matrix,
+                   const CmfData &cmf_data, bool photometric,
+                   std::optional<double> lambda_min = std::nullopt,
+                   std::optional<double> lambda_max = std::nullopt);
 
 } // namespace tm30

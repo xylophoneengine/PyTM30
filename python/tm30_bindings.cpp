@@ -793,7 +793,7 @@ struct BatchContext {
   /// Uses the pre-loaded CIE 1964 10 degree CMFs.
   nb::object spd_to_xyz(nb::ndarray<> spd_matrix, nb::object wl_arg,
                         nb::object K_arg, nb::object lambda_min_arg,
-                        nb::object lambda_max_arg) {
+                        nb::object lambda_max_arg, nb::object cmf_path_arg) {
     if (spd_matrix.ndim() != 2)
       throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
     require_c_contiguous(spd_matrix, "spd_matrix");
@@ -838,7 +838,14 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
     }
 
-    auto xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, cmf_10deg, K_opt,
+    tm30::CmfData fresh_cmf;
+    const tm30::CmfData *cmf_to_use = &cmf_10deg;
+    if (!cmf_path_arg.is_none()) {
+      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      cmf_to_use = &fresh_cmf;
+    }
+
+    auto xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, *cmf_to_use, K_opt,
                                        lambda_min_opt, lambda_max_opt);
 
     auto np = nb::module_::import_("numpy");
@@ -859,7 +866,7 @@ struct BatchContext {
   /// Chains spd_to_xyz then xyz_to_Yuv using pre-loaded CIE 1964 10 deg CMFs.
   nb::object spd_to_Yuv(nb::ndarray<> spd_matrix, nb::object wl_arg,
                         nb::object K_arg, nb::object lambda_min_arg,
-                        nb::object lambda_max_arg) {
+                        nb::object lambda_max_arg, nb::object cmf_path_arg) {
     if (spd_matrix.ndim() != 2)
       throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
     require_c_contiguous(spd_matrix, "spd_matrix");
@@ -904,7 +911,14 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
     }
 
-    auto yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, cmf_10deg, K_opt,
+    tm30::CmfData fresh_cmf;
+    const tm30::CmfData *cmf_to_use = &cmf_10deg;
+    if (!cmf_path_arg.is_none()) {
+      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      cmf_to_use = &fresh_cmf;
+    }
+
+    auto yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, *cmf_to_use, K_opt,
                                        lambda_min_opt, lambda_max_opt);
 
     auto np = nb::module_::import_("numpy");
@@ -917,6 +931,144 @@ struct BatchContext {
       buf[i * 3 + 1] = yuvs[i].u_prime;
       buf[i * 3 + 2] = yuvs[i].v_prime;
     }
+    return result;
+  }
+
+  /// Convert XYZ tristimulus triples to CIE 1976 Y,u',v' (N x 3 in, N x 3
+  /// out). Pure coordinate transform - no CMF or wavelength dependency.
+  nb::object xyz_to_Yuv(nb::ndarray<> xyz_matrix) {
+    if (xyz_matrix.ndim() != 2 || xyz_matrix.shape(1) != 3)
+      throw std::invalid_argument("xyz_matrix must be 2-D (N x 3)");
+    require_c_contiguous(xyz_matrix, "xyz_matrix");
+    size_t N = xyz_matrix.shape(0);
+    const double *data = static_cast<const double *>(xyz_matrix.data());
+
+    std::vector<tm30::XyzTriple> xyzs(N);
+    for (size_t i = 0; i < N; ++i) {
+      xyzs[i] =
+          tm30::XyzTriple{data[i * 3 + 0], data[i * 3 + 1], data[i * 3 + 2]};
+    }
+    auto yuvs = tm30::xyz_to_Yuv_batch(xyzs);
+
+    auto np = nb::module_::import_("numpy");
+    auto result =
+        np.attr("empty")(nb::make_tuple(N, 3), nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    double *buf = static_cast<double *>(nd.data());
+    for (size_t i = 0; i < N; ++i) {
+      buf[i * 3 + 0] = yuvs[i].Y;
+      buf[i * 3 + 1] = yuvs[i].u_prime;
+      buf[i * 3 + 2] = yuvs[i].v_prime;
+    }
+    return result;
+  }
+
+  /// Compute XYZ for the reference illuminant at each CCT (N,) in,
+  /// returns (N, 3). Always uses this context's grid-fixed wavelengths (set
+  /// via set_fixed_grid()) - no per-call wavelengths override. cmf_path=None
+  /// (default): use this context's bound cmf_10deg. cmf_path=str: load+
+  /// resample a different CMF for this call only.
+  nb::object cct_to_xyz(nb::ndarray<> cct_array, nb::object cmf_path_arg,
+                        nb::object K_arg) {
+    if (!fixed_tables_.has_value())
+      throw std::runtime_error(
+          "cct_to_xyz() called before set_fixed_grid() was ever called.");
+    if (cct_array.ndim() != 1)
+      throw std::invalid_argument("cct_array must be a 1-D array");
+    require_c_contiguous(cct_array, "cct_array");
+    size_t N = cct_array.shape(0);
+    const double *cct_data = static_cast<const double *>(cct_array.data());
+    std::vector<double> ccts(cct_data, cct_data + N);
+
+    std::optional<double> K_opt;
+    if (!K_arg.is_none())
+      K_opt = nb::cast<double>(K_arg);
+
+    std::vector<tm30::XyzTriple> xyzs;
+    if (cmf_path_arg.is_none()) {
+      xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
+                                    fixed_tables_->daylight_basis, cmf_10deg,
+                                    K_opt);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
+                                    fixed_tables_->daylight_basis, fresh_cmf,
+                                    K_opt);
+    }
+
+    auto np = nb::module_::import_("numpy");
+    auto result =
+        np.attr("empty")(nb::make_tuple(N, 3), nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    double *buf = static_cast<double *>(nd.data());
+    for (size_t i = 0; i < N; ++i) {
+      buf[i * 3 + 0] = xyzs[i].X;
+      buf[i * 3 + 1] = xyzs[i].Y;
+      buf[i * 3 + 2] = xyzs[i].Z;
+    }
+    return result;
+  }
+
+  /// Integrate each SPD in the batch to a single power value. Returns
+  /// shape (N,) - NOT (N,3) - power is one scalar per SPD.
+  /// photometric=false (default): radiometric (W). photometric=true:
+  /// Km=683.0 x ybar-weighted (lm). cmf_path=None: use this context's
+  /// bound cmf_10deg (ignored when photometric=false).
+  nb::object spd_to_power(nb::ndarray<> spd_matrix, nb::object wl_arg,
+                          nb::object cmf_path_arg, bool photometric,
+                          nb::object lambda_min_arg, nb::object lambda_max_arg) {
+    if (spd_matrix.ndim() != 2)
+      throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
+    require_c_contiguous(spd_matrix, "spd_matrix");
+    size_t N = spd_matrix.shape(0);
+    size_t nwl = spd_matrix.shape(1);
+    const double *data = static_cast<const double *>(spd_matrix.data());
+
+    std::vector<double> wl;
+    if (wl_arg.is_none()) {
+      if (nwl != 401)
+        throw std::invalid_argument(
+            "Expected 401 wavelengths (380-780 nm), got " +
+            std::to_string(nwl));
+      wl.resize(401);
+      for (size_t i = 0; i < 401; ++i)
+        wl[i] = 380.0 + i;
+    } else {
+      auto wl_arr = nb::cast<nb::ndarray<>>(wl_arg);
+      if (wl_arr.ndim() != 1 || wl_arr.shape(0) != nwl)
+        throw std::invalid_argument("wavelengths must match spd_matrix columns");
+      require_c_contiguous(wl_arr, "wavelengths");
+      const double *wl_data = static_cast<const double *>(wl_arr.data());
+      wl.assign(wl_data, wl_data + nwl);
+    }
+
+    std::vector<std::vector<double>> spd_vecs(N);
+    for (size_t i = 0; i < N; ++i) {
+      spd_vecs[i].assign(data + i * nwl, data + (i + 1) * nwl);
+    }
+
+    std::optional<double> lambda_min_opt;
+    if (!lambda_min_arg.is_none())
+      lambda_min_opt = nb::cast<double>(lambda_min_arg);
+    std::optional<double> lambda_max_opt;
+    if (!lambda_max_arg.is_none())
+      lambda_max_opt = nb::cast<double>(lambda_max_arg);
+
+    std::vector<double> results;
+    if (cmf_path_arg.is_none()) {
+      results = tm30::spd_to_power_batch(wl, spd_vecs, cmf_10deg, photometric,
+                                         lambda_min_opt, lambda_max_opt);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      results = tm30::spd_to_power_batch(wl, spd_vecs, fresh_cmf, photometric,
+                                         lambda_min_opt, lambda_max_opt);
+    }
+
+    auto np = nb::module_::import_("numpy");
+    auto result = np.attr("empty")(N, nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    double *buf = static_cast<double *>(nd.data());
+    std::copy(results.begin(), results.end(), buf);
     return result;
   }
 };
@@ -1099,10 +1251,11 @@ NB_MODULE(tm30_core, m) {
       .def("spd_to_xyz", &BatchContext::spd_to_xyz, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(), nb::arg("K") = nb::none(),
            nb::arg("lambda_min") = nb::none(),
-           nb::arg("lambda_max") = nb::none(),
+           nb::arg("lambda_max") = nb::none(), nb::arg("cmf") = nb::none(),
            "Compute source XYZ for all SPDs (N_spds x N_wl). "
            "Returns numpy array (N_spds, 3) with [X, Y, Z]. "
-           "Uses CIE 1964 10 degree CMFs. "
+           "Uses CIE 1964 10 degree CMFs by default, or the CMF at "
+           "cmf= (a CSV path) for this call only. "
            "K=None (default): auto-normalise Y=100 (TM-30-20 §3.2). "
            "K=float: use as multiplier for raw integrals (1.0 = raw, 683 = "
            "photometric). "
@@ -1110,13 +1263,34 @@ NB_MODULE(tm30_core, m) {
       .def("spd_to_Yuv", &BatchContext::spd_to_Yuv, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(), nb::arg("K") = nb::none(),
            nb::arg("lambda_min") = nb::none(),
-           nb::arg("lambda_max") = nb::none(),
+           nb::arg("lambda_max") = nb::none(), nb::arg("cmf") = nb::none(),
            "Compute CIE 1976 Y,u',v' for all SPDs (N_spds x N_wl). "
            "Returns numpy array (N_spds, 3) with [Y, u', v']. "
-           "Chains spd_to_xyz then xyz_to_Yuv. "
+           "Chains spd_to_xyz then xyz_to_Yuv. Uses CIE 1964 10 degree CMFs "
+           "by default, or the CMF at cmf= (a CSV path) for this call only. "
            "K=None (default): auto-normalise Y=100. "
            "K=float: use as multiplier for raw integrals. "
-           "lambda_min, lambda_max=None: clip integration range (nm).");
+           "lambda_min, lambda_max=None: clip integration range (nm).")
+      .def("xyz_to_Yuv", &BatchContext::xyz_to_Yuv, nb::arg("xyz_matrix"),
+           "Convert XYZ tristimulus triples to CIE 1976 Y,u',v'. "
+           "Input/output shape (N, 3). Pure coordinate transform - no CMF "
+           "or wavelength dependency.")
+      .def("cct_to_xyz", &BatchContext::cct_to_xyz, nb::arg("cct_array"),
+           nb::arg("cmf_path") = nb::none(), nb::arg("K") = nb::none(),
+           "Compute XYZ for the TM-30-20 reference illuminant at each CCT. "
+           "Input shape (N,), output shape (N, 3). Always uses this "
+           "context's grid-fixed wavelengths (set via set_fixed_grid()) - "
+           "no wavelengths override. cmf_path=None (default): use this "
+           "context's bound CMF. cmf_path=str: load+resample a different "
+           "CMF for this call only.")
+      .def("spd_to_power", &BatchContext::spd_to_power, nb::arg("spd_matrix"),
+           nb::arg("wavelengths") = nb::none(), nb::arg("cmf_path") = nb::none(),
+           nb::arg("photometric") = false, nb::arg("lambda_min") = nb::none(),
+           nb::arg("lambda_max") = nb::none(),
+           "Integrate each SPD to a single power value. Returns shape (N,), "
+           "NOT (N,3) - power is one scalar per SPD. photometric=False "
+           "(default): radiometric (W), unweighted. photometric=True: "
+           "Km=683.0 x ybar-weighted (lm).");
 
   // ── Exception translation ────────────────────────────────────────
 

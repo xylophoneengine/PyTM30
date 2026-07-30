@@ -2,5 +2,10 @@
 # Format: filepath:lineno (one per line)
 # Lines starting with # are comments.
 #
-# Currently empty - no exemptions granted yet.
 # Add entries only after careful review.
+
+# Km = 683 lm/W (CIE/SI maximum luminous efficacy) - a general photometric
+# constant, not a TM-30-20 spec citation. TM-30-20 works entirely in
+# relative (Y=100-normalized) colorimetry and never defines this constant,
+# so there is no honest "TM-30-20 §x.y" citation to attach here.
+src/tm30/xyz.cpp:131

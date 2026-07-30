@@ -114,31 +114,36 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
 
 namespace {
 
-/// Clip an SPD wavelength grid and values to [lambda_min, lambda_max].
-/// Both bounds are optional; if unset, the full range is used.
-/// Returns clipped copies.  Assumes wavelengths are monotonically increasing.
-/// @throws std::invalid_argument if the clip range produces <2 points.
-void clip_spd(const std::vector<double> &spd_wavelengths,
-              const std::vector<double> &spd_values,
-              std::optional<double> lambda_min,
-              std::optional<double> lambda_max,
-              std::vector<double> &out_wavelengths,
-              std::vector<double> &out_values) {
-  const size_t n = spd_wavelengths.size();
+/// [lo, hi] inclusive indices into an existing wavelength array that fall
+/// within [lambda_min, lambda_max]. Snaps inward to existing grid points -
+/// never synthesizes a new point at the exact boundary requested.
+struct ClipIndices {
+  std::size_t lo;
+  std::size_t hi;
+};
 
-  if (!lambda_min.has_value() && !lambda_max.has_value()) {
-    out_wavelengths = spd_wavelengths;
-    out_values = spd_values;
-    return;
-  }
+// CIE/SI maximum luminous efficacy Km = 683 lm/W - a general photometric
+// constant, not TM-30-20-specific (the spec works entirely in relative,
+// Y=100-normalized colorimetry and never defines this). Matches this
+// codebase's existing K=683.0 "photometric absolute" convention on
+// spd_to_xyz. Whitelisted in tools/check_constants_whitelist.txt rather
+// than cited to a TM-30-20 section, since no such section exists.
+constexpr double kMaxLuminousEfficacy = 683.0;
 
-  size_t lo_idx = 0;
-  size_t hi_idx = n - 1;
+/// Compute the [lo, hi] index range into `spd_wavelengths` that falls
+/// within [lambda_min, lambda_max]. Both bounds optional; unset means the
+/// full range. Throws if the resulting range has fewer than 2 points.
+ClipIndices compute_clip_indices(const std::vector<double> &spd_wavelengths,
+                                 std::optional<double> lambda_min,
+                                 std::optional<double> lambda_max) {
+  const std::size_t n = spd_wavelengths.size();
+  std::size_t lo_idx = 0;
+  std::size_t hi_idx = n - 1;
 
   if (lambda_min.has_value()) {
     auto it = std::lower_bound(spd_wavelengths.begin(), spd_wavelengths.end(),
                                lambda_min.value());
-    lo_idx = static_cast<size_t>(it - spd_wavelengths.begin());
+    lo_idx = static_cast<std::size_t>(it - spd_wavelengths.begin());
     if (lo_idx >= n)
       lo_idx = n - 1;
   }
@@ -146,7 +151,7 @@ void clip_spd(const std::vector<double> &spd_wavelengths,
     auto it = std::upper_bound(spd_wavelengths.begin(), spd_wavelengths.end(),
                                lambda_max.value());
     if (it != spd_wavelengths.begin()) {
-      hi_idx = static_cast<size_t>(it - spd_wavelengths.begin()) - 1;
+      hi_idx = static_cast<std::size_t>(it - spd_wavelengths.begin()) - 1;
     } else {
       hi_idx = 0;
     }
@@ -162,17 +167,39 @@ void clip_spd(const std::vector<double> &spd_wavelengths,
         " > hi_idx=" + std::to_string(hi_idx) + ")");
   }
 
-  size_t clipped_n = hi_idx - lo_idx + 1;
+  const std::size_t clipped_n = hi_idx - lo_idx + 1;
   if (clipped_n < 2) {
     throw std::invalid_argument(
         "Integration range produces fewer than 2 wavelength points "
         "(need ≥2 for trapezoidal integration)");
   }
 
-  out_wavelengths.assign(spd_wavelengths.begin() + lo_idx,
-                         spd_wavelengths.begin() + hi_idx + 1);
-  out_values.assign(spd_values.begin() + lo_idx,
-                    spd_values.begin() + hi_idx + 1);
+  return {lo_idx, hi_idx};
+}
+
+/// Clip an SPD wavelength grid and values to [lambda_min, lambda_max].
+/// Both bounds are optional; if unset, the full range is used.
+/// Returns clipped copies. Assumes wavelengths are monotonically increasing.
+/// @throws std::invalid_argument if the clip range produces <2 points.
+void clip_spd(const std::vector<double> &spd_wavelengths,
+              const std::vector<double> &spd_values,
+              std::optional<double> lambda_min,
+              std::optional<double> lambda_max,
+              std::vector<double> &out_wavelengths,
+              std::vector<double> &out_values) {
+  if (!lambda_min.has_value() && !lambda_max.has_value()) {
+    out_wavelengths = spd_wavelengths;
+    out_values = spd_values;
+    return;
+  }
+
+  const ClipIndices idx =
+      compute_clip_indices(spd_wavelengths, lambda_min, lambda_max);
+
+  out_wavelengths.assign(spd_wavelengths.begin() + idx.lo,
+                         spd_wavelengths.begin() + idx.hi + 1);
+  out_values.assign(spd_values.begin() + idx.lo,
+                    spd_values.begin() + idx.hi + 1);
 }
 
 } // namespace
@@ -209,48 +236,18 @@ spd_to_xyz_batch(const std::vector<double> &spd_wavelengths,
                  const CmfData &cmf_data, std::optional<double> K,
                  std::optional<double> lambda_min,
                  std::optional<double> lambda_max) {
-  // Clip wavelengths once (all SPDs share the same wavelength grid);
-  // build lo/hi indices for per-SPD value slicing.
-  const size_t n = spd_wavelengths.size();
-  size_t lo_idx = 0;
-  size_t hi_idx = n - 1;
+  const ClipIndices idx =
+      compute_clip_indices(spd_wavelengths, lambda_min, lambda_max);
 
-  if (lambda_min.has_value()) {
-    auto it = std::lower_bound(spd_wavelengths.begin(), spd_wavelengths.end(),
-                               lambda_min.value());
-    lo_idx = static_cast<size_t>(it - spd_wavelengths.begin());
-    if (lo_idx >= n)
-      lo_idx = n - 1;
-  }
-  if (lambda_max.has_value()) {
-    auto it = std::upper_bound(spd_wavelengths.begin(), spd_wavelengths.end(),
-                               lambda_max.value());
-    if (it != spd_wavelengths.begin()) {
-      hi_idx = static_cast<size_t>(it - spd_wavelengths.begin()) - 1;
-    } else {
-      hi_idx = 0;
-    }
-  }
-
-  if (hi_idx < lo_idx) {
-    throw std::invalid_argument("Integration range produces empty data");
-  }
-
-  size_t clipped_n = hi_idx - lo_idx + 1;
-  if (clipped_n < 2) {
-    throw std::invalid_argument(
-        "Integration range produces fewer than 2 wavelength points");
-  }
-
-  std::vector<double> clip_wl(spd_wavelengths.begin() + lo_idx,
-                              spd_wavelengths.begin() + hi_idx + 1);
+  std::vector<double> clip_wl(spd_wavelengths.begin() + idx.lo,
+                              spd_wavelengths.begin() + idx.hi + 1);
 
   CmfData cmf_resampled = resample_cmf(clip_wl, cmf_data);
   std::vector<XyzTriple> results;
   results.reserve(spd_matrix.size());
   for (const auto &vals : spd_matrix) {
-    std::vector<double> clip_vals(vals.begin() + lo_idx,
-                                  vals.begin() + hi_idx + 1);
+    std::vector<double> clip_vals(vals.begin() + idx.lo,
+                                  vals.begin() + idx.hi + 1);
     SourceXyz src =
         compute_source_xyz(clip_wl, clip_vals, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);
@@ -286,6 +283,113 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
   results.reserve(xyzs.size());
   for (const auto &xyz : xyzs) {
     results.push_back(xyz_to_Yuv(xyz.X, xyz.Y, xyz.Z));
+  }
+  return results;
+}
+
+std::vector<YuvTriple>
+xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs) {
+  std::vector<YuvTriple> results;
+  results.reserve(xyzs.size());
+  for (const auto &xyz : xyzs) {
+    results.push_back(xyz_to_Yuv(xyz.X, xyz.Y, xyz.Z));
+  }
+  return results;
+}
+
+XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
+                     const DaylightBasis &basis, const CmfData &cmf_data,
+                     std::optional<double> K) {
+  // Resample exactly once - reused for both the reference-SPD
+  // Y-normalization blend step and the final XYZ integration below.
+  CmfData cmf_resampled = resample_cmf(wavelengths, cmf_data);
+  std::vector<double> ref_spd =
+      generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar);
+
+  SourceXyz src = compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
+                                     cmf_resampled.y_bar, cmf_resampled.z_bar);
+  if (K.has_value()) {
+    double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+    return XyzTriple{src.X * scale, src.Y * scale, src.Z * scale};
+  }
+  return XyzTriple{src.X, src.Y, src.Z};
+}
+
+std::vector<XyzTriple>
+cct_to_xyz_batch(const std::vector<double> &ccts,
+                 const std::vector<double> &wavelengths,
+                 const DaylightBasis &basis, const CmfData &cmf_data,
+                 std::optional<double> K) {
+  CmfData cmf_resampled = resample_cmf(wavelengths, cmf_data);
+  std::vector<XyzTriple> results;
+  results.reserve(ccts.size());
+  for (double cct : ccts) {
+    std::vector<double> ref_spd =
+        generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar);
+    SourceXyz src =
+        compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
+                           cmf_resampled.y_bar, cmf_resampled.z_bar);
+    if (K.has_value()) {
+      double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+      results.push_back(XyzTriple{src.X * scale, src.Y * scale, src.Z * scale});
+    } else {
+      results.push_back(XyzTriple{src.X, src.Y, src.Z});
+    }
+  }
+  return results;
+}
+
+double spd_to_power(const std::vector<double> &wavelengths,
+                    const std::vector<double> &values, const CmfData &cmf_data,
+                    bool photometric, std::optional<double> lambda_min,
+                    std::optional<double> lambda_max) {
+  std::vector<double> clip_wl, clip_vals;
+  clip_spd(wavelengths, values, lambda_min, lambda_max, clip_wl, clip_vals);
+
+  if (!photometric) {
+    return trapezoidal_integrate(clip_wl, clip_vals);
+  }
+
+  CmfData cmf_resampled = resample_cmf(clip_wl, cmf_data);
+  std::vector<double> weighted(clip_vals.size());
+  for (std::size_t i = 0; i < clip_vals.size(); ++i) {
+    weighted[i] = clip_vals[i] * cmf_resampled.y_bar[i];
+  }
+  return kMaxLuminousEfficacy * trapezoidal_integrate(clip_wl, weighted);
+}
+
+std::vector<double>
+spd_to_power_batch(const std::vector<double> &wavelengths,
+                   const std::vector<std::vector<double>> &spd_matrix,
+                   const CmfData &cmf_data, bool photometric,
+                   std::optional<double> lambda_min,
+                   std::optional<double> lambda_max) {
+  const ClipIndices idx =
+      compute_clip_indices(wavelengths, lambda_min, lambda_max);
+  std::vector<double> clip_wl(wavelengths.begin() + idx.lo,
+                              wavelengths.begin() + idx.hi + 1);
+
+  std::vector<double> ybar_resampled;
+  if (photometric) {
+    CmfData cmf_resampled = resample_cmf(clip_wl, cmf_data);
+    ybar_resampled = std::move(cmf_resampled.y_bar);
+  }
+
+  std::vector<double> results;
+  results.reserve(spd_matrix.size());
+  for (const auto &vals : spd_matrix) {
+    std::vector<double> clip_vals(vals.begin() + idx.lo,
+                                  vals.begin() + idx.hi + 1);
+    if (!photometric) {
+      results.push_back(trapezoidal_integrate(clip_wl, clip_vals));
+      continue;
+    }
+    std::vector<double> weighted(clip_vals.size());
+    for (std::size_t i = 0; i < clip_vals.size(); ++i) {
+      weighted[i] = clip_vals[i] * ybar_resampled[i];
+    }
+    results.push_back(kMaxLuminousEfficacy *
+                      trapezoidal_integrate(clip_wl, weighted));
   }
   return results;
 }

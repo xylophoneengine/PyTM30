@@ -898,6 +898,7 @@ class TM30Calc:
 
         # Use the explicit-CMF constructor
         self._ctx = tm30_core.BatchContext(data_dir, path_2deg, path_10deg)
+        self._data_dir = data_dir
         self._cmf = cmf
         self._cmf_2deg = cmf_2deg
 
@@ -1032,6 +1033,7 @@ class TM30Calc:
         wavelengths: np.ndarray | None = None,
         *,
         K: float | None = None,
+        cmf: Cmf | str | os.PathLike | None = None,
         lambda_min: float | None = None,
         lambda_max: float | None = None,
     ) -> np.ndarray:
@@ -1054,6 +1056,10 @@ class TM30Calc:
             k = 100/∫St·ȳ dλ → Y = 100 (TM-30-20 §3.2 Eq. 4).
             K = 1.0: raw tristimulus integrals.
             K = 683.0: photometric absolute (matches luxpy's relative=False).
+        cmf : Cmf, str, Path, or None
+            CIE observer for this call. None (default): use this
+            calculator's bound CMF. Explicit value: load+resample a
+            different CMF for this call only.
         lambda_min, lambda_max : float or None
             Per‑call override of integration bounds.  None → integrate
             over the full wavelength grid.
@@ -1080,7 +1086,8 @@ class TM30Calc:
             # is not contiguous - the C++ layer requires it to be.
             wavelengths = np.ascontiguousarray(wavelengths)
 
-        result = self._ctx.spd_to_xyz(matrix, wavelengths, K, lo, hi)
+        cmf_path = None if cmf is None else _resolve_cmf(cmf, self._data_dir)
+        result = self._ctx.spd_to_xyz(matrix, wavelengths, K, lo, hi, cmf_path)
         return result[0] if single else result
 
     def spd_to_Yuv(
@@ -1089,6 +1096,7 @@ class TM30Calc:
         wavelengths: np.ndarray | None = None,
         *,
         K: float | None = None,
+        cmf: Cmf | str | os.PathLike | None = None,
         lambda_min: float | None = None,
         lambda_max: float | None = None,
     ) -> np.ndarray:
@@ -1110,6 +1118,10 @@ class TM30Calc:
             Normalisation constant passed to spd_to_xyz.
             None (default): auto-normalise Y = 100.
             K = 1.0: raw integrals. K = 683.0: photometric absolute.
+        cmf : Cmf, str, Path, or None
+            CIE observer for this call. None (default): use this
+            calculator's bound CMF. Explicit value: load+resample a
+            different CMF for this call only.
         lambda_min, lambda_max : float or None
             Per‑call override of integration bounds.  None → integrate
             over the full wavelength grid.
@@ -1136,5 +1148,140 @@ class TM30Calc:
             # is not contiguous - the C++ layer requires it to be.
             wavelengths = np.ascontiguousarray(wavelengths)
 
-        result = self._ctx.spd_to_Yuv(matrix, wavelengths, K, lo, hi)
+        cmf_path = None if cmf is None else _resolve_cmf(cmf, self._data_dir)
+        result = self._ctx.spd_to_Yuv(matrix, wavelengths, K, lo, hi, cmf_path)
         return result[0] if single else result
+
+    def xyz_to_Yuv(self, xyz: np.ndarray) -> np.ndarray:
+        """Convert CIE XYZ tristimulus values to CIE 1976 Y,u',v'.
+
+        Pure coordinate transform - no CMF or wavelength grid is involved,
+        since the CMF's job (turning a spectrum into XYZ) is already done
+        by the time XYZ reaches this function.
+
+        Parameters
+        ----------
+        xyz : np.ndarray, shape (3,) or (N, 3)
+            1-D -> single XYZ triple -> returns (3,) array [Y, u', v']
+            2-D -> batch of N triples -> returns (N, 3) array
+
+        Returns
+        -------
+        np.ndarray, shape (3,) or (N, 3)
+        """
+        single = xyz.ndim == 1
+        matrix = xyz[np.newaxis, :] if single else xyz
+        if matrix.dtype != np.float64:
+            matrix = matrix.astype(np.float64)
+        matrix = np.ascontiguousarray(matrix)
+
+        result = self._ctx.xyz_to_Yuv(matrix)
+        return result[0] if single else result
+
+    def cct_to_xyz(
+        self,
+        cct,
+        *,
+        cmf: Cmf | str | os.PathLike | None = None,
+        K: float | None = None,
+    ) -> np.ndarray:
+        """Compute XYZ for the TM-30-20 reference illuminant at a given CCT.
+
+        Always uses this calculator's fixed wavelength grid (see the
+        `wavelengths` parameter of ``TM30Calc.__init__``) - there's no
+        per-call wavelengths override, since (unlike spd_to_xyz) there's no
+        input SPD to carry an implicit grid.
+
+        Parameters
+        ----------
+        cct : float or np.ndarray, shape (N,)
+            Correlated color temperature(s) (K).
+            scalar -> returns (3,) array [X, Y, Z]
+            (N,) array -> returns (N, 3) array
+        cmf : Cmf, str, Path, or None
+            CIE observer for this call. None (default): use this
+            calculator's bound CMF (see the `cmf` parameter of
+            ``TM30Calc.__init__``). Explicit value: load+resample a
+            different CMF for this call only (same format as the
+            constructor's `cmf=`).
+        K : float or None
+            Normalisation constant. None (default): auto-normalise Y=100.
+            K=1.0: raw integrals. K=683.0: photometric absolute.
+
+        Returns
+        -------
+        np.ndarray, shape (3,) or (N, 3)
+        """
+        single = np.ndim(cct) == 0
+        cct_arr = np.ascontiguousarray(
+            np.atleast_1d(np.asarray(cct, dtype=np.float64))
+        )
+
+        cmf_path = None if cmf is None else _resolve_cmf(cmf, self._data_dir)
+
+        result = self._ctx.cct_to_xyz(cct_arr, cmf_path, K)
+        return result[0] if single else result
+
+    def spd_to_power(
+        self,
+        spd: np.ndarray,
+        wavelengths: np.ndarray | None = None,
+        *,
+        cmf: Cmf | str | os.PathLike | None = None,
+        photometric: bool = False,
+        lambda_min: float | None = None,
+        lambda_max: float | None = None,
+    ):
+        """Integrate one or many SPDs to a single power value each.
+
+        Parameters
+        ----------
+        spd : np.ndarray, shape (N_wl,) or (N_spds, N_wl)
+            1-D -> single SPD -> returns a float
+            2-D -> batch of N_spds -> returns (N_spds,) array
+        wavelengths : np.ndarray or None
+            Wavelength grid (nm). None (common case): use this
+            calculator's fixed grid - `spd`'s wavelength-axis length must
+            match it exactly. Explicit array: a one-off grid for this call
+            only.
+        cmf : Cmf, str, Path, or None
+            CIE observer for the photometric weighting. None (default):
+            use this calculator's bound CMF. Has no effect when
+            photometric=False (radiometric power has no CMF dependency).
+        photometric : bool
+            False (default): radiometric power (W), an unweighted spectral
+            integral. True: photometric power (lm), a Km=683.0 x
+            ybar-weighted integral.
+        lambda_min, lambda_max : float or None
+            Integration bounds (nm). None: full range of `wavelengths`.
+
+        Returns
+        -------
+        float (single SPD) or np.ndarray, shape (N_spds,) (batch)
+        """
+        single = spd.ndim == 1
+        matrix = spd[np.newaxis, :] if single else spd
+        if matrix.dtype != np.float64:
+            matrix = matrix.astype(np.float64)
+        matrix = np.ascontiguousarray(matrix)
+
+        if wavelengths is None:
+            if matrix.shape[1] != len(self._wavelengths):
+                raise ValueError(
+                    f"SPD wavelength-axis length ({matrix.shape[1]}) does "
+                    f"not match this TM30Calc's fixed wavelength grid "
+                    f"length ({len(self._wavelengths)}). Pass an explicit "
+                    f"wavelengths= for a different grid."
+                )
+            wl_arg = self._wavelengths
+        else:
+            if wavelengths.dtype != np.float64:
+                wavelengths = wavelengths.astype(np.float64)
+            wl_arg = np.ascontiguousarray(wavelengths)
+
+        cmf_path = None if cmf is None else _resolve_cmf(cmf, self._data_dir)
+
+        result = self._ctx.spd_to_power(
+            matrix, wl_arg, cmf_path, photometric, lambda_min, lambda_max
+        )
+        return float(result[0]) if single else result
