@@ -122,7 +122,7 @@ struct PyTm30 {
       if (n_vals != 401) {
         throw std::invalid_argument(
             "spd_values has " + std::to_string(n_vals) +
-            " elements but default wavelengths expect 401 (380–780 nm). "
+            " elements but default wavelengths expect 401 (380-780 nm). "
             "Pass explicit spd_wavelengths.");
       }
       wl.resize(401);
@@ -419,7 +419,35 @@ struct BatchContext {
   // shares that grid. Unset (nullopt) until set_fixed_grid() is called.
   std::optional<tm30::ResampledTables> fixed_tables_;
 
-  BatchContext(const std::string &data_dir) {
+  // Phase 2: persistent worker pool. Created eagerly when the context is
+  // constructed with persistent_workers=true and n_workers>1; passed to
+  // try_evaluate/try_evaluate_cached so repeated eval() calls reuse the
+  // same threads instead of spawning per call. unique_ptr makes this
+  // type move-only (a thread pool cannot be copied); nanobind does not
+  // copy bound objects, so this is safe.
+  std::unique_ptr<tm30::TaskPool> pool_;
+
+  /// Shared constructor tail: validate n_workers and create the
+  /// persistent pool when requested.
+  //  persistent_workers=true with n_workers<=1 is SILENTLY INERT
+  //  no pool is created and behaviour
+  /// is exactly the n_workers<=1 sequential path. n_workers<1 always
+  /// raises (Phase 1 decision (a): reject, no auto-detect).
+  void init_pool(int n_workers, bool persistent_workers) {
+    if (n_workers < 1) {
+      throw std::invalid_argument(
+          "n_workers must be >= 1 (got " + std::to_string(n_workers) +
+          "); n_workers=0/-1 auto-detection is not implemented");
+    }
+    if (persistent_workers && n_workers > 1) {
+      pool_ =
+          std::make_unique<tm30::TaskPool>(static_cast<std::size_t>(n_workers));
+    }
+  }
+
+  BatchContext(const std::string &data_dir, int n_workers = 1,
+               bool persistent_workers = false) {
+    init_pool(n_workers, persistent_workers);
     auto df = [&](const std::string &name) {
       return data_dir.empty() ? name : data_dir + "/" + name;
     };
@@ -433,7 +461,9 @@ struct BatchContext {
   /// Constructor with explicit CMF file paths.
   /// data_dir is used for the non-CMF tables only.
   BatchContext(const std::string &data_dir, const std::string &cmf_2deg_path,
-               const std::string &cmf_10deg_path) {
+               const std::string &cmf_10deg_path, int n_workers = 1,
+               bool persistent_workers = false) {
+    init_pool(n_workers, persistent_workers);
     auto df = [&](const std::string &name) {
       return data_dir.empty() ? name : data_dir + "/" + name;
     };
@@ -514,10 +544,23 @@ struct BatchContext {
   // same kind of gate: it only controls whether its additional fields get
   // array-copied into the per-SPD dict (the C++ pipeline computes them
   // unconditionally either way, same as bins/samples).
-  nb::list evaluate(bool bins, bool samples, bool extras = false) {
+  nb::list evaluate(bool bins, bool samples, bool extras, int n_workers) {
+    if (n_workers < 1) {
+      throw std::invalid_argument(
+          "n_workers must be >= 1 (got " + std::to_string(n_workers) +
+          "); n_workers=0/-1 auto-detection is not implemented");
+    }
     tm30::Tm30Request req{bins, samples};
-    auto results = tm30::try_evaluate(views, cmf_2deg, cmf_10deg, ces_data,
-                                      daylight_basis, planckian_lut, req);
+    // The C++ parallel region runs with the GIL released so a big batch
+    // call does not block other Python threads for its duration. All
+    // dict/array marshaling below happens AFTER this scope, with the GIL
+    // re-acquired (numpy calls require it).
+    auto results = [&]() {
+      nb::gil_scoped_release release;
+      return tm30::try_evaluate(
+          views, cmf_2deg, cmf_10deg, ces_data, daylight_basis, planckian_lut,
+          req, static_cast<std::size_t>(n_workers), pool_.get());
+    }();
     nb::list out;
     auto np = nb::module_::import_("numpy");
     for (auto &opt : results) {
@@ -657,15 +700,26 @@ struct BatchContext {
   /// try_evaluate_cached() - using the tables set up by set_fixed_grid().
   /// No CES/CMF/daylight-basis resampling happens here; that work was
   /// already done once, at set_fixed_grid() time.
-  nb::list evaluate_cached(bool bins, bool samples, bool extras = false) {
+  nb::list evaluate_cached(bool bins, bool samples, bool extras,
+                           int n_workers) {
+    if (n_workers < 1) {
+      throw std::invalid_argument(
+          "n_workers must be >= 1 (got " + std::to_string(n_workers) +
+          "); n_workers=0/-1 auto-detection is not implemented");
+    }
     if (!fixed_tables_.has_value()) {
       throw std::runtime_error(
           "evaluate_cached() called before set_fixed_grid() was ever "
           "called - the grid-fixed resampled tables are not initialized.");
     }
     tm30::Tm30Request req{bins, samples};
-    auto results =
-        tm30::try_evaluate_cached(views, *fixed_tables_, planckian_lut, req);
+    // Same scoped-GIL-release pattern as evaluate() above.
+    auto results = [&]() {
+      nb::gil_scoped_release release;
+      return tm30::try_evaluate_cached(views, *fixed_tables_, planckian_lut,
+                                       req, static_cast<std::size_t>(n_workers),
+                                       pool_.get());
+    }();
     nb::list out;
     auto np = nb::module_::import_("numpy");
     for (auto &opt : results) {
@@ -1028,7 +1082,8 @@ struct BatchContext {
   /// bound cmf_10deg (ignored when photometric=false).
   nb::object spd_to_power(nb::ndarray<> spd_matrix, nb::object wl_arg,
                           nb::object cmf_path_arg, bool photometric,
-                          nb::object lambda_min_arg, nb::object lambda_max_arg) {
+                          nb::object lambda_min_arg,
+                          nb::object lambda_max_arg) {
     if (spd_matrix.ndim() != 2)
       throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
     require_c_contiguous(spd_matrix, "spd_matrix");
@@ -1048,7 +1103,8 @@ struct BatchContext {
     } else {
       auto wl_arr = nb::cast<nb::ndarray<>>(wl_arg);
       if (wl_arr.ndim() != 1 || wl_arr.shape(0) != nwl)
-        throw std::invalid_argument("wavelengths must match spd_matrix columns");
+        throw std::invalid_argument(
+            "wavelengths must match spd_matrix columns");
       require_c_contiguous(wl_arr, "wavelengths");
       const double *wl_data = static_cast<const double *>(wl_arr.data());
       wl.assign(wl_data, wl_data + nwl);
@@ -1097,7 +1153,7 @@ NB_MODULE(tm30_core, m) {
         import numpy as np
         import tm30_core
 
-        # From numpy array (default 380–780 nm at 1 nm):
+        # From numpy array (default 380-780 nm at 1 nm):
         spd = np.loadtxt('my_spectrum.csv')
         m = tm30_core.Tm30(spd)
 
@@ -1119,7 +1175,7 @@ NB_MODULE(tm30_core, m) {
       .def_rw("cct_out_of_range", &tm30::Validity::cct_out_of_range,
               "CCT outside the stated bounds for TM-30 applicability.")
       .def_rw("extrapolated", &tm30::Validity::extrapolated,
-              "Test SPD does not cover 380–780 nm; extrapolation was used.");
+              "Test SPD does not cover 380-780 nm; extrapolation was used.");
 
   // ── Tm30 class ──────────────────────────────────────────────────
 
@@ -1136,7 +1192,7 @@ NB_MODULE(tm30_core, m) {
       spd_values : numpy.ndarray (1-D, float64)
           Spectral power values St(λ).
       spd_wavelengths : numpy.ndarray (1-D, float64) or None, optional
-          Wavelength grid in nm.  If None, defaults to 380–780 nm at 1 nm step.
+          Wavelength grid in nm.  If None, defaults to 380-780 nm at 1 nm step.
       data_dir : str, optional
           Directory containing the TM-30 data files (ces.csv,
           cmf_1964_10.csv, etc.).
@@ -1145,7 +1201,7 @@ NB_MODULE(tm30_core, m) {
            nb::arg("spd_values"), nb::arg("spd_wavelengths") = nb::none(),
            nb::arg("data_dir") = std::string(TM30_DATA_DIR),
            "Create a Tm30 evaluator from a numpy array of SPD values.\n"
-           "spd_wavelengths defaults to 380–780 nm (1 nm step) if None.")
+           "spd_wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def_prop_ro("rf", &PyTm30::rf,
                    "Fidelity index Rf [0, 100].  TM-30-20 §4.1.")
       .def_prop_ro("rg", &PyTm30::rg, "Gamut area index Rg.  TM-30-20 §4.4.")
@@ -1217,9 +1273,8 @@ NB_MODULE(tm30_core, m) {
           "Per-CES hue-angle bin index (0-15), assigned from the reference "
           "hue angle hr = atan2(b'r, a'r) - numpy int array of 99 values.  "
           "TM-30-20 §4.3.")
-      .def_prop_ro(
-          "validity", &PyTm30::validity,
-          "Domain validity flags (Validity named tuple).");
+      .def_prop_ro("validity", &PyTm30::validity,
+                   "Domain validity flags (Validity named tuple).");
 
   // ── Batch evaluation ───────────────────────────────────────────
 
@@ -1227,27 +1282,40 @@ NB_MODULE(tm30_core, m) {
       m, "BatchContext",
       "Pre-loaded data tables for batch TM-30 evaluation.\\n"
       "Call prepare_batch() then evaluate() to process many SPDs.")
-      .def(nb::init<const std::string &>(),
+      .def(nb::init<const std::string &, int, bool>(),
            nb::arg("data_dir") = std::string(TM30_DATA_DIR),
+           nb::arg("n_workers") = 1, nb::arg("persistent_workers") = false,
            "Create a batch context with pre-loaded data tables.\n"
-           "CMF paths default to cmf_1964_10.csv / cie_1931_2.csv.")
+           "CMF paths default to cmf_1964_10.csv / cie_1931_2.csv.\n"
+           "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
+           "persistent_workers=true (with n_workers>1) keeps the worker\n"
+           "threads alive across calls instead of spawning per call;\n"
+           "persistent_workers with n_workers<=1 is silently inert.")
       .def(nb::init<const std::string &, const std::string &,
-                    const std::string &>(),
+                    const std::string &, int, bool>(),
            nb::arg("data_dir"), nb::arg("cmf_2deg_path"),
-           nb::arg("cmf_10deg_path"),
+           nb::arg("cmf_10deg_path"), nb::arg("n_workers") = 1,
+           nb::arg("persistent_workers") = false,
            "Create a batch context with explicit CMF file paths.\n"
            "cmf_2deg_path: path to the 2° CMF CSV (for CCT).\n"
-           "cmf_10deg_path: path to the 10° CMF CSV (for tristimulus).")
+           "cmf_10deg_path: path to the 10° CMF CSV (for tristimulus).\n"
+           "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
+           "persistent_workers=true (with n_workers>1) keeps the worker\n"
+           "threads alive across calls instead of spawning per call;\n"
+           "persistent_workers with n_workers<=1 is silently inert.")
       .def("prepare_batch", &BatchContext::prepare_batch, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(),
            "Load SPDs from a 2-D numpy array (N_spds × N_wl). "
-           "wavelengths defaults to 380–780 nm (1 nm step) if None.")
+           "wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
            nb::arg("samples") = true, nb::arg("extras") = false,
+           nb::arg("n_workers") = 1,
            "Run TM-30 on all prepared SPDs. Returns list of dicts "
            "(or None for failed SPDs). extras=True additionally includes "
            "rf_hj, de_hj, cvg_{j,x,y}_{test,ref}, reference_spd, "
-           "xyz_test_ces, and xyz_ref_ces in each dict.")
+           "xyz_test_ces, and xyz_ref_ces in each dict. n_workers>1 "
+           "parallelizes across SPDs (bit-identical results); n_workers<1 "
+           "raises ValueError.")
       .def("set_fixed_grid", &BatchContext::set_fixed_grid,
            nb::arg("wavelengths"),
            "Precompute and cache CES/CMF/daylight-basis tables resampled to "
@@ -1255,11 +1323,12 @@ NB_MODULE(tm30_core, m) {
            "reuses this cache for every SPD sharing this grid.")
       .def("evaluate_cached", &BatchContext::evaluate_cached,
            nb::arg("bins") = true, nb::arg("samples") = true,
-           nb::arg("extras") = false,
+           nb::arg("extras") = false, nb::arg("n_workers") = 1,
            "Like evaluate(), but uses the grid-fixed tables cached by "
            "set_fixed_grid() and skips CES/CMF/daylight-basis resampling "
            "entirely. Raises RuntimeError if set_fixed_grid() was never "
-           "called.")
+           "called. n_workers>1 parallelizes across SPDs (bit-identical "
+           "results); n_workers<1 raises ValueError.")
       .def("spd_to_xyz", &BatchContext::spd_to_xyz, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(), nb::arg("K") = nb::none(),
            nb::arg("lambda_min") = nb::none(),
@@ -1296,8 +1365,9 @@ NB_MODULE(tm30_core, m) {
            "context's bound CMF. cmf_path=str: load+resample a different "
            "CMF for this call only.")
       .def("spd_to_power", &BatchContext::spd_to_power, nb::arg("spd_matrix"),
-           nb::arg("wavelengths") = nb::none(), nb::arg("cmf_path") = nb::none(),
-           nb::arg("photometric") = false, nb::arg("lambda_min") = nb::none(),
+           nb::arg("wavelengths") = nb::none(),
+           nb::arg("cmf_path") = nb::none(), nb::arg("photometric") = false,
+           nb::arg("lambda_min") = nb::none(),
            nb::arg("lambda_max") = nb::none(),
            "Integrate each SPD to a single power value. Returns shape (N,), "
            "NOT (N,3) - power is one scalar per SPD. photometric=False "

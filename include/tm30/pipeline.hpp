@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file pipeline.hpp
-/// TM-30-20 CES colorimetry pipeline - end-to-end integration of Slices 1–4.
+/// TM-30-20 CES colorimetry pipeline - end-to-end integration of Slices 1-4.
 ///
 /// Orchestrates the full sequence:
 ///   1. Resample CES to SPD grid (Slice 1)
@@ -48,7 +48,7 @@ struct CesColorimetryResult {
   HueBins hue_bins;   // TM-30-20 §4.3 (16 hue-angle bins)
   double delta_e_avg; // TM-30-20 §4.1 - mean of 99 ΔE′ values
   double Rf;          // TM-30-20 §4.1 Eq. (54) - fidelity index
-  GamutResult gamut;  // TM-30-20 §4.4–§4.8 - gamut, local metrics, CVG
+  GamutResult gamut;  // TM-30-20 §4.4-§4.8 - gamut, local metrics, CVG
   std::array<double, 99>
       rf_cesi;    // TM-30-20 §4.2 Eq. (56) - per-sample fidelity
   double rf_skin; // TM-30-20 §4.2 - skin fidelity (CES15+18 avg)

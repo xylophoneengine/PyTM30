@@ -119,7 +119,7 @@ CesColorimetryResult compute_ces_colorimetry(
   result.hue_bins = bin_by_hue(result.jab_ref_ces);
 
   // ── Step 13: Gamut metrics (Rg, local per-bin, CVG) ────────────────────
-  // TM-30-20 §4.4–§4.8
+  // TM-30-20 §4.4-§4.8
   result.gamut = compute_gamut(result.jab_test_ces, result.jab_ref_ces,
                                delta_e_array, result.hue_bins);
 
@@ -246,7 +246,7 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   result.hue_bins = bin_by_hue(result.jab_ref_ces);
 
   // ── Step 13: Gamut metrics (Rg, local per-bin, CVG) ────────────────────
-  // TM-30-20 §4.4–§4.8
+  // TM-30-20 §4.4-§4.8
   result.gamut = compute_gamut(result.jab_test_ces, result.jab_ref_ces,
                                delta_e_array, result.hue_bins);
 

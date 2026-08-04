@@ -1,5 +1,5 @@
 // Reference illuminant generation per TM-30-20 §3.3.
-// Planckian radiation, CIE D-series daylight, and the 4000–5000 K blend.
+// Planckian radiation, CIE D-series daylight, and the 4000-5000 K blend.
 #include "tm30/reference.hpp"
 #include "tm30/csv_loader.hpp"
 #include "tm30/integrate.hpp"

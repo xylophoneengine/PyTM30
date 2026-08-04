@@ -24,7 +24,7 @@ inline constexpr double Tol_Cct = 0.5;  // absolute (K)
 inline constexpr double Tol_Duv = 5e-4; // absolute
 
 // ─────────────────────────────────────────────────────────────────────────
-// CIECAM02 J'a'b': CIE TC8-01 worked examples provide values to 2–3
+// CIECAM02 J'a'b': CIE TC8-01 worked examples provide values to 2-3
 // decimal places.  Tolerance set to accommodate the rounding resolution
 // of those examples across all three dimensions.
 inline constexpr double Tol_Jab = 1e-3; // absolute

@@ -38,7 +38,7 @@ CesData load_ces(const std::string &path) {
     data.wavelengths.push_back(row[0]);
   }
 
-  // 99 CES samples: columns 1–99 (skip wavelength column)
+  // 99 CES samples: columns 1-99 (skip wavelength column)
   const std::size_t n_ces = 99;
   data.samples.resize(n_ces);
   for (std::size_t c = 0; c < n_ces; ++c) {
@@ -91,7 +91,7 @@ TEST_CASE("SPD construction - valid 1nm grid", "[spd][slice01]") {
   std::vector<double> wl(401);
   std::vector<double> vals(401, 1.0);
   for (int i = 0; i < 401; ++i) {
-    wl[i] = 380.0 + static_cast<double>(i); // TM-30-20 §3.5: 380–780 nm
+    wl[i] = 380.0 + static_cast<double>(i); // TM-30-20 §3.5: 380-780 nm
   }
 
   Spd spd(wl, vals);
@@ -119,7 +119,7 @@ TEST_CASE("SPD construction - valid 5nm grid", "[spd][slice01]") {
 
 TEST_CASE("SPD construction - non-uniform grid returns step 0",
           "[spd][slice01]") {
-  // TM-30-20 §3.5: Minimum required range is 400–700 nm.
+  // TM-30-20 §3.5: Minimum required range is 400-700 nm.
   // Grid covers the range but with non-uniform spacing.
   std::vector<double> wl = {400.0, 500.0, 600.0, 625.0, 700.0, 780.0};
   std::vector<double> vals(wl.size(), 1.0);
@@ -169,7 +169,7 @@ TEST_CASE("SPD validation - negative values throw", "[spd][slice01]") {
 
 // ── Validation: insufficient wavelength range ───────────────────────────
 
-TEST_CASE("SPD validation - range < 400–700 throws", "[spd][slice01]") {
+TEST_CASE("SPD validation - range < 400-700 throws", "[spd][slice01]") {
   // TM-30-20 §3.5: "Minimum required range: 400 to 700 nm"
   std::vector<double> wl = {420.0, 600.0}; // starts above 400
   std::vector<double> vals(wl.size(), 1.0);
@@ -183,13 +183,13 @@ TEST_CASE("SPD validation - range starts at 400 but ends before 700 throws",
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
 }
 
-TEST_CASE("SPD validation - range exactly 400–700 passes", "[spd][slice01]") {
+TEST_CASE("SPD validation - range exactly 400-700 passes", "[spd][slice01]") {
   std::vector<double> wl = {400.0, 500.0, 700.0};
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_NOTHROW(Spd(wl, vals));
 }
 
-TEST_CASE("SPD validation - range wider than 400–700 passes",
+TEST_CASE("SPD validation - range wider than 400-700 passes",
           "[spd][slice01]") {
   std::vector<double> wl = {380.0, 500.0, 780.0};
   std::vector<double> vals(wl.size(), 1.0);
@@ -275,7 +275,7 @@ TEST_CASE("Resample - linear interpolation at grid points returns exact values",
 
 TEST_CASE("Resample - flat extrapolation below source range",
           "[resample][slice01]") {
-  // TM-30-20 §1.3 (Errata): flat extrapolation for CES outside 400–700 nm.
+  // TM-30-20 §1.3 (Errata): flat extrapolation for CES outside 400-700 nm.
   //
   // CES data starts at 400 nm. Request at 380 nm → return 400 nm value.
 
@@ -351,10 +351,10 @@ TEST_CASE("Grid invariance - CES resampled at 1nm and 5nm agree at shared "
 
   CesData ces_1nm = load_ces(data_path("ces.csv"));
 
-  REQUIRE(ces_1nm.wavelengths.size() == 401); // 380–780 nm at 1 nm steps
+  REQUIRE(ces_1nm.wavelengths.size() == 401); // 380-780 nm at 1 nm steps
   REQUIRE(ces_1nm.samples.size() == 99);
 
-  // 1nm target: full 380–780 grid
+  // 1nm target: full 380-780 grid
   std::vector<double> wl_1nm = ces_1nm.wavelengths;
   CesData resampled_1nm = resample_ces(wl_1nm, ces_1nm);
 
@@ -395,13 +395,13 @@ TEST_CASE("Grid invariance - CMF resampled at 1nm and 5nm agree at shared "
           "[resample][slice01][grid-invariance]") {
   CmfData cmf_1nm = load_cmf(data_path("cmf_1964_10.csv"));
 
-  REQUIRE(cmf_1nm.wavelengths.size() == 471); // 360–830 nm at 1 nm
+  REQUIRE(cmf_1nm.wavelengths.size() == 471); // 360-830 nm at 1 nm
 
-  // Use the 380–780 nm subset for grid-invariance test
+  // Use the 380-780 nm subset for grid-invariance test
   std::vector<double> wl_1nm = cmf_1nm.wavelengths;
   CmfData resampled_1nm = resample_cmf(wl_1nm, cmf_1nm);
 
-  // Pick every 5th point from the 380–780 nm range for the 5 nm grid
+  // Pick every 5th point from the 380-780 nm range for the 5 nm grid
   std::vector<double> wl_5nm;
   for (size_t i = 0; i < wl_1nm.size(); i += 5) {
     wl_5nm.push_back(wl_1nm[i]);
@@ -431,7 +431,7 @@ TEST_CASE("Resample - 5nm CES source to 1nm target via linear interpolation",
           "[resample][slice01]") {
   // Load 5nm CES data, resample to 1nm grid.
   CesData ces_5nm = load_ces(data_path("ces_5nm.csv"));
-  REQUIRE(ces_5nm.wavelengths.size() == 81); // 380–780 at 5nm steps
+  REQUIRE(ces_5nm.wavelengths.size() == 81); // 380-780 at 5nm steps
 
   std::vector<double> wl_1nm(401);
   for (int i = 0; i < 401; ++i) {

@@ -1,5 +1,5 @@
 // Slice 4 - Reference illuminant generation tests.
-// TM-30-20 §3.3: Planckian, CIE D-series, 4000–5000 K blend.
+// TM-30-20 §3.3: Planckian, CIE D-series, 4000-5000 K blend.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -35,7 +35,7 @@ CmfData load_cmf_10deg(const std::string &path) {
   return data;
 }
 
-// Generate 1nm wavelength grid 380–780 nm
+// Generate 1nm wavelength grid 380-780 nm
 std::vector<double> wl_1nm() {
   std::vector<double> wl(401);
   for (int i = 0; i < 401; ++i)

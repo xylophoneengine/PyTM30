@@ -22,6 +22,9 @@ include(Catch)
 set(TM30_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data")
 set(TM30_FIXTURE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
 
+# ── Threads (std::thread in tm30.cpp batch path) ─────────────────────────
+find_package(Threads REQUIRED)
+
 # ── Core library ─────────────────────────────────────────────────────────
 add_library(tm30-core STATIC
   src/tm30/version.cpp
@@ -38,6 +41,7 @@ add_library(tm30-core STATIC
   src/tm30/metrics.cpp
   src/tm30/hue_bins.cpp
   src/tm30/gamut.cpp
+  src/tm30/task_pool.cpp
   src/tm30/tm30.cpp
 )
 target_include_directories(tm30-core
@@ -46,6 +50,7 @@ target_include_directories(tm30-core
     $<INSTALL_INTERFACE:include>
 )
 target_compile_features(tm30-core PUBLIC cxx_std_20)
+target_link_libraries(tm30-core PUBLIC Threads::Threads)
 
 # ── Tests ────────────────────────────────────────────────────────────────
 add_executable(tm30-tests
@@ -62,6 +67,7 @@ add_executable(tm30-tests
   tests/slice_10_sample_test.cpp
   tests/slice_11_tm30_test.cpp
   tests/slice_12_spd_utils_test.cpp
+  tests/slice_13_parallel_test.cpp
 )
 target_link_libraries(tm30-tests PRIVATE
   tm30-core
@@ -75,4 +81,10 @@ target_compile_definitions(tm30-tests PRIVATE
 
 # ── CTest integration ────────────────────────────────────────────────────
 include(CTest)
-catch_discover_tests(tm30-tests)
+# Option so sanitizer builds (whose binaries cannot run test discovery -
+# e.g. GCC TSan crashes on Ubuntu 24.04's ASLR entropy) can skip it.
+option(TM30_ENABLE_CTEST_DISCOVERY
+       "Run catch_discover_tests for the tm30-tests target" ON)
+if(TM30_ENABLE_CTEST_DISCOVERY)
+  catch_discover_tests(tm30-tests)
+endif()

@@ -217,7 +217,7 @@ load_spd_csv(const std::string &path) {
   return {wl, vals};
 }
 
-/// Generate a 401-point 1nm wavelength grid 380–780 nm.
+/// Generate a 401-point 1nm wavelength grid 380-780 nm.
 std::vector<double> wl_1nm() {
   std::vector<double> wl(401);
   for (int i = 0; i < 401; ++i)
@@ -648,7 +648,8 @@ void check_results_match(const CesColorimetryResult &a,
 
   for (std::size_t j = 0; j < 16; ++j) {
     INFO(label << " hue bin " << j);
-    CHECK(nan_aware_close(a.gamut.local.Rf_hj[j], b.gamut.local.Rf_hj[j], Tol_Rf));
+    CHECK(nan_aware_close(a.gamut.local.Rf_hj[j], b.gamut.local.Rf_hj[j],
+                          Tol_Rf));
     CHECK(nan_aware_close(a.gamut.local.Rcs_hj[j], b.gamut.local.Rcs_hj[j],
                           Tol_LocalShift));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
@@ -720,20 +721,18 @@ void check_row_both_paths(const std::vector<double> &wl,
                           const std::string &row_name) {
   auto &G = GlobalFixtures::instance();
 
-  ResampledTables tables = prepare_resampled_tables(
-      wl, G.cmf_2deg, G.cmf_10deg, G.ces, G.daylight_basis);
+  ResampledTables tables = prepare_resampled_tables(wl, G.cmf_2deg, G.cmf_10deg,
+                                                    G.ces, G.daylight_basis);
 
   {
     CesColorimetryResult non_cached = run_noncached(wl, spd_1, G);
     CesColorimetryResult cached = run_cached(spd_1, tables, G);
-    check_results_match(non_cached, cached,
-                        row_name + " / " + spd_1_name);
+    check_results_match(non_cached, cached, row_name + " / " + spd_1_name);
   }
   {
     CesColorimetryResult non_cached = run_noncached(wl, spd_2, G);
     CesColorimetryResult cached = run_cached(spd_2, tables, G);
-    check_results_match(non_cached, cached,
-                        row_name + " / " + spd_2_name);
+    check_results_match(non_cached, cached, row_name + " / " + spd_2_name);
   }
 }
 
@@ -861,8 +860,8 @@ TEST_CASE("Grid matrix row 6 - minimal 2-point grid: cached/non-cached "
     noncached_what = e.what();
   }
 
-  ResampledTables tables = prepare_resampled_tables(
-      wl, G.cmf_2deg, G.cmf_10deg, G.ces, G.daylight_basis);
+  ResampledTables tables = prepare_resampled_tables(wl, G.cmf_2deg, G.cmf_10deg,
+                                                    G.ces, G.daylight_basis);
   try {
     cached = run_cached(spd, tables, G);
   } catch (const std::exception &e) {
@@ -934,8 +933,8 @@ TEST_CASE("Grid matrix row 7 - all-zero SPD: cached/non-cached agree (no "
     noncached_what = e.what();
   }
 
-  ResampledTables tables = prepare_resampled_tables(
-      wl, G.cmf_2deg, G.cmf_10deg, G.ces, G.daylight_basis);
+  ResampledTables tables = prepare_resampled_tables(wl, G.cmf_2deg, G.cmf_10deg,
+                                                    G.ces, G.daylight_basis);
   try {
     cached = run_cached(spd, tables, G);
   } catch (const std::exception &e) {
@@ -985,8 +984,8 @@ TEST_CASE("Tables immutability - unrelated compute_ces_colorimetry call "
   auto &G = GlobalFixtures::instance();
 
   auto wl = wl_1nm();
-  ResampledTables tables = prepare_resampled_tables(
-      wl, G.cmf_2deg, G.cmf_10deg, G.ces, G.daylight_basis);
+  ResampledTables tables = prepare_resampled_tables(wl, G.cmf_2deg, G.cmf_10deg,
+                                                    G.ces, G.daylight_basis);
 
   auto [d65_wl, spd_a] = load_spd_csv(data_path("d65_1nm.csv"));
   REQUIRE(d65_wl == wl);
@@ -997,8 +996,8 @@ TEST_CASE("Tables immutability - unrelated compute_ces_colorimetry call "
   // SPD, its own fresh cmf/ces/daylight-basis tables.
   auto [hp1_wl, hp1_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
   CesColorimetryResult interloper =
-      compute_ces_colorimetry(hp1_wl, hp1_vals, G.cmf_2deg, G.cmf_10deg,
-                              G.ces, G.daylight_basis, G.planckian_lut);
+      compute_ces_colorimetry(hp1_wl, hp1_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
+                              G.daylight_basis, G.planckian_lut);
   // Touch the interloper result so it isn't optimized away and so this
   // call is genuinely exercised, not just constructed.
   REQUIRE_FALSE(std::isnan(interloper.cct));

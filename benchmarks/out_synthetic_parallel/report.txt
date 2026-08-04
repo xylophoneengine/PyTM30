@@ -1,0 +1,17 @@
+Synthetic timing benchmark - 1000 SPDs/rep, 100 reps, n_workers=4
+machine: darwin, corpus: convex blends of 19 bundled illuminants, 380-780 nm @ 1 nm
+
+per-repetition wall time (ms):
+  a) sequential (1 SPD/call)         mean   81.67 ±   1.12 ms | median   81.39 | min   80.72 | max   88.13 | ms/SPD 81.6707
+  b) batch n_workers=1               mean   81.83 ±   0.73 ms | median   81.66 | min   80.90 | max   85.58 | ms/SPD 81.8277
+  c) batch n_workers=4               mean   25.48 ±   0.58 ms | median   25.59 | min   24.08 | max   26.94 | ms/SPD 25.4783
+  d) batch n_workers=4, persistent   mean   25.40 ±   0.51 ms | median   25.51 | min   24.19 | max   26.85 | ms/SPD 25.3950
+
+median speedups:
+  b vs a (batching vs single-SPD loop):    1.00x
+  c vs b (threads vs sequential batch):    3.19x
+  d vs c (persistent vs spawn):            1.00x
+  d vs a (persistent vs single-SPD loop):  3.19x
+
+raw times: out_synthetic_parallel/times.feather
+plots:     out_synthetic_parallel/histograms.png, out_synthetic_parallel/kde_overlay.png

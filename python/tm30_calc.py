@@ -908,6 +908,20 @@ class TM30Calc:
         entirely.  This grid never changes after construction -- pass an
         explicit `wavelengths=` to eval() for a one-off different grid
         without replacing it.
+    n_workers : int
+        Number of worker threads for batch evaluation.  1 (default) is the
+        pure sequential path with zero thread overhead; values > 1 spawn
+        min(n_workers, batch_size) threads across the batch (results are
+        bit-identical to the sequential path).  Values < 1 raise ValueError.
+    persistent_workers : bool
+        Keep the worker threads alive across eval() calls instead of
+        spawning them per call (Phase 2).  Only meaningful when
+        n_workers > 1: with n_workers <= 1 it is SILENTLY INERT (no
+        pool is created, behavior is exactly the sequential path) - this
+        is a documented decision, not an error.  Use for long-lived
+        calculators making many repeated eval() calls; threads are
+        created eagerly at construction and shut down when the
+        calculator is garbage-collected.
     """
 
     def __init__(
@@ -917,7 +931,16 @@ class TM30Calc:
         cmf: Cmf | str | os.PathLike | None = None,
         cmf_2deg: Cmf | str | os.PathLike | None = None,
         wavelengths: np.ndarray | None = None,
+        n_workers: int = 1,
+        persistent_workers: bool = False,
     ) -> None:
+        if n_workers < 1:
+            raise ValueError(
+                f"n_workers must be >= 1 (got {n_workers}); "
+                "n_workers=0/-1 auto-detection is not implemented"
+            )
+        self._n_workers = n_workers
+        self._persistent_workers = persistent_workers
         if data_dir is None:
             # Resolve compiled-in TM30_DATA_DIR from the existing Tm30 class.
             # Tm30.__init__.__doc__ contains the default data_dir path.
@@ -935,8 +958,12 @@ class TM30Calc:
         path_2deg = _resolve_cmf(cmf_2deg, data_dir, suffix="2deg")
         path_10deg = _resolve_cmf(cmf, data_dir)
 
-        # Use the explicit-CMF constructor
-        self._ctx = tm30_core.BatchContext(data_dir, path_2deg, path_10deg)
+        # Use the explicit-CMF constructor (n_workers/persistent_workers
+        # handled inside BatchContext: pool created eagerly when
+        # persistent_workers && n_workers > 1, else inert).
+        self._ctx = tm30_core.BatchContext(
+            data_dir, path_2deg, path_10deg, n_workers, persistent_workers
+        )
         self._data_dir = data_dir
         self._cmf = cmf
         self._cmf_2deg = cmf_2deg
@@ -1032,7 +1059,12 @@ class TM30Calc:
                     f"data."
                 )
             self._ctx.prepare_batch(matrix, self._wavelengths)
-            raw = self._ctx.evaluate_cached(bins=bins, samples=samples, extras=extras)
+            raw = self._ctx.evaluate_cached(
+                bins=bins,
+                samples=samples,
+                extras=extras,
+                n_workers=self._n_workers,
+            )
             used_wavelengths = self._wavelengths
         else:
             if wavelengths.dtype != np.float64:
@@ -1041,7 +1073,12 @@ class TM30Calc:
             # is not contiguous - the C++ layer requires it to be.
             wavelengths = np.ascontiguousarray(wavelengths)
             self._ctx.prepare_batch(matrix, wavelengths)
-            raw = self._ctx.evaluate(bins=bins, samples=samples, extras=extras)
+            raw = self._ctx.evaluate(
+                bins=bins,
+                samples=samples,
+                extras=extras,
+                n_workers=self._n_workers,
+            )
             used_wavelengths = wavelengths
 
         if single:
@@ -1104,7 +1141,7 @@ class TM30Calc:
             calculator's bound CMF. Explicit value: load+resample a
             different CMF for this call only.
         lambda_min, lambda_max : float or None
-            Per‑call override of integration bounds.  None → integrate
+            Per-call override of integration bounds.  None → integrate
             over the full wavelength grid.
 
         Returns
@@ -1166,7 +1203,7 @@ class TM30Calc:
             calculator's bound CMF. Explicit value: load+resample a
             different CMF for this call only.
         lambda_min, lambda_max : float or None
-            Per‑call override of integration bounds.  None → integrate
+            Per-call override of integration bounds.  None → integrate
             over the full wavelength grid.
 
         Returns
@@ -1256,9 +1293,7 @@ class TM30Calc:
         np.ndarray, shape (3,) or (N, 3)
         """
         single = np.ndim(cct) == 0
-        cct_arr = np.ascontiguousarray(
-            np.atleast_1d(np.asarray(cct, dtype=np.float64))
-        )
+        cct_arr = np.ascontiguousarray(np.atleast_1d(np.asarray(cct, dtype=np.float64)))
 
         cmf_path = None if cmf is None else _resolve_cmf(cmf, self._data_dir)
 

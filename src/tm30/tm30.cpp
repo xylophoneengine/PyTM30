@@ -4,8 +4,11 @@
 #include "tm30/errors.hpp"
 #include "tm30/pipeline.hpp"
 
+#include <algorithm> // std::min
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
+#include <thread>
 
 namespace tm30 {
 
@@ -28,7 +31,7 @@ constexpr double kCctMax = 25000.0; // TM-30-20 §1
 // large Duv values reduce metric interpretability.
 constexpr double kDuvMaxAbs = 0.05; // TM-30-20 §1
 
-// TM-30-20 §3.5: Full CES wavelength range is 380–780 nm.
+// TM-30-20 §3.5: Full CES wavelength range is 380-780 nm.
 // If the test SPD does not cover this range, extrapolation is needed.
 constexpr double kFullRangeMin = 380.0; // TM-30-20 §3.5
 constexpr double kFullRangeMax = 780.0; // TM-30-20 §3.5
@@ -51,7 +54,7 @@ static Validity compute_validity(const CesColorimetryResult &cr,
   v.duv_out_of_range = (std::abs(cr.duv) > kDuvMaxAbs);
 
   // TM-30-20 §3.5: Extrapolation
-  // The test SPD must cover 380–780 nm. If it doesn't, the pipeline
+  // The test SPD must cover 380-780 nm. If it doesn't, the pipeline
   // fills missing edges with zeros or flat-extrapolates.
   v.extrapolated = (spd.min_wavelength() > kFullRangeMin ||
                     spd.max_wavelength() < kFullRangeMax);
@@ -171,35 +174,128 @@ std::vector<std::optional<Tm30Result>>
 try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
              const CmfData &cmf_10deg, const CesData &ces_data,
              const DaylightBasis &daylight_basis,
-             const PlanckianLut &planckian_lut, Tm30Request /*request*/) {
+             const PlanckianLut &planckian_lut, Tm30Request /*request*/,
+             std::size_t n_workers, TaskPool *pool) {
 
   std::vector<std::optional<Tm30Result>> results;
-  results.reserve(spds.size());
+  results.resize(spds.size());
 
-  for (const auto &sv : spds) {
-    try {
-      // Validate: construct an Spd from the SpdView data.
-      // This copies the data into vectors, then validates.
-      // Throws InvalidSpd if validation fails.
-      Spd spd(std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
+  if (n_workers <= 1) {
+    // ══════════════════════════════════════════════════════════════════
+    // Sequential path - the project's default. MUST stay free of any
+    // std::thread construction: spawning+joining even one thread costs
+    // ~40 us on real hardware against a ~140 us per-SPD workload here -
+    // a double-digit-percent regression on the exact path every test
+    // and benchmark has run against. Keep this loop body in sync with
+    // the worker lambda in the parallel path below.
+    // ══════════════════════════════════════════════════════════════════
+    for (std::size_t i = 0; i < spds.size(); i++) {
+      const auto &sv = spds[i];
+      try {
+        // Validate: construct an Spd from the SpdView data.
+        // This copies the data into vectors, then validates.
+        // Throws InvalidSpd if validation fails.
+        Spd spd(
+            std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
+            std::vector<double>(sv.values.begin(), sv.values.end()));
+
+        // Run the full pipeline.
+        Tm30Result result;
+        result.colorimetry = compute_ces_colorimetry(
+            spd.wavelengths(), spd.values(), cmf_2deg, cmf_10deg, ces_data,
+            daylight_basis, planckian_lut);
+
+        // Compute validity.
+        result.validity = compute_validity(result.colorimetry, spd);
+
+        results[i] = std::move(result);
+      } catch (const InvalidSpd &) {
+        // Per-SPD validation failure → nullopt.
+        // Batch never throws.
+        results[i] = std::nullopt;
+      }
+    }
+    return results;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Parallel path - only reachable when n_workers > 1. Task-parallel:
+  // each SPD's whole computation runs start-to-finish on one thread, so
+  // results are bit-identical to the sequential path. Static contiguous
+  // chunking (per-SPD cost is uniform for a given grid), each thread
+  // writes only its own results[i] indices; all tables are const& -
+  // no locks, no shared mutable state. InvalidSpd is still caught
+  // locally per iteration; nothing crosses a thread boundary.
+  // ══════════════════════════════════════════════════════════════════
+
+  // Persistent path (Phase 2): route around the spawn-per-call path
+  // when a worker pool is active. run_chunked() uses the same partition
+  // math and blocks until every chunk is done; exceptions never escape
+  // the worker threads (InvalidSpd is caught locally per iteration, and
+  // the pool catches anything else and rethrows it here).
+  if (pool != nullptr) {
+    pool->run_chunked(spds.size(), [&](std::size_t i) {
+      const auto &sv = spds[i];
+      try {
+        // Keep in sync with the sequential loop body above.
+        Spd spd(
+            std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
+            std::vector<double>(sv.values.begin(), sv.values.end()));
+
+        Tm30Result result;
+        result.colorimetry = compute_ces_colorimetry(
+            spd.wavelengths(), spd.values(), cmf_2deg, cmf_10deg, ces_data,
+            daylight_basis, planckian_lut);
+
+        result.validity = compute_validity(result.colorimetry, spd);
+
+        results[i] = std::move(result);
+      } catch (const InvalidSpd &) {
+        results[i] = std::nullopt;
+      }
+    });
+    return results;
+  }
+
+  const std::size_t actual_workers = std::min(n_workers, spds.size());
+  if (actual_workers == 0)
+    return results; // empty batch - nothing to do
+
+  // Balanced contiguous chunks: sizes differ by at most 1, no thread
+  // gets zero work (actual_workers <= spds.size() by construction).
+  const std::size_t chunk_base = spds.size() / actual_workers;
+  const std::size_t chunk_extra = spds.size() % actual_workers;
+
+  std::vector<std::thread> threads;
+  threads.reserve(actual_workers);
+  for (std::size_t t = 0; t < actual_workers; ++t) {
+    const std::size_t begin = t * chunk_base + std::min(t, chunk_extra);
+    const std::size_t end = (t + 1) * chunk_base + std::min(t + 1, chunk_extra);
+    threads.emplace_back([&, begin, end] {
+      for (std::size_t i = begin; i < end; ++i) {
+        const auto &sv = spds[i];
+        try {
+          // Keep in sync with the sequential loop body above.
+          Spd spd(
+              std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
               std::vector<double>(sv.values.begin(), sv.values.end()));
 
-      // Run the full pipeline.
-      Tm30Result result;
-      result.colorimetry = compute_ces_colorimetry(
-          spd.wavelengths(), spd.values(), cmf_2deg, cmf_10deg, ces_data,
-          daylight_basis, planckian_lut);
+          Tm30Result result;
+          result.colorimetry = compute_ces_colorimetry(
+              spd.wavelengths(), spd.values(), cmf_2deg, cmf_10deg, ces_data,
+              daylight_basis, planckian_lut);
 
-      // Compute validity.
-      result.validity = compute_validity(result.colorimetry, spd);
+          result.validity = compute_validity(result.colorimetry, spd);
 
-      results.push_back(std::move(result));
-    } catch (const InvalidSpd &) {
-      // Per-SPD validation failure → nullopt.
-      // Batch never throws.
-      results.push_back(std::nullopt);
-    }
+          results[i] = std::move(result);
+        } catch (const InvalidSpd &) {
+          results[i] = std::nullopt;
+        }
+      }
+    });
   }
+  for (auto &th : threads)
+    th.join();
 
   return results;
 }
@@ -208,37 +304,112 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
 //  Batch evaluate - pre-resampled, grid-fixed tables
 // ══════════════════════════════════════════════════════════════════════════
 
-std::vector<std::optional<Tm30Result>> try_evaluate_cached(
-    std::span<const SpdView> spds, const ResampledTables &tables,
-    const PlanckianLut &planckian_lut, Tm30Request /*request*/) {
+std::vector<std::optional<Tm30Result>>
+try_evaluate_cached(std::span<const SpdView> spds,
+                    const ResampledTables &tables,
+                    const PlanckianLut &planckian_lut, Tm30Request /*request*/,
+                    std::size_t n_workers, TaskPool *pool) {
 
   std::vector<std::optional<Tm30Result>> results;
-  results.reserve(spds.size());
+  results.resize(spds.size());
 
-  for (const auto &sv : spds) {
-    try {
-      // Validate: construct an Spd from the SpdView data.
-      // This copies the data into vectors, then validates.
-      // Throws InvalidSpd if validation fails.
-      Spd spd(std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
+  if (n_workers <= 1) {
+    // ══════════════════════════════════════════════════════════════════
+    // Sequential path - mirrors try_evaluate() exactly; same zero-thread
+    // rule applies (see the comment there).
+    // ══════════════════════════════════════════════════════════════════
+    for (std::size_t i = 0; i < spds.size(); i++) {
+      const auto &sv = spds[i];
+      try {
+        // Validate: construct an Spd from the SpdView data.
+        // This copies the data into vectors, then validates.
+        // Throws InvalidSpd if validation fails.
+        Spd spd(
+            std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
+            std::vector<double>(sv.values.begin(), sv.values.end()));
+
+        // Run the pipeline using the pre-resampled tables - no CES/CMF
+        // resampling happens here.
+        Tm30Result result;
+        result.colorimetry =
+            compute_ces_colorimetry_cached(spd.values(), tables, planckian_lut);
+
+        // Compute validity.
+        result.validity = compute_validity(result.colorimetry, spd);
+
+        results[i] = std::move(result);
+      } catch (const InvalidSpd &) {
+        // Per-SPD validation failure → nullopt.
+        // Batch never throws.
+        results[i] = std::nullopt;
+      }
+    }
+    return results;
+  }
+
+  // Persistent path (Phase 2) - mirrors try_evaluate()'s persistent
+  // path; same partition math, same per-chunk body.
+  if (pool != nullptr) {
+    pool->run_chunked(spds.size(), [&](std::size_t i) {
+      const auto &sv = spds[i];
+      try {
+        // Keep in sync with the sequential loop body above.
+        Spd spd(
+            std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
+            std::vector<double>(sv.values.begin(), sv.values.end()));
+
+        Tm30Result result;
+        result.colorimetry =
+            compute_ces_colorimetry_cached(spd.values(), tables, planckian_lut);
+
+        result.validity = compute_validity(result.colorimetry, spd);
+
+        results[i] = std::move(result);
+      } catch (const InvalidSpd &) {
+        results[i] = std::nullopt;
+      }
+    });
+    return results;
+  }
+
+  // Parallel path - mirrors try_evaluate()'s parallel path. Same static
+  // contiguous chunking, same per-thread disjoint index writes.
+  const std::size_t actual_workers = std::min(n_workers, spds.size());
+  if (actual_workers == 0)
+    return results; // empty batch - nothing to do
+
+  const std::size_t chunk_base = spds.size() / actual_workers;
+  const std::size_t chunk_extra = spds.size() % actual_workers;
+
+  std::vector<std::thread> threads;
+  threads.reserve(actual_workers);
+  for (std::size_t t = 0; t < actual_workers; ++t) {
+    const std::size_t begin = t * chunk_base + std::min(t, chunk_extra);
+    const std::size_t end = (t + 1) * chunk_base + std::min(t + 1, chunk_extra);
+    threads.emplace_back([&, begin, end] {
+      for (std::size_t i = begin; i < end; ++i) {
+        const auto &sv = spds[i];
+        try {
+          // Keep in sync with the sequential loop body above.
+          Spd spd(
+              std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
               std::vector<double>(sv.values.begin(), sv.values.end()));
 
-      // Run the pipeline using the pre-resampled tables - no CES/CMF
-      // resampling happens here.
-      Tm30Result result;
-      result.colorimetry =
-          compute_ces_colorimetry_cached(spd.values(), tables, planckian_lut);
+          Tm30Result result;
+          result.colorimetry = compute_ces_colorimetry_cached(
+              spd.values(), tables, planckian_lut);
 
-      // Compute validity.
-      result.validity = compute_validity(result.colorimetry, spd);
+          result.validity = compute_validity(result.colorimetry, spd);
 
-      results.push_back(std::move(result));
-    } catch (const InvalidSpd &) {
-      // Per-SPD validation failure → nullopt.
-      // Batch never throws.
-      results.push_back(std::nullopt);
-    }
+          results[i] = std::move(result);
+        } catch (const InvalidSpd &) {
+          results[i] = std::nullopt;
+        }
+      }
+    });
   }
+  for (auto &th : threads)
+    th.join();
 
   return results;
 }

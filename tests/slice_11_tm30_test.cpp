@@ -121,7 +121,7 @@ TEST_CASE("Tm30 - SPD validation at construction",
           "[tm30][slice11][validation]") {
   auto &t = tables();
 
-  // SPD with insufficient wavelength range (< 400–700 nm) should throw.
+  // SPD with insufficient wavelength range (< 400-700 nm) should throw.
   REQUIRE_THROWS_AS(Tm30(Spd({400.0, 500.0}, {1.0, 1.0}), t.cmf_2deg,
                          t.cmf_10deg, t.ces, t.basis, t.lut),
                     InvalidSpd);
@@ -298,8 +298,8 @@ TEST_CASE("Validity - extrapolated flag for truncated SPD",
           "[tm30][slice11][validity]") {
   auto &t = tables();
 
-  // Construct an SPD covering only 400–700 nm (valid per Spd rules,
-  // but requires extrapolation for the full 380–780 nm CES range).
+  // Construct an SPD covering only 400-700 nm (valid per Spd rules,
+  // but requires extrapolation for the full 380-780 nm CES range).
   // TM-30-20 §3.5: Missing edges are zero-filled.
   std::vector<double> wl, vals;
   for (int lam = 400; lam <= 700; lam += 5) {
@@ -312,8 +312,8 @@ TEST_CASE("Validity - extrapolated flag for truncated SPD",
 
   const auto &v = m.validity();
 
-  // 400–700 nm is within the minimum range but doesn't cover
-  // the full 380–780 nm CES range. Extrapolation is needed.
+  // 400-700 nm is within the minimum range but doesn't cover
+  // the full 380-780 nm CES range. Extrapolation is needed.
   REQUIRE(v.extrapolated);
 }
 

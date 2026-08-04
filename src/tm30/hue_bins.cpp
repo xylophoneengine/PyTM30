@@ -5,16 +5,16 @@
 // TM-30-20 §4.3, Annex B
 #include "tm30/hue_bins.hpp"
 
-#include <cmath>   // atan2, M_PI
+#include <cmath> // atan2, M_PI
 #include <cstdint>
 
 namespace tm30 {
 
 // TM-30-20 §4.3: 16 bins of 22.5° each in the a'-b' plane.
 // Bin width in radians: 22.5° = π/8 rad.
-static constexpr double kBinWidth = 0.39269908169872414;  // TM-30-20 §4.3
+static constexpr double kBinWidth = 0.39269908169872414; // TM-30-20 §4.3
 
-HueBins bin_by_hue(const std::array<Cam02Ucs, 99>& jab_ref) {
+HueBins bin_by_hue(const std::array<Cam02Ucs, 99> &jab_ref) {
   HueBins bins;
 
   for (int i = 0; i < 99; ++i) {
@@ -29,11 +29,18 @@ HueBins bin_by_hue(const std::array<Cam02Ucs, 99>& jab_ref) {
 
     // Assign to bin. TM-30-20 §4.3:
     // Bin j (0-indexed) spans [j × 22.5°, (j+1) × 22.5°).
-    // Half-open intervals: boundary value goes to the bin starting at that angle
-    // (higher bin index). Bin 15 spans [337.5°, 360.0°] inclusive.
-    int bin = static_cast<int>(h / kBinWidth);  // TM-30-20 §4.3
-    if (bin >= 16) {
-      bin = 15;  // h ≈ 2π → bin 15 (0-indexed)  // TM-30-20 §4.3
+    // Half-open intervals: boundary value goes to the bin starting at that
+    // angle (higher bin index). Bin 15 spans [337.5°, 360.0°] inclusive.
+    int bin = static_cast<int>(h / kBinWidth); // TM-30-20 §4.3
+    if (std::isnan(h) || bin < 0) {
+      // Degenerate input (e.g. an all-zero SPD) propagates NaN through
+      // atan2; static_cast<int>(NaN) is UB and yields INT_MIN on x86-64,
+      // which would index bins[] out of bounds. Clamp to bin 0 - the
+      // result is garbage-in/garbage-out anyway (the pipeline flags such
+      // SPDs via Validity).
+      bin = 0;
+    } else if (bin >= 16) {
+      bin = 15; // h ≈ 2π → bin 15 (0-indexed)  // TM-30-20 §4.3
     }
 
     bins[bin].push_back(i);
@@ -42,4 +49,4 @@ HueBins bin_by_hue(const std::array<Cam02Ucs, 99>& jab_ref) {
   return bins;
 }
 
-}  // namespace tm30
+} // namespace tm30

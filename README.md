@@ -58,6 +58,8 @@ floating-point noise of colour-science's own values.
     - [Troubleshooting](#troubleshooting)
   - [Architecture](#architecture)
   - [Performance](#performance)
+    - [Parallel batch evaluation (`n_workers`, `persistent_workers`)](#parallel-batch-evaluation-n_workers-persistent_workers)
+      - [Which mode should I use?](#which-mode-should-i-use)
   - [Data Files \& Provenance](#data-files--provenance)
   - [Tests](#tests)
   - [Design Principles](#design-principles)
@@ -193,11 +195,11 @@ const auto& colorimetry = m.colorimetry_result();    // full raw result
 
 ### Prerequisites
 
-| Tool           | Version              | Notes                                                                                                                                            |
-| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tool           | Version              | Notes                                                                                                                                                  |
+| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | C++20 compiler | GCC ≥11 or Clang ≥14 | Includes Apple Clang on macOS. No compiler-specific extensions - should build clean under `-std=c++20` on Linux, macOS, and Windows, x86_64 and arm64. |
-| CMake          | ≥3.20                | `pip install cmake` works fine if you'd rather not touch your system package manager.                                                            |
-| Python         | ≥3.10                | Only needed for the Python bindings.                                                                                                             |
+| CMake          | ≥3.20                | `pip install cmake` works fine if you'd rather not touch your system package manager.                                                                  |
+| Python         | ≥3.10                | Only needed for the Python bindings.                                                                                                                   |
 
 > **Platform status:** the code is written to be portable (standard C++20,
 > no platform-specific extensions or intrinsics), but it has so far only
@@ -268,8 +270,44 @@ spd → [validate] → [resample CES + CMF] → [XYZ] → [CCT + Reference]
 
 ## Performance
 
-~40-80 µs per SPD (single-threaded, full TM-30 pipeline). Batch evaluation
-amortizes table-loading overhead - see `benchmarks/benchmark_tm30.py`.
+### Parallel batch evaluation (`n_workers`, `persistent_workers`)
+
+Batch evaluation can run across worker threads - results are **bit-identical**
+to the sequential path (task parallelism, no cross-thread accumulation):
+
+```python
+calc = TM30Calc(n_workers=4)                  # spawn 4 threads per eval() call
+res  = calc.eval(spd_matrix)                  # same numbers, faster for big batches
+
+calc = TM30Calc(n_workers=4, persistent_workers=True)  # reuse threads across calls
+```
+
+- `n_workers=1` (default) is the pure sequential path with **zero** thread
+  overhead - the number every benchmark in this project was measured with.
+- `n_workers < 1` raises `ValueError` (no auto-detect convention yet).
+- `persistent_workers=True` keeps the worker threads alive for the
+  calculator's lifetime, avoiding a per-call thread-spawn/join - whether
+  that's measurable on top of spawn-per-call depends on your workload and
+  machine; silently inert when `n_workers <= 1`.
+
+#### Which mode should I use?
+
+| Situation                                                                                   | Use                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single SPD, small batches, or "just give me correct numbers"                                | default `TM30Calc()` / `n_workers=1`                                                                                                                      |
+| You have a matrix and want it computed                                                      | batch `eval(matrix)` with `n_workers=1` - same per-SPD speed as looping single evals, one call instead of N                                               |
+| You're already looping per SPD (per-SPD grids, per-SPD post-processing, streaming)          | one SPD per call - no throughput penalty vs batching, but no benefit either                                                                               |
+| One-off *large* batch (a few hundred SPDs or more per call)                                 | `n_workers=4` (spawn per call) - can meaningfully speed up multi-core machines; below ~50 SPDs/call the per-call thread-spawn tax can outweigh the gain   |
+| Many repeated large-batch calls on one long-lived calculator (server loop, mass evaluation) | `n_workers=4, persistent_workers=True` - threads stay alive across calls instead of respawning each time                                                 |
+
+Rule of thumb: **single or small → default · one big batch → `n_workers>1` ·
+repeated big batches → try `persistent_workers=True`**. Speedups are
+workload- and machine-dependent - on some CPUs or batch sizes parallelizing
+can even be slower than sequential, and the persistent-pool gain over
+spawn-per-call has been small to unmeasurable in this project's own
+benchmarks (see `benchmarks/`). Measure your own case rather than assuming
+a multiplier.
+
 
 ## Data Files & Provenance
 
@@ -302,6 +340,20 @@ python3 tools/check_constants.py    # 0 uncited float literals
 
 Every numeric constant in `src/`/`include/` cites the TM-30-20 spec section
 it comes from; `check_constants.py` enforces this mechanically.
+
+### Formatting
+
+C++ formatting is pinned by `.clang-format` (LLVM style, C++20) and enforced
+via [pre-commit](https://pre-commit.com):
+
+```bash
+pip install pre-commit
+pre-commit install       # one-time per clone - wires into .git/hooks/pre-commit
+```
+
+After that, `git commit` auto-formats staged `.cpp`/`.hpp` files; if the hook
+rewrites anything, re-stage and commit again. Run it over the whole tree with
+`pre-commit run --all-files`.
 
 ---
 

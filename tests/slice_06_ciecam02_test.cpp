@@ -321,7 +321,7 @@ load_spd_csv(const std::string &path) {
   return {wl, vals};
 }
 
-/// Generate a 401-point 1nm wavelength grid 380–780 nm.
+/// Generate a 401-point 1nm wavelength grid 380-780 nm.
 std::vector<double> wl_1nm() {
   std::vector<double> wl(401);
   for (int i = 0; i < 401; ++i)

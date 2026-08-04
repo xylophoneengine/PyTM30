@@ -11,6 +11,7 @@ set(TM30_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # ── Find Python + nanobind ──────────────────────────────────────────────
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(Threads REQUIRED)
 
 execute_process(
   COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
@@ -37,12 +38,14 @@ add_library(tm30-core STATIC
   ${TM30_ROOT}/src/tm30/metrics.cpp
   ${TM30_ROOT}/src/tm30/hue_bins.cpp
   ${TM30_ROOT}/src/tm30/gamut.cpp
+  ${TM30_ROOT}/src/tm30/task_pool.cpp
   ${TM30_ROOT}/src/tm30/tm30.cpp
 )
 target_include_directories(tm30-core
   PUBLIC ${TM30_ROOT}/include
 )
 target_compile_features(tm30-core PUBLIC cxx_std_20)
+target_link_libraries(tm30-core PUBLIC Threads::Threads)
 set_target_properties(tm30-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ── Data directory path ─────────────────────────────────────────────────

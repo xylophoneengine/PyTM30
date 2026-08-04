@@ -12,8 +12,8 @@
 #include <array>
 #include <cstddef>
 
-#include "tm30/ciecam02.hpp"  // Cam02Ucs
-#include "tm30/hue_bins.hpp"  // HueBins
+#include "tm30/ciecam02.hpp" // Cam02Ucs
+#include "tm30/hue_bins.hpp" // HueBins
 
 namespace tm30 {
 
@@ -23,19 +23,19 @@ namespace tm30 {
 ///
 /// TM-30-20 §4.4
 struct BinAverages {
-  std::array<double, 16> J_prime;  // Average J' per bin  // TM-30-20 §4.4
-  std::array<double, 16> a_prime;  // Average a' per bin  // TM-30-20 §4.4
-  std::array<double, 16> b_prime;  // Average b' per bin  // TM-30-20 §4.4
+  std::array<double, 16> J_prime; // Average J' per bin  // TM-30-20 §4.4
+  std::array<double, 16> a_prime; // Average a' per bin  // TM-30-20 §4.4
+  std::array<double, 16> b_prime; // Average b' per bin  // TM-30-20 §4.4
 };
 
 /// Per-bin local metrics.
 ///
 /// TM-30-20 §4.6, §4.7, §4.8
 struct LocalBinMetrics {
-  std::array<double, 16> Rf_hj;   // Local fidelity per bin   // TM-30-20 §4.8
-  std::array<double, 16> Rcs_hj;  // Local chroma shift per bin  // TM-30-20 §4.6
-  std::array<double, 16> Rhs_hj;  // Local hue shift per bin   // TM-30-20 §4.7
-  std::array<double, 16> DE_hj;   // Mean ΔE′ per bin        // TM-30-20 §4.8
+  std::array<double, 16> Rf_hj;  // Local fidelity per bin   // TM-30-20 §4.8
+  std::array<double, 16> Rcs_hj; // Local chroma shift per bin  // TM-30-20 §4.6
+  std::array<double, 16> Rhs_hj; // Local hue shift per bin   // TM-30-20 §4.7
+  std::array<double, 16> DE_hj;  // Mean ΔE′ per bin        // TM-30-20 §4.8
 };
 
 /// CVG-normalized bin-average coordinates.
@@ -47,25 +47,29 @@ struct LocalBinMetrics {
 /// TM-30-20 §4.5
 struct CvgCoordinates {
   /// Test CES bin-averaged J'a'b', normalized per CVG §4.5.
-  std::array<double, 16> J_test;   // J' unchanged               // TM-30-20 §4.5
-  std::array<double, 16> x_test;   // CVG x (horizontal axis)    // TM-30-20 §4.5 Eq. (60)
-  std::array<double, 16> y_test;   // CVG y (vertical axis)      // TM-30-20 §4.5 Eq. (61)
+  std::array<double, 16> J_test; // J' unchanged               // TM-30-20 §4.5
+  std::array<double, 16>
+      x_test; // CVG x (horizontal axis)    // TM-30-20 §4.5 Eq. (60)
+  std::array<double, 16>
+      y_test; // CVG y (vertical axis)      // TM-30-20 §4.5 Eq. (61)
 
   /// Reference CES bin-averaged J'a'b', normalized per CVG §4.5.
-  std::array<double, 16> J_ref;    // J' unchanged               // TM-30-20 §4.5
-  std::array<double, 16> x_ref;    // Reference circle x (cos)   // TM-30-20 §4.5 Eq. (58)
-  std::array<double, 16> y_ref;    // Reference circle y (sin)   // TM-30-20 §4.5 Eq. (59)
+  std::array<double, 16> J_ref; // J' unchanged               // TM-30-20 §4.5
+  std::array<double, 16>
+      x_ref; // Reference circle x (cos)   // TM-30-20 §4.5 Eq. (58)
+  std::array<double, 16>
+      y_ref; // Reference circle y (sin)   // TM-30-20 §4.5 Eq. (59)
 };
 
 /// Complete gamut result: Rg, per-bin local metrics, bin averages, and CVG.
 ///
-/// TM-30-20 §4.4–§4.8
+/// TM-30-20 §4.4-§4.8
 struct GamutResult {
-  double Rg;                          // Gamut area index         // TM-30-20 §4.4 Eq. (57)
-  BinAverages test_avg;               // Test bin averages       // TM-30-20 §4.4
-  BinAverages ref_avg;                // Reference bin averages  // TM-30-20 §4.4
-  LocalBinMetrics local;              // Per-bin local metrics   // TM-30-20 §4.6–§4.8
-  CvgCoordinates cvg;                 // CVG coordinates         // TM-30-20 §4.5
+  double Rg;             // Gamut area index         // TM-30-20 §4.4 Eq. (57)
+  BinAverages test_avg;  // Test bin averages       // TM-30-20 §4.4
+  BinAverages ref_avg;   // Reference bin averages  // TM-30-20 §4.4
+  LocalBinMetrics local; // Per-bin local metrics   // TM-30-20 §4.6-§4.8
+  CvgCoordinates cvg;    // CVG coordinates         // TM-30-20 §4.5
 };
 
 /// Compute bin-averaged J'a'b' for all 16 bins.
@@ -78,8 +82,8 @@ struct GamutResult {
 /// @return         BinAverages with per-bin average J', a', b'.
 ///
 /// TM-30-20 §4.4
-BinAverages bin_average(const std::array<Cam02Ucs, 99>& jab_ces,
-                        const HueBins& bins);
+BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
+                        const HueBins &bins);
 
 /// Compute the polygon area in the (a', b') plane using the shoelace formula.
 ///
@@ -90,7 +94,7 @@ BinAverages bin_average(const std::array<Cam02Ucs, 99>& jab_ces,
 /// @return     Polygon area (positive).
 ///
 /// TM-30-20 §4.4
-double polygon_area(const BinAverages& avg);
+double polygon_area(const BinAverages &avg);
 
 /// Compute the Gamut Area Index Rg.
 ///
@@ -101,7 +105,7 @@ double polygon_area(const BinAverages& avg);
 /// @return          Rg value.
 ///
 /// TM-30-20 §4.4 Eq. (57)
-double compute_rg(const BinAverages& test_avg, const BinAverages& ref_avg);
+double compute_rg(const BinAverages &test_avg, const BinAverages &ref_avg);
 
 /// Compute per-bin local metrics: Rf,hj, Rcs,hj, Rhs,hj, DE_hj.
 ///
@@ -115,11 +119,10 @@ double compute_rg(const BinAverages& test_avg, const BinAverages& ref_avg);
 /// @return             LocalBinMetrics for all 16 bins.
 ///
 /// TM-30-20 §4.6, §4.7, §4.8
-LocalBinMetrics compute_local_bin_metrics(
-    const BinAverages& test_avg,
-    const BinAverages& ref_avg,
-    const std::array<double, 99>& delta_e,
-    const HueBins& bins);
+LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
+                                          const BinAverages &ref_avg,
+                                          const std::array<double, 99> &delta_e,
+                                          const HueBins &bins);
 
 /// Compute CVG-normalized bin-average coordinates.
 ///
@@ -135,12 +138,11 @@ LocalBinMetrics compute_local_bin_metrics(
 /// @param bins      Hue-angle bin assignments.
 /// @return          CVG coordinates for test and reference.
 ///
-/// TM-30-20 §4.5 Eq. (58)–(61)
-CvgCoordinates compute_cvg_coordinates(
-    const BinAverages& test_avg,
-    const BinAverages& ref_avg,
-    const std::array<Cam02Ucs, 99>& jab_ref,
-    const HueBins& bins);
+/// TM-30-20 §4.5 Eq. (58)-(61)
+CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
+                                       const BinAverages &ref_avg,
+                                       const std::array<Cam02Ucs, 99> &jab_ref,
+                                       const HueBins &bins);
 
 /// Compute all gamut metrics: Rg, per-bin local metrics, and CVG.
 ///
@@ -152,11 +154,10 @@ CvgCoordinates compute_cvg_coordinates(
 /// @param bins        Hue-angle bin assignments (16 bins).
 /// @return            Complete GamutResult.
 ///
-/// TM-30-20 §4.4–§4.8
-GamutResult compute_gamut(
-    const std::array<Cam02Ucs, 99>& jab_test,
-    const std::array<Cam02Ucs, 99>& jab_ref,
-    const std::array<double, 99>& delta_e,
-    const HueBins& bins);
+/// TM-30-20 §4.4-§4.8
+GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
+                          const std::array<Cam02Ucs, 99> &jab_ref,
+                          const std::array<double, 99> &delta_e,
+                          const HueBins &bins);
 
-}  // namespace tm30
+} // namespace tm30

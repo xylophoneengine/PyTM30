@@ -8,12 +8,12 @@
 /// TM-30-20 §3.5: Range and Interpolation of Data
 /// TM-30-20 §3.2: Test Source
 
-#include <vector>
-#include <cstddef>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <sstream>
+#include <vector>
 
 #include "tm30/errors.hpp"
 
@@ -23,7 +23,7 @@ namespace tm30 {
 ///
 /// Construction validates:
 /// - non-empty
-/// - wavelengths cover at least 400–700 nm (minimum required range per §3.5)
+/// - wavelengths cover at least 400-700 nm (minimum required range per §3.5)
 /// - wavelengths are strictly monotonic increasing
 /// - all spectral values are non-negative
 ///
@@ -34,8 +34,10 @@ public:
   /// @throws InvalidSpd if validation fails.
   Spd(std::vector<double> wavelengths, std::vector<double> values);
 
-  const std::vector<double>& wavelengths() const noexcept { return wavelengths_; }
-  const std::vector<double>& values()     const noexcept { return values_; }
+  const std::vector<double> &wavelengths() const noexcept {
+    return wavelengths_;
+  }
+  const std::vector<double> &values() const noexcept { return values_; }
 
   std::size_t size() const noexcept { return wavelengths_.size(); }
 
@@ -51,7 +53,7 @@ private:
 
   std::vector<double> wavelengths_;
   std::vector<double> values_;
-  double step_{};  // 0.0 when non-uniform; set in validate()
+  double step_{}; // 0.0 when non-uniform; set in validate()
 };
 
-}  // namespace tm30
+} // namespace tm30

@@ -4,7 +4,7 @@
 /// Lazy memoized TM-30 handle + batch API with Validity flags.
 ///
 /// Provides the ergonomics layer on top of the fully verified color-science
-/// core (Slices 0–10). Two entry points:
+/// core (Slices 0-10). Two entry points:
 ///
 ///   Single SPD → Tm30 handle (lazy evaluation, memoized cache)
 ///   Batch SPDs → try_evaluate() with request flags
@@ -24,6 +24,7 @@
 #include "tm30/reference.hpp" // DaylightBasis
 #include "tm30/resample.hpp"  // CesData, CmfData
 #include "tm30/spd.hpp"       // Spd
+#include "tm30/task_pool.hpp" // TaskPool (persistent workers, Phase 2)
 
 namespace tm30 {
 
@@ -47,7 +48,7 @@ struct SpdView {
 /// Controls what gets included in batch output.
 ///
 /// One decision per batch run. In the batch path, flags bound the output
-/// buffer size (memory-bandwidth win, not FLOP win - ~85–90% of compute
+/// buffer size (memory-bandwidth win, not FLOP win - ~85-90% of compute
 /// is upstream of the binning fork).
 struct Tm30Request {
   /// Include per-bin metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj) and CVG
@@ -75,7 +76,7 @@ struct Validity {
   /// TM-30-20: intended for white light sources in the stated CCT range.
   bool cct_out_of_range = false; // TM-30-20: applicability domain
 
-  /// The test SPD does not cover the full 380–780 nm range, requiring
+  /// The test SPD does not cover the full 380-780 nm range, requiring
   /// extrapolation (zero-fill or flat-extrapolation per TM-30-20 §3.5).
   bool extrapolated = false; // TM-30-20 §3.5
 };
@@ -153,10 +154,10 @@ public:
   /// Skin fidelity Rf,skin (average of CES15 + CES18).    TM-30-20 §4.2
   double rf_skin() const;
 
-  /// Full gamut result: Rg, per-bin metrics, CVG.         TM-30-20 §4.4–§4.8
+  /// Full gamut result: Rg, per-bin metrics, CVG.         TM-30-20 §4.4-§4.8
   const GamutResult &gamut() const;
 
-  /// Per-bin local metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj). TM-30-20 §4.6–§4.8
+  /// Per-bin local metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj). TM-30-20 §4.6-§4.8
   const LocalBinMetrics &local_chroma_shift() const;
 
   /// CVG-normalized bin-average coordinates.              TM-30-20 §4.5
@@ -216,6 +217,18 @@ private:
 /// @param daylight_basis Daylight basis vectors (S₀, S₁, S₂).
 /// @param planckian_lut  Planckian locus LUT.
 /// @param request        Output control flags (bins, samples).
+/// @param n_workers      Number of worker threads to use for this call.
+///                       n_workers <= 1 (the default) runs the sequential
+///                       loop with ZERO std::thread construction; values
+///                       > 1 spawn min(n_workers, spds.size()) threads,
+///                       one contiguous chunk each (static balancing,
+///                       results bit-identical to sequential).
+/// @param pool           Optional persistent worker pool (Phase 2). When
+///                       non-null AND n_workers > 1, the batch runs on
+///                       the pool's persistent threads instead of
+///                       spawning per call - same partition math, same
+///                       bit-identical results. Ignored when
+///                       n_workers <= 1.
 ///
 /// @return Vector of optional Tm30Result - one per input SPD.
 ///         `nullopt` at index i means SPD i failed validation.
@@ -223,7 +236,8 @@ std::vector<std::optional<Tm30Result>>
 try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
              const CmfData &cmf_10deg, const CesData &ces_data,
              const DaylightBasis &daylight_basis,
-             const PlanckianLut &planckian_lut, Tm30Request request = {});
+             const PlanckianLut &planckian_lut, Tm30Request request = {},
+             std::size_t n_workers = 1, TaskPool *pool = nullptr);
 
 /// Evaluate TM-30 for a batch of SPDs using pre-resampled, grid-fixed
 /// tables (see prepare_resampled_tables() in pipeline.hpp).
@@ -239,11 +253,17 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
 /// @param tables         Pre-resampled CES/CMF/daylight-basis tables.
 /// @param planckian_lut  Planckian locus LUT.
 /// @param request        Output control flags (bins, samples).
+/// @param n_workers      Number of worker threads for this call; same
+///                       semantics as try_evaluate()'s parameter.
+/// @param pool           Optional persistent worker pool (Phase 2); same
+///                       semantics as try_evaluate()'s parameter.
 ///
 /// @return Vector of optional Tm30Result - one per input SPD.
 ///         `nullopt` at index i means SPD i failed validation.
-std::vector<std::optional<Tm30Result>> try_evaluate_cached(
-    std::span<const SpdView> spds, const ResampledTables &tables,
-    const PlanckianLut &planckian_lut, Tm30Request request = {});
+std::vector<std::optional<Tm30Result>>
+try_evaluate_cached(std::span<const SpdView> spds,
+                    const ResampledTables &tables,
+                    const PlanckianLut &planckian_lut, Tm30Request request = {},
+                    std::size_t n_workers = 1, TaskPool *pool = nullptr);
 
 } // namespace tm30

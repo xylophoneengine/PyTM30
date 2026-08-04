@@ -1,0 +1,5 @@
+---
+# Matches the style already in use across the codebase (verified by diffing
+# clang-format's output against hand-formatted files before adopting this).
+BasedOnStyle: LLVM
+Standard: c++20

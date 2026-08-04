@@ -19,7 +19,7 @@ void Spd::validate() {
   // 1. Non-empty
   if (wavelengths_.empty()) {
     throw InvalidSpd(
-        "SPD is empty; at least one wavelength–value pair required");
+        "SPD is empty; at least one wavelength-value pair required");
   }
 
   if (wavelengths_.size() != values_.size()) {
@@ -47,7 +47,7 @@ void Spd::validate() {
     }
   }
 
-  // 4. Minimum required range: at least 400–700 nm - TM-30-20 §3.5
+  // 4. Minimum required range: at least 400-700 nm - TM-30-20 §3.5
   const double lo = wavelengths_.front();
   const double hi = wavelengths_.back();
   if (lo > kMinRequiredLo || hi < kMinRequiredHi) {

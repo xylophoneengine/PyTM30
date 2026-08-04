@@ -139,7 +139,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 
     if (m == 0 || std::isnan(ref_avg.a_prime[j])) {
       // Empty bin: set metrics to NaN
-      // TM-30-20 §4.6–§4.8 edge case
+      // TM-30-20 §4.6-§4.8 edge case
       metrics.Rf_hj[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.Rcs_hj[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.Rhs_hj[j] = std::numeric_limits<double>::quiet_NaN();
@@ -272,7 +272,7 @@ GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
                           const std::array<double, 99> &delta_e,
                           const HueBins &bins) {
 
-  // TM-30-20 §4.4–§4.8
+  // TM-30-20 §4.4-§4.8
   GamutResult result{};
 
   // Step 1: Bin-averaged J'a'b'
@@ -285,7 +285,7 @@ GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
   result.Rg = compute_rg(result.test_avg, result.ref_avg);
 
   // Step 3: Per-bin local metrics
-  // TM-30-20 §4.6–§4.8
+  // TM-30-20 §4.6-§4.8
   result.local =
       compute_local_bin_metrics(result.test_avg, result.ref_avg, delta_e, bins);
 

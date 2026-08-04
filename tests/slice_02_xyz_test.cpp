@@ -70,7 +70,7 @@ CmfData load_cmf(const std::string &path) {
 }
 
 /// Load CMF and resample to match the given SPD wavelength grid.
-/// The CMF file may cover a wider range (e.g. 360–830 nm); this helper
+/// The CMF file may cover a wider range (e.g. 360-830 nm); this helper
 /// resamples it to the SPD's wavelengths so compute_source_xyz() receives
 /// matching arrays.
 CmfData load_cmf_for_spd(const std::string &cmf_path,
@@ -105,9 +105,9 @@ std::vector<double> full_1nm_grid() {
 
 /// Linear interpolation of spectral data to a new wavelength grid.
 /// Uses flat extrapolation outside the source range.
-std::vector<double> resample_spd(const std::vector<double>& target_wl,
-                                  const std::vector<double>& source_wl,
-                                  const std::vector<double>& source_vals) {
+std::vector<double> resample_spd(const std::vector<double> &target_wl,
+                                 const std::vector<double> &source_wl,
+                                 const std::vector<double> &source_vals) {
   std::vector<double> result;
   result.reserve(target_wl.size());
 
@@ -150,7 +150,7 @@ std::vector<double> resample_spd(const std::vector<double>& target_wl,
 
 TEST_CASE("Integrate - constant function over uniform grid",
           "[integrate][slice02]") {
-  // f(λ) = 1 over 380–780 nm at 1 nm step: 401 points.
+  // f(λ) = 1 over 380-780 nm at 1 nm step: 401 points.
   // Expected: 400.0 (401 points, 400 segments of width 1, avg = 1)
   auto wl = full_1nm_grid();
   std::vector<double> unity(wl.size(), 1.0);
@@ -219,7 +219,7 @@ TEST_CASE("Integrate - throws on fewer than 2 points", "[integrate][slice02]") {
 
 TEST_CASE("Trapezoidal weights - uniform 1 nm grid with constant function",
           "[integrate][slice02]") {
-  // f(λ) = 1 over 380–780 nm at 1 nm step: 401 points.
+  // f(λ) = 1 over 380-780 nm at 1 nm step: 401 points.
   // Σ w[i]*f[i] should equal trapezoidal_integrate result.
   auto wl = full_1nm_grid();
   std::vector<double> unity(wl.size(), 1.0);
@@ -238,7 +238,7 @@ TEST_CASE("Trapezoidal weights - uniform 1 nm grid with constant function",
 
 TEST_CASE("Trapezoidal weights - uniform 1 nm grid with linear function",
           "[integrate][slice02]") {
-  // f(λ) = λ over 380–780 nm at 1 nm step: 401 points.
+  // f(λ) = λ over 380-780 nm at 1 nm step: 401 points.
   auto wl = full_1nm_grid();
 
   auto weights = trapezoidal_weights(wl);
@@ -255,7 +255,7 @@ TEST_CASE("Trapezoidal weights - uniform 1 nm grid with linear function",
 
 TEST_CASE("Trapezoidal weights - uniform 1 nm grid with D65 spectrum",
           "[integrate][slice02]") {
-  // f(λ) = D65 SPD values over 380–780 nm.
+  // f(λ) = D65 SPD values over 380-780 nm.
   auto wl = full_1nm_grid();
   auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
   REQUIRE(d65_wl.size() == wl.size());
@@ -339,7 +339,7 @@ TEST_CASE("Trapezoidal weights - uniform 5 nm grid with D65 spectrum",
 
 TEST_CASE("Trapezoidal weights - non-uniform grid with constant function",
           "[integrate][slice02]") {
-  // Non-uniform: 1 nm from 380–500, then 2 nm from 500–780
+  // Non-uniform: 1 nm from 380-500, then 2 nm from 500-780
   std::vector<double> wl;
   for (double w = 380.0; w <= 500.0; w += 1.0) {
     wl.push_back(w);
@@ -462,7 +462,7 @@ TEST_CASE("Trapezoidal weights - minimal 2-point grid with real spectrum",
 
 TEST_CASE("Trapezoidal weights - narrow range grid with constant function",
           "[integrate][slice02]") {
-  // Narrow range: 450–600 nm at 1 nm
+  // Narrow range: 450-600 nm at 1 nm
   std::vector<double> wl;
   for (double w = 450.0; w <= 600.0; w += 1.0) {
     wl.push_back(w);
@@ -525,7 +525,7 @@ TEST_CASE("Trapezoidal weights - narrow range grid with real spectrum",
 
 TEST_CASE("Trapezoidal weights - fine grid with constant function",
           "[integrate][slice02]") {
-  // Very fine: 0.5 nm steps over 500–520 nm (41 points)
+  // Very fine: 0.5 nm steps over 500-520 nm (41 points)
   std::vector<double> wl;
   for (double w = 500.0; w <= 520.0; w += 0.5) {
     wl.push_back(w);
@@ -598,9 +598,9 @@ TEST_CASE("Trapezoidal weights - throws on fewer than 2 points",
 
 TEST_CASE("CMF - x̄₁₀ integral over 380-780 nm", "[cmf][slice02]") {
   CmfData cmf_full = load_cmf(data_path("cmf_1964_10.csv"));
-  REQUIRE(cmf_full.wavelengths.size() == 471); // 360–830 nm at 1 nm
+  REQUIRE(cmf_full.wavelengths.size() == 471); // 360-830 nm at 1 nm
 
-  // Clip to 380–780 nm for the TM-30 range integral.
+  // Clip to 380-780 nm for the TM-30 range integral.
   auto wl_380_780 = full_1nm_grid();
   CmfData cmf = resample_cmf(wl_380_780, cmf_full);
 
@@ -635,7 +635,7 @@ TEST_CASE("CMF - z̄₁₀ integral over 380-780 nm", "[cmf][slice02]") {
 // ─────────────────────────────────────────────────────────────────────────
 
 TEST_CASE("XYZ - D65 source tristimulus (1 nm)", "[xyz][slice02]") {
-  // Load D65 SPD at 1 nm, 380–780. CMF now covers 360–830 nm - resample.
+  // Load D65 SPD at 1 nm, 380-780. CMF now covers 360-830 nm - resample.
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
   REQUIRE(spd_wl.size() == 401);
 
@@ -719,13 +719,11 @@ TEST_CASE("XYZ - normalisation produces Y=100 for source", "[xyz][slice02]") {
 /// weights-based rewrite in src/tm30/xyz.cpp can be checked against it
 /// directly. Do not "clean up" to match the new implementation - the whole
 /// point is that this stays a faithful copy of the old algorithm.
-std::array<XyzTriple, 99>
-compute_ces_xyz_reference(const std::vector<double> &spd_wavelengths,
-                          const std::vector<double> &spd_values,
-                          const CesData &ces_data,
-                          const std::vector<double> &cmf_x_bar,
-                          const std::vector<double> &cmf_y_bar,
-                          const std::vector<double> &cmf_z_bar, double k) {
+std::array<XyzTriple, 99> compute_ces_xyz_reference(
+    const std::vector<double> &spd_wavelengths,
+    const std::vector<double> &spd_values, const CesData &ces_data,
+    const std::vector<double> &cmf_x_bar, const std::vector<double> &cmf_y_bar,
+    const std::vector<double> &cmf_z_bar, double k) {
   const std::size_t n = spd_wavelengths.size();
 
   if (ces_data.samples.size() != 99) {
@@ -854,9 +852,8 @@ TEST_CASE("XYZ - CES weights-based rewrite agrees with reference algorithm",
   SourceXyz src =
       compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
 
-  auto ces_old = compute_ces_xyz_reference(spd_wl, spd_vals, ces_1nm,
-                                           cmf.x_bar, cmf.y_bar, cmf.z_bar,
-                                           src.k);
+  auto ces_old = compute_ces_xyz_reference(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                           cmf.y_bar, cmf.z_bar, src.k);
   auto ces_new = compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
                                  cmf.y_bar, cmf.z_bar, src.k);
 
@@ -930,7 +927,7 @@ TEST_CASE("XYZ - source XYZ from 5nm resampled data agrees with 1nm",
   }
 
   // Resample CMF from the full file to 5 nm
-  CmfData cmf_source = load_cmf(data_path("cmf_1964_10.csv")); // 360–830 nm
+  CmfData cmf_source = load_cmf(data_path("cmf_1964_10.csv")); // 360-830 nm
   CmfData cmf_5nm = resample_cmf(wl_5nm, cmf_source);
 
   SourceXyz src_5nm = compute_source_xyz(wl_5nm, spd_5nm, cmf_5nm.x_bar,

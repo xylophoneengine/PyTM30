@@ -95,7 +95,7 @@ load_spd_csv(const std::string &path) {
   return {wl, vals};
 }
 
-/// Generate a 401-point 1nm wavelength grid 380–780 nm.
+/// Generate a 401-point 1nm wavelength grid 380-780 nm.
 std::vector<double> wl_1nm() {
   std::vector<double> wl(401);
   for (int i = 0; i < 401; ++i)
@@ -546,8 +546,8 @@ TEST_CASE("Hue binning - per-bin sample count in [2, 11] for D65",
   for (int bin = 0; bin < 16; ++bin) {
     int count = static_cast<int>(result.hue_bins[bin].size());
     INFO("Bin " << bin << " has " << count << " CES");
-    CHECK(count >= 2);  // TM-30-20 §4.3: range 2–11
-    CHECK(count <= 11); // TM-30-20 §4.3: range 2–11
+    CHECK(count >= 2);  // TM-30-20 §4.3: range 2-11
+    CHECK(count <= 11); // TM-30-20 §4.3: range 2-11
   }
 }
 
