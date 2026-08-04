@@ -118,6 +118,12 @@ SPD - negligible for one spectrum, real memory for a 100,000-row batch. See
 `notebooks/pytm30_tutorial.ipynb` for a full walkthrough including plotting
 the CVG "flower" graphic from these fields.
 
+Going the other direction, `bins=False` and/or `samples=False` opt *out* of
+`rcs_hj`/`rhs_hj` and `rf_cesi` respectively, skipping the corresponding
+array allocation/copy entirely - a genuine memory/bandwidth win for large
+batches when you only need the scalar fields (`rf`, `rg`, `cct`, `duv`,
+`delta_e_avg`, `rf_skin`).
+
 ### Convenience: SPD → XYZ / Yuv
 
 ```python

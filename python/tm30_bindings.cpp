@@ -503,13 +503,17 @@ struct BatchContext {
                                                    ces_data, daylight_basis);
   }
 
-  // NOTE: `bins`/`samples` are pre-existing and currently vestigial -
-  // try_evaluate() (src/tm30/tm30.cpp) ignores its Tm30Request argument and
-  // always computes/returns every field regardless of these flags. That's a
-  // separate, out-of-scope bug - left untouched here. `extras` below is a
-  // genuinely functional gate: it only controls whether the 5 additional
-  // fields get array-copied into the per-SPD dict (the C++ pipeline computes
-  // them unconditionally either way, per the same pre-existing behavior).
+  // NOTE: `bins`/`samples` gate which arrays get allocated and copied into
+  // the per-SPD Python dict at *this* layer - `samples` controls `rf_cesi`,
+  // `bins` controls `rcs_hj`/`rhs_hj`. That's the actual memory-bandwidth
+  // win the docs describe (not a FLOP win): the underlying C++ pipeline in
+  // src/tm30/tm30.cpp still computes every field unconditionally regardless
+  // of these flags - see Tm30Request's doc comment in include/tm30/tm30.hpp
+  // ("~85-90% of compute is upstream of the binning fork"). That part is
+  // unchanged and intentionally out of scope here. `extras` below is the
+  // same kind of gate: it only controls whether its additional fields get
+  // array-copied into the per-SPD dict (the C++ pipeline computes them
+  // unconditionally either way, same as bins/samples).
   nb::list evaluate(bool bins, bool samples, bool extras = false) {
     tm30::Tm30Request req{bins, samples};
     auto results = tm30::try_evaluate(views, cmf_2deg, cmf_10deg, ces_data,
@@ -529,27 +533,31 @@ struct BatchContext {
       d["delta_e_avg"] = opt->colorimetry.delta_e_avg;
       d["rf_skin"] = opt->colorimetry.rf_skin;
 
-      // rf_cesi as numpy array
-      auto arr_cesi = np.attr("empty")(99, nb::arg("dtype") = "float64");
-      auto nd_cesi = nb::cast<nb::ndarray<>>(arr_cesi);
-      double *buf_cesi = static_cast<double *>(nd_cesi.data());
-      std::copy(opt->colorimetry.rf_cesi.begin(),
-                opt->colorimetry.rf_cesi.end(), buf_cesi);
-      d["rf_cesi"] = arr_cesi;
-
-      // Per-bin as numpy arrays
-      auto arr_rcs = np.attr("empty")(16, nb::arg("dtype") = "float64");
-      auto arr_rhs = np.attr("empty")(16, nb::arg("dtype") = "float64");
-      auto nd_rcs = nb::cast<nb::ndarray<>>(arr_rcs);
-      auto nd_rhs = nb::cast<nb::ndarray<>>(arr_rhs);
-      double *buf_rcs = static_cast<double *>(nd_rcs.data());
-      double *buf_rhs = static_cast<double *>(nd_rhs.data());
-      for (int j = 0; j < 16; ++j) {
-        buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
-        buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
+      if (samples) {
+        // rf_cesi as numpy array
+        auto arr_cesi = np.attr("empty")(99, nb::arg("dtype") = "float64");
+        auto nd_cesi = nb::cast<nb::ndarray<>>(arr_cesi);
+        double *buf_cesi = static_cast<double *>(nd_cesi.data());
+        std::copy(opt->colorimetry.rf_cesi.begin(),
+                  opt->colorimetry.rf_cesi.end(), buf_cesi);
+        d["rf_cesi"] = arr_cesi;
       }
-      d["rcs_hj"] = arr_rcs;
-      d["rhs_hj"] = arr_rhs;
+
+      if (bins) {
+        // Per-bin as numpy arrays
+        auto arr_rcs = np.attr("empty")(16, nb::arg("dtype") = "float64");
+        auto arr_rhs = np.attr("empty")(16, nb::arg("dtype") = "float64");
+        auto nd_rcs = nb::cast<nb::ndarray<>>(arr_rcs);
+        auto nd_rhs = nb::cast<nb::ndarray<>>(arr_rhs);
+        double *buf_rcs = static_cast<double *>(nd_rcs.data());
+        double *buf_rhs = static_cast<double *>(nd_rhs.data());
+        for (int j = 0; j < 16; ++j) {
+          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
+          buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
+        }
+        d["rcs_hj"] = arr_rcs;
+        d["rhs_hj"] = arr_rhs;
+      }
 
       if (extras) {
         // Rf,hj + DE_hj (16 values each)
@@ -673,27 +681,31 @@ struct BatchContext {
       d["delta_e_avg"] = opt->colorimetry.delta_e_avg;
       d["rf_skin"] = opt->colorimetry.rf_skin;
 
-      // rf_cesi as numpy array
-      auto arr_cesi = np.attr("empty")(99, nb::arg("dtype") = "float64");
-      auto nd_cesi = nb::cast<nb::ndarray<>>(arr_cesi);
-      double *buf_cesi = static_cast<double *>(nd_cesi.data());
-      std::copy(opt->colorimetry.rf_cesi.begin(),
-                opt->colorimetry.rf_cesi.end(), buf_cesi);
-      d["rf_cesi"] = arr_cesi;
-
-      // Per-bin as numpy arrays
-      auto arr_rcs = np.attr("empty")(16, nb::arg("dtype") = "float64");
-      auto arr_rhs = np.attr("empty")(16, nb::arg("dtype") = "float64");
-      auto nd_rcs = nb::cast<nb::ndarray<>>(arr_rcs);
-      auto nd_rhs = nb::cast<nb::ndarray<>>(arr_rhs);
-      double *buf_rcs = static_cast<double *>(nd_rcs.data());
-      double *buf_rhs = static_cast<double *>(nd_rhs.data());
-      for (int j = 0; j < 16; ++j) {
-        buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
-        buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
+      if (samples) {
+        // rf_cesi as numpy array
+        auto arr_cesi = np.attr("empty")(99, nb::arg("dtype") = "float64");
+        auto nd_cesi = nb::cast<nb::ndarray<>>(arr_cesi);
+        double *buf_cesi = static_cast<double *>(nd_cesi.data());
+        std::copy(opt->colorimetry.rf_cesi.begin(),
+                  opt->colorimetry.rf_cesi.end(), buf_cesi);
+        d["rf_cesi"] = arr_cesi;
       }
-      d["rcs_hj"] = arr_rcs;
-      d["rhs_hj"] = arr_rhs;
+
+      if (bins) {
+        // Per-bin as numpy arrays
+        auto arr_rcs = np.attr("empty")(16, nb::arg("dtype") = "float64");
+        auto arr_rhs = np.attr("empty")(16, nb::arg("dtype") = "float64");
+        auto nd_rcs = nb::cast<nb::ndarray<>>(arr_rcs);
+        auto nd_rhs = nb::cast<nb::ndarray<>>(arr_rhs);
+        double *buf_rcs = static_cast<double *>(nd_rcs.data());
+        double *buf_rhs = static_cast<double *>(nd_rhs.data());
+        for (int j = 0; j < 16; ++j) {
+          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
+          buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
+        }
+        d["rcs_hj"] = arr_rcs;
+        d["rhs_hj"] = arr_rhs;
+      }
 
       if (extras) {
         // Rf,hj + DE_hj (16 values each)
@@ -1231,7 +1243,7 @@ NB_MODULE(tm30_core, m) {
            "Load SPDs from a 2-D numpy array (N_spds × N_wl). "
            "wavelengths defaults to 380–780 nm (1 nm step) if None.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
-           nb::arg("samples") = false, nb::arg("extras") = false,
+           nb::arg("samples") = true, nb::arg("extras") = false,
            "Run TM-30 on all prepared SPDs. Returns list of dicts "
            "(or None for failed SPDs). extras=True additionally includes "
            "rf_hj, de_hj, cvg_{j,x,y}_{test,ref}, reference_spd, "
@@ -1242,7 +1254,7 @@ NB_MODULE(tm30_core, m) {
            "`wavelengths`. Call once at construction; evaluate_cached() then "
            "reuses this cache for every SPD sharing this grid.")
       .def("evaluate_cached", &BatchContext::evaluate_cached,
-           nb::arg("bins") = true, nb::arg("samples") = false,
+           nb::arg("bins") = true, nb::arg("samples") = true,
            nb::arg("extras") = false,
            "Like evaluate(), but uses the grid-fixed tables cached by "
            "set_fixed_grid() and skips CES/CMF/daylight-basis resampling "

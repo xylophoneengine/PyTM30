@@ -259,7 +259,9 @@ class Tm30Result:
 
     # ── Scalar property names in display order ──
     _SCALAR_KEYS = ("rf", "rg", "cct", "duv", "delta_e_avg", "rf_skin")
-    _ARRAY_KEYS = ("rf_cesi", "rcs_hj", "rhs_hj")
+    # samples=True-only / bins=True-only array keys; absent otherwise.
+    _SAMPLES_ARRAY_KEYS = ("rf_cesi",)
+    _BINS_ARRAY_KEYS = ("rcs_hj", "rhs_hj")
     # extras=True-only array keys (see eval(extras=...)); absent otherwise.
     _EXTRAS_ARRAY_KEYS = (
         "rf_hj",
@@ -287,7 +289,8 @@ class Tm30Result:
         default arrays, and any extras=True fields)."""
         return (
             self._SCALAR_KEYS
-            + self._ARRAY_KEYS
+            + tuple(k for k in self._SAMPLES_ARRAY_KEYS if k in self._d)
+            + tuple(k for k in self._BINS_ARRAY_KEYS if k in self._d)
             + tuple(k for k in self._EXTRAS_ARRAY_KEYS if k in self._d)
         )
 
@@ -317,14 +320,32 @@ class Tm30Result:
 
     @property
     def rf_cesi(self) -> np.ndarray:
+        if "rf_cesi" not in self._d:
+            raise AttributeError(
+                "rf_cesi is not available on this result — call "
+                "eval(..., samples=True) to include it (samples defaults "
+                "to True; this result came from an explicit samples=False)."
+            )
         return np.asarray(self._d["rf_cesi"])
 
     @property
     def rcs_hj(self) -> np.ndarray:
+        if "rcs_hj" not in self._d:
+            raise AttributeError(
+                "rcs_hj is not available on this result — call "
+                "eval(..., bins=True) to include it (bins defaults "
+                "to True; this result came from an explicit bins=False)."
+            )
         return np.asarray(self._d["rcs_hj"])
 
     @property
     def rhs_hj(self) -> np.ndarray:
+        if "rhs_hj" not in self._d:
+            raise AttributeError(
+                "rhs_hj is not available on this result — call "
+                "eval(..., bins=True) to include it (bins defaults "
+                "to True; this result came from an explicit bins=False)."
+            )
         return np.asarray(self._d["rhs_hj"])
 
     # ── Extras (only present if eval(..., extras=True)) ──
@@ -599,16 +620,34 @@ class Tm30BatchResult:
     @property
     def rf_cesi(self) -> np.ndarray:
         """Per-sample fidelity Rf,CESi - shape (N, 99).  TM-30-20 §4.2."""
+        if "rf_cesi" not in self._d:
+            raise AttributeError(
+                "rf_cesi is not available on this result — call "
+                "eval(..., samples=True) to include it (samples defaults "
+                "to True; this result came from an explicit samples=False)."
+            )
         return self._d["rf_cesi"]
 
     @property
     def rcs_hj(self) -> np.ndarray:
         """Per-bin chroma shift Rcs,hj - shape (N, 16).  TM-30-20 §4.6."""
+        if "rcs_hj" not in self._d:
+            raise AttributeError(
+                "rcs_hj is not available on this result — call "
+                "eval(..., bins=True) to include it (bins defaults "
+                "to True; this result came from an explicit bins=False)."
+            )
         return self._d["rcs_hj"]
 
     @property
     def rhs_hj(self) -> np.ndarray:
         """Per-bin hue shift Rhs,hj - shape (N, 16).  TM-30-20 §4.7."""
+        if "rhs_hj" not in self._d:
+            raise AttributeError(
+                "rhs_hj is not available on this result — call "
+                "eval(..., bins=True) to include it (bins defaults "
+                "to True; this result came from an explicit bins=False)."
+            )
         return self._d["rhs_hj"]
 
     # ── Extras (only present if eval(..., extras=True)) ──
@@ -933,7 +972,7 @@ class TM30Calc:
         wavelengths: np.ndarray | None = None,
         *,
         bins: bool = True,
-        samples: bool = False,
+        samples: bool = True,
         extras: bool = False,
     ) -> Tm30Result | Tm30BatchResult:
         """Evaluate TM-30 for one or many SPDs.
@@ -959,9 +998,13 @@ class TM30Calc:
             Resampling is redone on the fly; the calculator's cached fixed
             grid is unaffected and unchanged by this.
         bins : bool
-            Include per-bin metrics (Rcs,hj, Rhs,hj).  Default True.
+            Include per-bin metrics (Rcs,hj, Rhs,hj).  Default True - pass
+            False to skip allocating/copying these arrays as a batch-size
+            memory/bandwidth optimization.
         samples : bool
-            Include per-sample fidelity Rf,CESi.  Default False.
+            Include per-sample fidelity Rf,CESi.  Default True - pass
+            False to skip allocating/copying this array as a batch-size
+            memory/bandwidth optimization.
         extras : bool
             Include additional fields: rf_hj, de_hj (16 each), CVG
             coordinates (cvg_j_test/x_test/y_test/j_ref/x_ref/y_ref, 16
