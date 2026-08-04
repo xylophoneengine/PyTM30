@@ -80,31 +80,39 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
 
   std::array<XyzTriple, 99> result;
 
-  // Pre-allocate integrand buffers (reused for each CES)
-  std::vector<double> st_r_times_cmf(n);
+  // Trapezoidal weights for this wavelength grid depend only on the grid
+  // itself, not on any CES sample - compute once per call (not once per
+  // CES) and reuse for all 99 samples.
+  // TM-30-20 §3.6: Σ_i w[i]·f[i] ≡ trapezoidal integration of f over
+  // spd_wavelengths.
+  const std::vector<double> w = trapezoidal_weights(spd_wavelengths);
+
+  // St(λ)·x̄₁₀(λ)/ȳ₁₀(λ)/z̄₁₀(λ), pre-multiplied by the trapezoidal weight,
+  // is also CES-independent - hoist it out of the 99-CES loop so it is
+  // computed once per call instead of once per CES per channel.
+  std::vector<double> swx(n), swy(n), swz(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    const double sw = w[i] * spd_values[i];
+    swx[i] = sw * cmf_x_bar[i];
+    swy[i] = sw * cmf_y_bar[i];
+    swz[i] = sw * cmf_z_bar[i];
+  }
 
   for (std::size_t ces_idx = 0; ces_idx < 99; ++ces_idx) {
     const auto &reflectance = ces_data.samples[ces_idx];
 
+    // TM-30-20 §3.6 Eq. (21)-(23): fused dot-product accumulators.
+    double X = 0.0, Y = 0.0, Z = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      X += reflectance[i] * swx[i];
+      Y += reflectance[i] * swy[i];
+      Z += reflectance[i] * swz[i];
+    }
+
     // TM-30-20 §3.6 Eq. (21): X_i = k · ∫ St(λ) · R_i(λ) · x̄₁₀(λ) dλ
-    for (std::size_t i = 0; i < n; ++i) {
-      st_r_times_cmf[i] = spd_values[i] * reflectance[i] * cmf_x_bar[i];
-    }
-    const double X = k * trapezoidal_integrate(spd_wavelengths, st_r_times_cmf);
-
     // TM-30-20 §3.6 Eq. (22): Y_i = k · ∫ St(λ) · R_i(λ) · ȳ₁₀(λ) dλ
-    for (std::size_t i = 0; i < n; ++i) {
-      st_r_times_cmf[i] = spd_values[i] * reflectance[i] * cmf_y_bar[i];
-    }
-    const double Y = k * trapezoidal_integrate(spd_wavelengths, st_r_times_cmf);
-
     // TM-30-20 §3.6 Eq. (23): Z_i = k · ∫ St(λ) · R_i(λ) · z̄₁₀(λ) dλ
-    for (std::size_t i = 0; i < n; ++i) {
-      st_r_times_cmf[i] = spd_values[i] * reflectance[i] * cmf_z_bar[i];
-    }
-    const double Z = k * trapezoidal_integrate(spd_wavelengths, st_r_times_cmf);
-
-    result[ces_idx] = XyzTriple{X, Y, Z};
+    result[ces_idx] = XyzTriple{k * X, k * Y, k * Z};
   }
 
   return result;

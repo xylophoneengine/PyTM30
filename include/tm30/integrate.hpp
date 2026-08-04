@@ -29,4 +29,21 @@ namespace tm30 {
 double trapezoidal_integrate(const std::vector<double>& wavelengths,
                              const std::vector<double>& integrand);
 
+/// Per-point trapezoidal weights for a wavelength grid.
+///
+/// Returns a vector of weights such that Σ_i weights[i] * f[i] is
+/// mathematically equivalent to trapezoidal_integrate(wavelengths, f) for
+/// any integrand f. This allows precomputing weights once for a wavelength
+/// grid and reusing them across many integrands.
+///
+/// Handles non-uniform wavelength grids correctly by computing Δλ per
+/// segment. Each interior point's weight is half the sum of its two adjacent
+/// segment widths; each endpoint's weight is half of its one adjacent segment.
+///
+/// @param wavelengths  Monotonically increasing wavelength values (nm).
+/// @return             A vector of per-point weights (same size as wavelengths).
+///
+/// @throws std::invalid_argument if fewer than 2 points are provided.
+std::vector<double> trapezoidal_weights(const std::vector<double>& wavelengths);
+
 }  // namespace tm30

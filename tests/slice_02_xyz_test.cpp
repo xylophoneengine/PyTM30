@@ -103,6 +103,47 @@ std::vector<double> full_1nm_grid() {
   return wl;
 }
 
+/// Linear interpolation of spectral data to a new wavelength grid.
+/// Uses flat extrapolation outside the source range.
+std::vector<double> resample_spd(const std::vector<double>& target_wl,
+                                  const std::vector<double>& source_wl,
+                                  const std::vector<double>& source_vals) {
+  std::vector<double> result;
+  result.reserve(target_wl.size());
+
+  std::size_t j = 0;
+
+  for (double tw : target_wl) {
+    // Flat extrapolation - low side
+    if (tw <= source_wl.front()) {
+      result.push_back(source_vals.front());
+      continue;
+    }
+
+    // Flat extrapolation - high side
+    if (tw >= source_wl.back()) {
+      result.push_back(source_vals.back());
+      continue;
+    }
+
+    // Advance j until source_wl[j] <= tw < source_wl[j+1]
+    while (j + 1 < source_wl.size() && source_wl[j + 1] <= tw) {
+      ++j;
+    }
+
+    // Linear interpolation between indices j and j+1
+    const double w0 = source_wl[j];
+    const double w1 = source_wl[j + 1];
+    const double v0 = source_vals[j];
+    const double v1 = source_vals[j + 1];
+
+    const double t = (tw - w0) / (w1 - w0);
+    result.push_back(v0 + t * (v1 - v0));
+  }
+
+  return result;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Integration accuracy
 // ─────────────────────────────────────────────────────────────────────────
@@ -170,6 +211,385 @@ TEST_CASE("Integrate - throws on fewer than 2 points", "[integrate][slice02]") {
   std::vector<double> wl = {1.0};
   std::vector<double> vals = {1.0};
   REQUIRE_THROWS_AS(trapezoidal_integrate(wl, vals), std::invalid_argument);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Trapezoidal weights - per-point weight equivalence
+// ─────────────────────────────────────────────────────────────────────────
+
+TEST_CASE("Trapezoidal weights - uniform 1 nm grid with constant function",
+          "[integrate][slice02]") {
+  // f(λ) = 1 over 380–780 nm at 1 nm step: 401 points.
+  // Σ w[i]*f[i] should equal trapezoidal_integrate result.
+  auto wl = full_1nm_grid();
+  std::vector<double> unity(wl.size(), 1.0);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * unity[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, unity);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - uniform 1 nm grid with linear function",
+          "[integrate][slice02]") {
+  // f(λ) = λ over 380–780 nm at 1 nm step: 401 points.
+  auto wl = full_1nm_grid();
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * wl[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, wl);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - uniform 1 nm grid with D65 spectrum",
+          "[integrate][slice02]") {
+  // f(λ) = D65 SPD values over 380–780 nm.
+  auto wl = full_1nm_grid();
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  REQUIRE(d65_wl.size() == wl.size());
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * d65_vals[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, d65_vals);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - uniform 5 nm grid with constant function",
+          "[integrate][slice02]") {
+  // Construct 5 nm grid: 380, 385, 390, ..., 780 (81 points)
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 780.0; w += 5.0) {
+    wl.push_back(w);
+  }
+  REQUIRE(wl.size() == 81);
+
+  std::vector<double> unity(wl.size(), 1.0);
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * unity[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, unity);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - uniform 5 nm grid with linear function",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 780.0; w += 5.0) {
+    wl.push_back(w);
+  }
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * wl[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, wl);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - uniform 5 nm grid with D65 spectrum",
+          "[integrate][slice02]") {
+  // Resample D65 to 5 nm grid
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 780.0; w += 5.0) {
+    wl.push_back(w);
+  }
+
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  // Resample d65 to match 5 nm grid
+  std::vector<double> d65_5nm = resample_spd(wl, d65_wl, d65_vals);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * d65_5nm[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, d65_5nm);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - non-uniform grid with constant function",
+          "[integrate][slice02]") {
+  // Non-uniform: 1 nm from 380–500, then 2 nm from 500–780
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 500.0; w += 1.0) {
+    wl.push_back(w);
+  }
+  for (double w = 502.0; w <= 780.0; w += 2.0) {
+    wl.push_back(w);
+  }
+
+  std::vector<double> unity(wl.size(), 1.0);
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * unity[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, unity);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - non-uniform grid with linear function",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 500.0; w += 1.0) {
+    wl.push_back(w);
+  }
+  for (double w = 502.0; w <= 780.0; w += 2.0) {
+    wl.push_back(w);
+  }
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * wl[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, wl);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - non-uniform grid with real spectrum",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 500.0; w += 1.0) {
+    wl.push_back(w);
+  }
+  for (double w = 502.0; w <= 780.0; w += 2.0) {
+    wl.push_back(w);
+  }
+
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  std::vector<double> d65_resampled = resample_spd(wl, d65_wl, d65_vals);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * d65_resampled[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, d65_resampled);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - minimal 2-point grid with constant function",
+          "[integrate][slice02]") {
+  std::vector<double> wl = {400.0, 500.0};
+  std::vector<double> unity(wl.size(), 1.0);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == 2);
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * unity[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, unity);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - minimal 2-point grid with linear function",
+          "[integrate][slice02]") {
+  std::vector<double> wl = {400.0, 500.0};
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == 2);
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * wl[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, wl);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - minimal 2-point grid with real spectrum",
+          "[integrate][slice02]") {
+  std::vector<double> wl = {400.0, 500.0};
+
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  std::vector<double> d65_2pt = resample_spd(wl, d65_wl, d65_vals);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == 2);
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * d65_2pt[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, d65_2pt);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - narrow range grid with constant function",
+          "[integrate][slice02]") {
+  // Narrow range: 450–600 nm at 1 nm
+  std::vector<double> wl;
+  for (double w = 450.0; w <= 600.0; w += 1.0) {
+    wl.push_back(w);
+  }
+  REQUIRE(wl.size() == 151);
+
+  std::vector<double> unity(wl.size(), 1.0);
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * unity[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, unity);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - narrow range grid with linear function",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 450.0; w <= 600.0; w += 1.0) {
+    wl.push_back(w);
+  }
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * wl[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, wl);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - narrow range grid with real spectrum",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 450.0; w <= 600.0; w += 1.0) {
+    wl.push_back(w);
+  }
+
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  std::vector<double> d65_narrow = resample_spd(wl, d65_wl, d65_vals);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * d65_narrow[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, d65_narrow);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - fine grid with constant function",
+          "[integrate][slice02]") {
+  // Very fine: 0.5 nm steps over 500–520 nm (41 points)
+  std::vector<double> wl;
+  for (double w = 500.0; w <= 520.0; w += 0.5) {
+    wl.push_back(w);
+  }
+  REQUIRE(wl.size() == 41);
+
+  std::vector<double> unity(wl.size(), 1.0);
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * unity[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, unity);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - fine grid with linear function",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 500.0; w <= 520.0; w += 0.5) {
+    wl.push_back(w);
+  }
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * wl[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, wl);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - fine grid with real spectrum",
+          "[integrate][slice02]") {
+  std::vector<double> wl;
+  for (double w = 500.0; w <= 520.0; w += 0.5) {
+    wl.push_back(w);
+  }
+
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  std::vector<double> d65_fine = resample_spd(wl, d65_wl, d65_vals);
+
+  auto weights = trapezoidal_weights(wl);
+  REQUIRE(weights.size() == wl.size());
+
+  double weighted_sum = 0.0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    weighted_sum += weights[i] * d65_fine[i];
+  }
+
+  double integral = trapezoidal_integrate(wl, d65_fine);
+  REQUIRE_THAT(weighted_sum, Catch::Matchers::WithinAbs(integral, 1e-9));
+}
+
+TEST_CASE("Trapezoidal weights - throws on fewer than 2 points",
+          "[integrate][slice02]") {
+  std::vector<double> wl = {1.0};
+  REQUIRE_THROWS_AS(trapezoidal_weights(wl), std::invalid_argument);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -293,6 +713,54 @@ TEST_CASE("XYZ - normalisation produces Y=100 for source", "[xyz][slice02]") {
 // CES tristimulus values
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Characterization-test oracle: verbatim copy of compute_ces_xyz's
+/// pre-rewrite body (nested loop building a fresh integrand per CES per
+/// channel and calling trapezoidal_integrate), preserved here so the
+/// weights-based rewrite in src/tm30/xyz.cpp can be checked against it
+/// directly. Do not "clean up" to match the new implementation - the whole
+/// point is that this stays a faithful copy of the old algorithm.
+std::array<XyzTriple, 99>
+compute_ces_xyz_reference(const std::vector<double> &spd_wavelengths,
+                          const std::vector<double> &spd_values,
+                          const CesData &ces_data,
+                          const std::vector<double> &cmf_x_bar,
+                          const std::vector<double> &cmf_y_bar,
+                          const std::vector<double> &cmf_z_bar, double k) {
+  const std::size_t n = spd_wavelengths.size();
+
+  if (ces_data.samples.size() != 99) {
+    throw std::invalid_argument(
+        "compute_ces_xyz requires exactly 99 CES samples, got " +
+        std::to_string(ces_data.samples.size()));
+  }
+
+  std::array<XyzTriple, 99> result;
+  std::vector<double> st_r_times_cmf(n);
+
+  for (std::size_t ces_idx = 0; ces_idx < 99; ++ces_idx) {
+    const auto &reflectance = ces_data.samples[ces_idx];
+
+    for (std::size_t i = 0; i < n; ++i) {
+      st_r_times_cmf[i] = spd_values[i] * reflectance[i] * cmf_x_bar[i];
+    }
+    const double X = k * trapezoidal_integrate(spd_wavelengths, st_r_times_cmf);
+
+    for (std::size_t i = 0; i < n; ++i) {
+      st_r_times_cmf[i] = spd_values[i] * reflectance[i] * cmf_y_bar[i];
+    }
+    const double Y = k * trapezoidal_integrate(spd_wavelengths, st_r_times_cmf);
+
+    for (std::size_t i = 0; i < n; ++i) {
+      st_r_times_cmf[i] = spd_values[i] * reflectance[i] * cmf_z_bar[i];
+    }
+    const double Z = k * trapezoidal_integrate(spd_wavelengths, st_r_times_cmf);
+
+    result[ces_idx] = XyzTriple{X, Y, Z};
+  }
+
+  return result;
+}
+
 TEST_CASE("XYZ - CES output shape is 99", "[xyz][slice02]") {
   // TM-30-20 §3.6: compute tristimulus values for all 99 CES under D65.
 
@@ -367,6 +835,40 @@ TEST_CASE("XYZ - CES compute rejects wrong CES count", "[xyz][slice02]") {
   REQUIRE_THROWS_AS(compute_ces_xyz(spd_wl, spd_vals, bad_ces, cmf.x_bar,
                                     cmf.y_bar, cmf.z_bar, 1.0),
                     std::invalid_argument);
+}
+
+TEST_CASE("XYZ - CES weights-based rewrite agrees with reference algorithm",
+          "[xyz][slice02]") {
+  // Old-vs-new regression test: compute_ces_xyz was rewritten to compute
+  // trapezoidal_weights() once per call and reduce the per-CES work to
+  // fused dot products, instead of building a fresh integrand array and
+  // calling trapezoidal_integrate per channel per CES. This must remain
+  // bit-level-equivalent (within floating-point reassociation noise) to
+  // the pre-rewrite algorithm, captured verbatim above as
+  // compute_ces_xyz_reference.
+
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), spd_wl);
+  CesData ces_1nm = load_ces(data_path("ces.csv"));
+
+  SourceXyz src =
+      compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
+
+  auto ces_old = compute_ces_xyz_reference(spd_wl, spd_vals, ces_1nm,
+                                           cmf.x_bar, cmf.y_bar, cmf.z_bar,
+                                           src.k);
+  auto ces_new = compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                 cmf.y_bar, cmf.z_bar, src.k);
+
+  // Reassociating the summation order (per-point weighted dot product vs.
+  // per-segment trapezoidal accumulation) introduces floating-point noise
+  // at the ~1e-13 level when prototyped; 1e-9 leaves generous headroom
+  // while still catching a real bug such as an off-by-one in the weights.
+  for (std::size_t i = 0; i < 99; ++i) {
+    REQUIRE_THAT(ces_new[i].X, Catch::Matchers::WithinAbs(ces_old[i].X, 1e-9));
+    REQUIRE_THAT(ces_new[i].Y, Catch::Matchers::WithinAbs(ces_old[i].Y, 1e-9));
+    REQUIRE_THAT(ces_new[i].Z, Catch::Matchers::WithinAbs(ces_old[i].Z, 1e-9));
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
