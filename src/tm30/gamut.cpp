@@ -9,15 +9,16 @@
 
 #include <cmath>
 #include <limits>
+#include <numbers> // std::numbers::pi
 
 namespace tm30 {
 
-// ─── Constants ────────────────────────────────────────────────────────────
+// --- Constants ------------------------------------------------------------
 
-// TM-30-20 §4.3: 16 bins of 22.5° each.
+// TM-30-20 §4.3: 16 bins of 22.5-deg each.
 static constexpr int kNumBins = 16; // TM-30-20 §4.3
 
-// TM-30-20 §4.3: Bin width in radians (22.5° = π/8).
+// TM-30-20 §4.3: Bin width in radians (22.5-deg = pi/8).
 static constexpr double kBinWidthDeg = 22.5; // TM-30-20 §4.3
 
 // TM-30-20 §4.1: Rf scaling factor.
@@ -27,15 +28,20 @@ static constexpr double kRfScale = 6.73; // TM-30-20 §4.1 Eq. (53)
 static constexpr double kLogRescale = 10.0; // TM-30-20 §4.1 Eq. (54)
 
 // TM-30-20 §4.6, §4.7: Local shift scaling.
-// Note: Eq. (62) and (63) in the spec include a factor of 100 to convert
-// to percentage, but luxpy (the oracle) stores unscaled values.
-// We match the oracle convention.
+// Note: Eqs. (62)/(63) as printed are ratio-valued and carry NO x100
+// factor. §4.6/§4.7 only require Rcs,hj/Rhs,hj to be "represented as a
+// percentage" -- a reporting instruction, not equation content. luxpy
+// stores raw ratios; we match luxpy (compute raw, scale at report time).
 static constexpr double kLocalShiftScale = 1.0; // TM-30-20 §4.6, §4.7
 
-// TM-30-20 §4.5: CVG display scaling factor.
-static constexpr double kCvgScale = 100.0; // TM-30-20 §4.5
+// CVG display scale -- implementation convention, NOT a §4.5 quantity.
+// §4.5 normalizes reference coordinates to a unit circle (radius 1) with
+// plot axis limits of +/-1.5; no x100 appears in Eqs. (58)-(61) or their
+// surrounding text. The x100 here is kept for luxpy fixture parity;
+// whitelisted in tools/check_constants_whitelist.txt.
+static constexpr double kCvgScale = 100.0;
 
-// ─── Bin Averages ─────────────────────────────────────────────────────────
+// --- Bin Averages ---------------------------------------------------------
 
 BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
                         const HueBins &bins) {
@@ -72,12 +78,12 @@ BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
   return avg;
 }
 
-// ─── Polygon Area (Shoelace) ──────────────────────────────────────────────
+// --- Polygon Area (Shoelace) ----------------------------------------------
 
 double polygon_area(const BinAverages &avg) {
   // TM-30-20 §4.4: Shoelace formula in (a', b') plane
 
-  // Collect non-NaN vertices in bin order (0→15).
+  // Collect non-NaN vertices in bin order (0->15).
   // TM-30-20 §4.4: empty bins are skipped.
   struct Vertex {
     double a;
@@ -102,7 +108,7 @@ double polygon_area(const BinAverages &avg) {
     return 0.0;
   }
 
-  // Shoelace: A = 0.5 * |Σ (x_i * y_{i+1} - x_{i+1} * y_i)|
+  // Shoelace: A = 0.5 * |sum (x_i * y_{i+1} - x_{i+1} * y_i)|
   // TM-30-20 §4.4
   double sum = 0.0;
   for (int i = 0; i < n; ++i) {
@@ -113,7 +119,7 @@ double polygon_area(const BinAverages &avg) {
   return 0.5 * std::abs(sum); // TM-30-20 §4.4
 }
 
-// ─── Rg ───────────────────────────────────────────────────────────────────
+// --- Rg -------------------------------------------------------------------
 
 double compute_rg(const BinAverages &test_avg, const BinAverages &ref_avg) {
   // TM-30-20 §4.4 Eq. (57)
@@ -122,7 +128,7 @@ double compute_rg(const BinAverages &test_avg, const BinAverages &ref_avg) {
   return 100.0 * A_test / A_ref;                // TM-30-20 §4.4 Eq. (57)
 }
 
-// ─── Local Bin Metrics ────────────────────────────────────────────────────
+// --- Local Bin Metrics ----------------------------------------------------
 
 LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
                                           const BinAverages &ref_avg,
@@ -147,7 +153,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
       continue;
     }
 
-    // ── Mean ΔE′ per bin ───────────────────────────────────────
+    // -- Mean dE' per bin ---------------------------------------
     // TM-30-20 §4.8
     double sum_de = 0.0;
     for (int idx : bin) {
@@ -156,7 +162,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     const double DE_hj = sum_de / static_cast<double>(m); // TM-30-20 §4.8
     metrics.DE_hj[j] = DE_hj;
 
-    // ── Rf,hj ──────────────────────────────────────────────────
+    // -- Rf,hj --------------------------------------------------
     // TM-30-20 §4.8 Eq. (64), (65)
     const double Rf_hj_prime =
         100.0 - kRfScale * DE_hj; // TM-30-20 §4.8 Eq. (64)
@@ -164,7 +170,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
         kLogRescale * std::log( // TM-30-20 §4.8 Eq. (65)
                           std::exp(Rf_hj_prime / kLogRescale) + 1.0);
 
-    // ── Rcs,hj and Rhs,hj ──────────────────────────────────────
+    // -- Rcs,hj and Rhs,hj --------------------------------------
     // TM-30-20 §4.6, §4.7
     const double da = test_avg.a_prime[j] - ref_avg.a_prime[j]; // TM-30-20 §4.6
     const double db = test_avg.b_prime[j] - ref_avg.b_prime[j]; // TM-30-20 §4.6
@@ -182,10 +188,10 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
       continue;
     }
 
-    // Bin bisector angle: θj = (j + 0.5) × 22.5° (0-indexed)
-    // TM-30-20 §4.6: θj is the bisector angle of bin j
+    // Bin bisector angle: thetaj = (j + 0.5) x 22.5-deg (0-indexed)
+    // TM-30-20 §4.6: thetaj is the bisector angle of bin j
     const double theta_deg = (static_cast<double>(j) + 0.5) * kBinWidthDeg;
-    const double theta = theta_deg * M_PI / 180.0; // TM-30-20 §4.6
+    const double theta = theta_deg * std::numbers::pi / 180.0; // TM-30-20 §4.6
 
     const double cos_t = std::cos(theta);
     const double sin_t = std::sin(theta);
@@ -202,7 +208,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
   return metrics;
 }
 
-// ─── CVG Coordinates ──────────────────────────────────────────────────────
+// --- CVG Coordinates ------------------------------------------------------
 
 CvgCoordinates
 compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
@@ -213,7 +219,11 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
   CvgCoordinates cvg{};
 
   for (int j = 0; j < kNumBins; ++j) {
-    // TM-30-20 §4.5: J' passes through unchanged
+    // Pass J' through as a pytm30 extension of the §4.4 bin averages.
+    // NOT a §4.5 quantity -- §4.4 explicitly discards J' ("so that the
+    // (a', b') coordinates each form a polygon"), and §4.5 Eqs. (58)-(61)
+    // are strictly 2-D in (a', b'). Carrying J' is a convenience for
+    // downstream consumers; the spec does not.
     cvg.J_test[j] = test_avg.J_prime[j];
     cvg.J_ref[j] = ref_avg.J_prime[j];
 
@@ -227,7 +237,7 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
     }
 
     // Reference hue angle from bin-averaged a', b'
-    // TM-30-20 §4.5: h̄_ref,j = atan2(b̄'r,j, ā'r,j)
+    // TM-30-20 §4.5: hbar_ref,j = atan2(bbar'r,j, abar'r,j)
     // The spec calls for mean of individual hue angles, but the
     // oracle (luxpy) uses the bin-averaged coordinates directly.
     const double h_bar = std::atan2(ref_avg.b_prime[j], ref_avg.a_prime[j]);
@@ -265,7 +275,7 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
   return cvg;
 }
 
-// ─── Main compute_gamut ───────────────────────────────────────────────────
+// --- Main compute_gamut ---------------------------------------------------
 
 GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
                           const std::array<Cam02Ucs, 99> &jab_ref,

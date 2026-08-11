@@ -1,4 +1,4 @@
-// CIE 1964 10° tristimulus value computation.
+// CIE 1964 10-deg tristimulus value computation.
 // TM-30-20 §3.1: Colorimetric Observer
 // TM-30-20 §3.2: Test Source - tristimulus values
 // TM-30-20 §3.6: Calculation of Tristimulus Values
@@ -23,8 +23,9 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
         "compute_source_xyz requires at least 2 wavelength points");
   }
 
-  // Build integrand for numerator of k: St(λ) · ȳ₁₀(λ)
-  // TM-30-20 §3.2 Eq. (4): k = 100 / ∫ St(λ) · ȳ₁₀(λ) dλ
+  // Build integrand for numerator of k: St(lambda) * ybar10(lambda)
+  // TM-30-20 §3.2 Eq. (4): k = 100 / integral St(lambda) * ybar10(lambda)
+  // dlambda
   std::vector<double> st_times_ybar(n);
   for (std::size_t i = 0; i < n; ++i) {
     st_times_ybar[i] = spd_values[i] * cmf_y_bar[i];
@@ -37,9 +38,9 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
   const double k = 100.0 / integral_st_ybar;
 
   // Build integrands and integrate
-  // TM-30-20 §3.2 Eq. (1): X = k · ∫ St(λ) · x̄₁₀(λ) dλ
-  // TM-30-20 §3.2 Eq. (2): Y = k · ∫ St(λ) · ȳ₁₀(λ) dλ
-  // TM-30-20 §3.2 Eq. (3): Z = k · ∫ St(λ) · z̄₁₀(λ) dλ
+  // TM-30-20 §3.2 Eq. (1): X = k * integral St(lambda) * xbar10(lambda) dlambda
+  // TM-30-20 §3.2 Eq. (2): Y = k * integral St(lambda) * ybar10(lambda) dlambda
+  // TM-30-20 §3.2 Eq. (3): Z = k * integral St(lambda) * zbar10(lambda) dlambda
 
   std::vector<double> st_times_xbar(n);
   std::vector<double> st_times_zbar(n);
@@ -83,13 +84,14 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
   // Trapezoidal weights for this wavelength grid depend only on the grid
   // itself, not on any CES sample - compute once per call (not once per
   // CES) and reuse for all 99 samples.
-  // TM-30-20 §3.6: Σ_i w[i]·f[i] ≡ trapezoidal integration of f over
+  // TM-30-20 §3.6: sum_i w[i]*f[i] == trapezoidal integration of f over
   // spd_wavelengths.
   const std::vector<double> w = trapezoidal_weights(spd_wavelengths);
 
-  // St(λ)·x̄₁₀(λ)/ȳ₁₀(λ)/z̄₁₀(λ), pre-multiplied by the trapezoidal weight,
-  // is also CES-independent - hoist it out of the 99-CES loop so it is
-  // computed once per call instead of once per CES per channel.
+  // St(lambda)*xbar10(lambda)/ybar10(lambda)/zbar10(lambda), pre-multiplied by
+  // the trapezoidal weight, is also CES-independent - hoist it out of the
+  // 99-CES loop so it is computed once per call instead of once per CES per
+  // channel.
   std::vector<double> swx(n), swy(n), swz(n);
   for (std::size_t i = 0; i < n; ++i) {
     const double sw = w[i] * spd_values[i];
@@ -109,16 +111,17 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
       Z += reflectance[i] * swz[i];
     }
 
-    // TM-30-20 §3.6 Eq. (21): X_i = k · ∫ St(λ) · R_i(λ) · x̄₁₀(λ) dλ
-    // TM-30-20 §3.6 Eq. (22): Y_i = k · ∫ St(λ) · R_i(λ) · ȳ₁₀(λ) dλ
-    // TM-30-20 §3.6 Eq. (23): Z_i = k · ∫ St(λ) · R_i(λ) · z̄₁₀(λ) dλ
+    // TM-30-20 §3.6 Eq. (21)-(23):
+    //   X_i = k * integral St(lambda) * R_i(lambda) * xbar10(lambda) dlambda
+    //   Y_i = k * integral St(lambda) * R_i(lambda) * ybar10(lambda) dlambda
+    //   Z_i = k * integral St(lambda) * R_i(lambda) * zbar10(lambda) dlambda
     result[ces_idx] = XyzTriple{k * X, k * Y, k * Z};
   }
 
   return result;
 }
 
-// ── Convenience functions ──────────────────────────────────────────────
+// -- Convenience functions ----------------------------------------------
 
 namespace {
 
@@ -179,7 +182,7 @@ ClipIndices compute_clip_indices(const std::vector<double> &spd_wavelengths,
   if (clipped_n < 2) {
     throw std::invalid_argument(
         "Integration range produces fewer than 2 wavelength points "
-        "(need ≥2 for trapezoidal integration)");
+        "(need >=2 for trapezoidal integration)");
   }
 
   return {lo_idx, hi_idx};
@@ -225,7 +228,8 @@ XyzTriple spd_to_xyz(const std::vector<double> &spd_wavelengths,
   CmfData cmf_resampled = resample_cmf(clip_wl, cmf_data);
   SourceXyz src = compute_source_xyz(clip_wl, clip_vals, cmf_resampled.x_bar,
                                      cmf_resampled.y_bar, cmf_resampled.z_bar);
-  // src.X = k·∫St·x̄, src.Y = k·∫St·ȳ, src.Z = k·∫St·z̄ where k = 100/∫St·ȳ
+  // src.X = k*integral St*xbar, src.Y = k*integral St*ybar,
+  // src.Z = k*integral St*zbar, where k = 100/integral St*ybar
   // TM-30-20 §3.2 Eq. (1)-(4)
   if (K.has_value()) {
     // Use caller-supplied multiplier: undo auto-k, apply K
@@ -295,8 +299,7 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
   return results;
 }
 
-std::vector<YuvTriple>
-xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs) {
+std::vector<YuvTriple> xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs) {
   std::vector<YuvTriple> results;
   results.reserve(xyzs.size());
   for (const auto &xyz : xyzs) {
@@ -323,11 +326,11 @@ XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
   return XyzTriple{src.X, src.Y, src.Z};
 }
 
-std::vector<XyzTriple>
-cct_to_xyz_batch(const std::vector<double> &ccts,
-                 const std::vector<double> &wavelengths,
-                 const DaylightBasis &basis, const CmfData &cmf_data,
-                 std::optional<double> K) {
+std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
+                                        const std::vector<double> &wavelengths,
+                                        const DaylightBasis &basis,
+                                        const CmfData &cmf_data,
+                                        std::optional<double> K) {
   CmfData cmf_resampled = resample_cmf(wavelengths, cmf_data);
   std::vector<XyzTriple> results;
   results.reserve(ccts.size());

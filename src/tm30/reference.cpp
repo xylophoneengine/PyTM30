@@ -10,9 +10,9 @@
 
 namespace tm30 {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // load_daylight_basis
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 DaylightBasis load_daylight_basis(const std::string &filepath) {
   CsvTable table = load_csv(filepath);
@@ -34,9 +34,9 @@ DaylightBasis load_daylight_basis(const std::string &filepath) {
   return basis;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Linear interpolation helper for spectral vectors
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 namespace {
 
@@ -84,9 +84,9 @@ std::vector<double> interpolate_linear(const std::vector<double> &target_wl,
 
 } // anonymous namespace
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // resample_daylight_basis
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 DaylightBasis
 resample_daylight_basis(const std::vector<double> &target_wavelengths,
@@ -102,9 +102,9 @@ resample_daylight_basis(const std::vector<double> &target_wavelengths,
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // generate_planckian
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::vector<double> generate_planckian(double cct,
                                        const std::vector<double> &wavelengths) {
@@ -115,9 +115,10 @@ std::vector<double> generate_planckian(double cct,
   std::vector<double> spd(n);
 
   // Pre-compute normalisation denominator at 560 nm
-  // λ = 560 nm = 5.60e-7 m
+  // lambda = 560 nm = 5.60e-7 m
   constexpr double lambda_560_m = 560.0e-9; // TM-30-20 §3.3 Eq. (5)
-  // TM-30-20 §3.3 Eq. (6): Le,λ(λ, T) = λ^(-5) / (exp(c2/(λ·T)) - 1)
+  // TM-30-20 §3.3 Eq. (6):
+  //   Le,lambda(lambda, T) = lambda^(-5) / (exp(c2/(lambda*T)) - 1)
   const double L_560 =
       std::pow(lambda_560_m, -5.0) /
       (std::exp(c2 / (lambda_560_m * cct)) - 1.0); // TM-30-20 §3.3 Eq. (6)
@@ -138,9 +139,9 @@ std::vector<double> generate_planckian(double cct,
   return spd;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // generate_cie_d
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::vector<double> generate_cie_d(double cct,
                                    const std::vector<double> &wavelengths,
@@ -168,7 +169,7 @@ std::vector<double> generate_cie_d(double cct,
   // The reciprocal temperature
   const double Tr = cct; // TM-30-20 §3.3: Tr = Tt for TM-30 reference
 
-  // TM-30-20 §3.3 Eq. (10): Tt ≤ 7000 K branch
+  // TM-30-20 §3.3 Eq. (10): Tt <= 7000 K branch
   // TM-30-20 §3.3 Eq. (11): Tt > 7000 K branch
   double xD;
   if (Tr <= 7000.0) {
@@ -189,7 +190,7 @@ std::vector<double> generate_cie_d(double cct,
   const double yD =
       -3.000 * xD * xD + 2.870 * xD - 0.275; // TM-30-20 §3.3 Eq. (12)
 
-  // TM-30-20 §3.3 Eq. (8)-(9): M₁, M₂ multipliers
+  // TM-30-20 §3.3 Eq. (8)-(9): M1, M2 multipliers
   const double denom = 0.0241 + 0.2562 * xD -
                        0.7341 * yD; // TM-30-20 §3.3 Eq. (8)-(9) denominator
 
@@ -197,16 +198,19 @@ std::vector<double> generate_cie_d(double cct,
       (-1.3515 - 1.7703 * xD + 5.9114 * yD) / denom; // TM-30-20 §3.3 Eq. (8)
   const double M2 =
       (0.0300 - 31.4424 * xD + 30.0717 * yD) / denom; // TM-30-20 §3.3 Eq. (9)
-  // NOTE: 0.0300 corrected per TM-30-20 Errata 1  - TM-30-20 §3.3 Eq. (9)
+  // NOTE: 0.0300 per TM-30-20 §3.3 Eq. (9) main body (TM-30-15 printed
+  // 0.030). Errata 1 covers only §3.7.1 + Annex F.3.2/F.3.3/F.3.6 (plus
+  // figure replacements F-2/F-3/F-5/F-9) and does NOT touch Eq. (9).
 
-  // TM-30-20 §3.3 Eq. (7): S(λ) = S₀(λ) + M₁·S₁(λ) + M₂·S₂(λ)
+  // TM-30-20 §3.3 Eq. (7): S(lambda) = S0(lambda) + M1*S1(lambda) +
+  // M2*S2(lambda)
   std::vector<double> spd(n);
   for (std::size_t i = 0; i < n; ++i) {
     spd[i] = S0[i] + M1 * S1[i] + M2 * S2[i]; // TM-30-20 §3.3 Eq. (7)
   }
 
   // Normalise at 560 nm.
-  // The basis vectors give S₀(560) = 100, S₁(560) = 0, S₂(560) = 0,
+  // The basis vectors give S0(560) = 100, S1(560) = 0, S2(560) = 0,
   // so S(560) = 100.  Divide by 100 (or more generally, by the value
   // at whichever wavelength is closest to 560 nm).
   // Find the index closest to 560 nm
@@ -229,9 +233,9 @@ std::vector<double> generate_cie_d(double cct,
   return spd;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // generate_reference_spd
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::vector<double>
 generate_reference_spd(double cct, const std::vector<double> &wavelengths,
@@ -240,21 +244,21 @@ generate_reference_spd(double cct, const std::vector<double> &wavelengths,
                        bool already_resampled) {
   const std::size_t n = wavelengths.size();
 
-  // TM-30-20 §3.3 Eq. (14): Tt ≤ 4000 K → pure Planckian
+  // TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   if (cct <= 4000.0) { // TM-30-20 §3.3 Eq. (14)
     return generate_planckian(cct, wavelengths);
   }
 
-  // TM-30-20 §3.3 Eq. (16): Tt ≥ 5000 K → pure D-series
+  // TM-30-20 §3.3 Eq. (16): Tt >= 5000 K -> pure D-series
   if (cct >= 5000.0) { // TM-30-20 §3.3 Eq. (16)
     return generate_cie_d(cct, wavelengths, basis, already_resampled);
   }
 
-  // TM-30-20 §3.3 Eq. (15): 4000 K < Tt < 5000 K → proportional blend
+  // TM-30-20 §3.3 Eq. (15): 4000 K < Tt < 5000 K -> proportional blend
   //
   // Blend procedure:
   // 1. Generate Planckian and D-series SPDs, both 560-nm normalised.
-  // 2. Y-normalise each to 100 using CIE 1964 10° ȳ₁₀(λ).
+  // 2. Y-normalise each to 100 using CIE 1964 10-deg ybar10(lambda).
   // 3. Blend linearly with factor (5000 - Tt) / 1000.
   // 4. Re-normalise at 560 nm.
   //
@@ -266,7 +270,7 @@ generate_reference_spd(double cct, const std::vector<double> &wavelengths,
       cct, wavelengths, basis, already_resampled); // TM-30-20 §3.3 Eq. (7)
 
   // Compute Y for each component via trapezoidal integration.
-  // TM-30-20 §3.6: Y = ∫ SPD(λ) · ȳ₁₀(λ) dλ
+  // TM-30-20 §3.6: Y = integral SPD(lambda) * ybar10(lambda) dlambda
   auto compute_Y = [&](const std::vector<double> &spd) -> double {
     std::vector<double> integrand(n);
     for (std::size_t i = 0; i < n; ++i) {

@@ -1,4 +1,5 @@
-// Slice 2 - CMF integration → XYZ tristimulus values (CIE 1964 10° observer).
+// Slice 2 - CMF integration -> XYZ tristimulus values (CIE 1964 10-deg
+// observer).
 //
 // TM-30-20 §3.1: Colorimetric Observer
 // TM-30-20 §3.2: Test Source Tristimulus Values
@@ -25,9 +26,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -54,7 +55,7 @@ CesData load_ces(const std::string &path) {
   return data;
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -144,13 +145,13 @@ std::vector<double> resample_spd(const std::vector<double> &target_wl,
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Integration accuracy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Integrate - constant function over uniform grid",
           "[integrate][slice02]") {
-  // f(λ) = 1 over 380-780 nm at 1 nm step: 401 points.
+  // f(lambda) = 1 over 380-780 nm at 1 nm step: 401 points.
   // Expected: 400.0 (401 points, 400 segments of width 1, avg = 1)
   auto wl = full_1nm_grid();
   std::vector<double> unity(wl.size(), 1.0);
@@ -161,16 +162,16 @@ TEST_CASE("Integrate - constant function over uniform grid",
 
 TEST_CASE("Integrate - linear function over uniform grid",
           "[integrate][slice02]") {
-  // f(λ) = λ over [0, 10] with step 1.
-  // Expected: ∫₀¹⁰ λ dλ = 50.0
+  // f(lambda) = lambda over [0, 10] with step 1.
+  // Expected: integral 0^1^0 lambda dlambda = 50.0
   std::vector<double> wl = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0,
                             6.0, 7.0, 8.0, 9.0, 10.0};
-  double result = trapezoidal_integrate(wl, wl); // f(λ) = λ
+  double result = trapezoidal_integrate(wl, wl); // f(lambda) = lambda
   REQUIRE_THAT(result, Catch::Matchers::WithinAbs(50.0, 1e-12));
 }
 
 TEST_CASE("Integrate - non-uniform grid", "[integrate][slice02]") {
-  // f(λ) = 1 over [0, 10] with non-uniform steps: [0, 2, 5, 7, 10]
+  // f(lambda) = 1 over [0, 10] with non-uniform steps: [0, 2, 5, 7, 10]
   // Expected: 10.0 (total interval length)
   std::vector<double> wl = {0.0, 2.0, 5.0, 7.0, 10.0};
   std::vector<double> unity(wl.size(), 1.0);
@@ -180,9 +181,9 @@ TEST_CASE("Integrate - non-uniform grid", "[integrate][slice02]") {
 
 TEST_CASE("Integrate - non-uniform grid with varying function",
           "[integrate][slice02]") {
-  // f(λ) = λ² over [0, 1, 3, 6]
-  // Expected: ∫₀⁶ λ² dλ = 72.0
-  // Trapezoidal: ½·(0²+1²)·1 + ½·(1²+3²)·2 + ½·(3²+6²)·3
+  // f(lambda) = lambda^2 over [0, 1, 3, 6]
+  // Expected: integral 0^6 lambda^2 dlambda = 72.0
+  // Trapezoidal: 1/2*(0^2+1^2)*1 + 1/2*(1^2+3^2)*2 + 1/2*(3^2+6^2)*3
   // = 0.5 + 10 + 67.5 = 78.0 (approximation)
   std::vector<double> wl = {0.0, 1.0, 3.0, 6.0};
   std::vector<double> vals;
@@ -194,7 +195,7 @@ TEST_CASE("Integrate - non-uniform grid with varying function",
 }
 
 TEST_CASE("Integrate - single segment", "[integrate][slice02]") {
-  // f(λ) = 3 over [5, 10]: expected = 3 * 5 = 15
+  // f(lambda) = 3 over [5, 10]: expected = 3 * 5 = 15
   std::vector<double> wl = {5.0, 10.0};
   std::vector<double> vals = {3.0, 3.0};
   REQUIRE_THAT(trapezoidal_integrate(wl, vals),
@@ -213,14 +214,14 @@ TEST_CASE("Integrate - throws on fewer than 2 points", "[integrate][slice02]") {
   REQUIRE_THROWS_AS(trapezoidal_integrate(wl, vals), std::invalid_argument);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Trapezoidal weights - per-point weight equivalence
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Trapezoidal weights - uniform 1 nm grid with constant function",
           "[integrate][slice02]") {
-  // f(λ) = 1 over 380-780 nm at 1 nm step: 401 points.
-  // Σ w[i]*f[i] should equal trapezoidal_integrate result.
+  // f(lambda) = 1 over 380-780 nm at 1 nm step: 401 points.
+  // sum w[i]*f[i] should equal trapezoidal_integrate result.
   auto wl = full_1nm_grid();
   std::vector<double> unity(wl.size(), 1.0);
 
@@ -238,7 +239,7 @@ TEST_CASE("Trapezoidal weights - uniform 1 nm grid with constant function",
 
 TEST_CASE("Trapezoidal weights - uniform 1 nm grid with linear function",
           "[integrate][slice02]") {
-  // f(λ) = λ over 380-780 nm at 1 nm step: 401 points.
+  // f(lambda) = lambda over 380-780 nm at 1 nm step: 401 points.
   auto wl = full_1nm_grid();
 
   auto weights = trapezoidal_weights(wl);
@@ -255,7 +256,7 @@ TEST_CASE("Trapezoidal weights - uniform 1 nm grid with linear function",
 
 TEST_CASE("Trapezoidal weights - uniform 1 nm grid with D65 spectrum",
           "[integrate][slice02]") {
-  // f(λ) = D65 SPD values over 380-780 nm.
+  // f(lambda) = D65 SPD values over 380-780 nm.
   auto wl = full_1nm_grid();
   auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
   REQUIRE(d65_wl.size() == wl.size());
@@ -592,11 +593,11 @@ TEST_CASE("Trapezoidal weights - throws on fewer than 2 points",
   REQUIRE_THROWS_AS(trapezoidal_weights(wl), std::invalid_argument);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Energy conservation - CMF integrals
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("CMF - x̄₁₀ integral over 380-780 nm", "[cmf][slice02]") {
+TEST_CASE("CMF - xbar10 integral over 380-780 nm", "[cmf][slice02]") {
   CmfData cmf_full = load_cmf(data_path("cmf_1964_10.csv"));
   REQUIRE(cmf_full.wavelengths.size() == 471); // 360-830 nm at 1 nm
 
@@ -606,33 +607,33 @@ TEST_CASE("CMF - x̄₁₀ integral over 380-780 nm", "[cmf][slice02]") {
 
   double int_xbar = trapezoidal_integrate(cmf.wavelengths, cmf.x_bar);
   // Golden value computed from luxpy CMF data via trapezoidal integration:
-  // ∫ x̄₁₀ dλ = 116.6475035076
+  // integral xbar10 dlambda = 116.6475035076
   REQUIRE_THAT(int_xbar, WithinTolerance(Tol_Xyz, 116.6475035076));
 }
 
-TEST_CASE("CMF - ȳ₁₀ integral over 380-780 nm", "[cmf][slice02]") {
+TEST_CASE("CMF - ybar10 integral over 380-780 nm", "[cmf][slice02]") {
   CmfData cmf_full = load_cmf(data_path("cmf_1964_10.csv"));
   auto wl_380_780 = full_1nm_grid();
   CmfData cmf = resample_cmf(wl_380_780, cmf_full);
 
   double int_ybar = trapezoidal_integrate(cmf.wavelengths, cmf.y_bar);
-  // ∫ ȳ₁₀ dλ = 116.6616192707
+  // integral ybar10 dlambda = 116.6616192707
   REQUIRE_THAT(int_ybar, WithinTolerance(Tol_Xyz, 116.6616192707));
 }
 
-TEST_CASE("CMF - z̄₁₀ integral over 380-780 nm", "[cmf][slice02]") {
+TEST_CASE("CMF - zbar10 integral over 380-780 nm", "[cmf][slice02]") {
   CmfData cmf_full = load_cmf(data_path("cmf_1964_10.csv"));
   auto wl_380_780 = full_1nm_grid();
   CmfData cmf = resample_cmf(wl_380_780, cmf_full);
 
   double int_zbar = trapezoidal_integrate(cmf.wavelengths, cmf.z_bar);
-  // ∫ z̄₁₀ dλ = 116.6717442180
+  // integral zbar10 dlambda = 116.6717442180
   REQUIRE_THAT(int_zbar, WithinTolerance(Tol_Xyz, 116.6717442180));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // D65 source XYZ
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("XYZ - D65 source tristimulus (1 nm)", "[xyz][slice02]") {
   // Load D65 SPD at 1 nm, 380-780. CMF now covers 360-830 nm - resample.
@@ -641,7 +642,7 @@ TEST_CASE("XYZ - D65 source tristimulus (1 nm)", "[xyz][slice02]") {
 
   CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), spd_wl);
 
-  // TM-30-20 §3.2: compute source XYZ with CIE 1964 10° observer
+  // TM-30-20 §3.2: compute source XYZ with CIE 1964 10-deg observer
   SourceXyz src =
       compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
 
@@ -657,14 +658,15 @@ TEST_CASE("XYZ - D65 source tristimulus (1 nm)", "[xyz][slice02]") {
   REQUIRE_THAT(src.Z, WithinTolerance(Tol_Xyz, 107.3036929917));
 
   // k must be positive and finite
-  // TM-30-20 §3.2 Eq. (4): k = 100 / ∫ St(λ) · ȳ₁₀(λ) dλ
+  // TM-30-20 §3.2 Eq. (4): k = 100 / integral St(lambda) * ybar10(lambda)
+  // dlambda
   REQUIRE(src.k > 0.0);
   REQUIRE(std::isfinite(src.k));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Illuminant A source XYZ
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("XYZ - Illuminant A source tristimulus (1 nm)", "[xyz][slice02]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
@@ -686,9 +688,9 @@ TEST_CASE("XYZ - Illuminant A source tristimulus (1 nm)", "[xyz][slice02]") {
   REQUIRE(std::isfinite(src.k));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Normalisation verification
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("XYZ - normalisation produces Y=100 for source", "[xyz][slice02]") {
   // TM-30-20 §3.2: Y should be exactly 100 for any valid source SPD.
@@ -709,9 +711,9 @@ TEST_CASE("XYZ - normalisation produces Y=100 for source", "[xyz][slice02]") {
   REQUIRE_THAT(a_xyz.Y, WithinTolerance(Tol_Xyz, 100.0));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CES tristimulus values
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /// Characterization-test oracle: verbatim copy of compute_ces_xyz's
 /// pre-rewrite body (nested loop building a fresh integrand per CES per
@@ -805,7 +807,7 @@ TEST_CASE("XYZ - CES tristimulus uses source normalisation constant",
   auto ces_xyz = compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
                                  cmf.y_bar, cmf.z_bar, src.k);
 
-  // All CES Y values should be between 0 and 100 (reflectance ≤ 1)
+  // All CES Y values should be between 0 and 100 (reflectance <= 1)
   for (const auto &xyz : ces_xyz) {
     REQUIRE(xyz.Y >= 0.0);
     REQUIRE(xyz.Y <= 100.0);
@@ -868,15 +870,15 @@ TEST_CASE("XYZ - CES weights-based rewrite agrees with reference algorithm",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Scale invariance - doubling SPD should double XYZ (pre-normalisation)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("XYZ - scale invariance: doubled SPD gives same XYZ",
           "[xyz][slice02]") {
   // TM-30-20 normalisation means scaling the SPD by any factor
   // produces identical XYZ tristimulus values.
-  // k changes inversely, but k * ∫ St·x̄ stays constant.
+  // k changes inversely, but k * integral St*xbar stays constant.
 
   auto wl = full_1nm_grid();
   CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), wl);
@@ -902,9 +904,9 @@ TEST_CASE("XYZ - scale invariance: doubled SPD gives same XYZ",
   REQUIRE_THAT(src2.k, Catch::Matchers::WithinAbs(src1.k * 0.5, Tol_Xyz));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Resampled input (5 nm grid)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("XYZ - source XYZ from 5nm resampled data agrees with 1nm",
           "[xyz][slice02]") {

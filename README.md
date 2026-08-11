@@ -1,5 +1,7 @@
 # pytm30 - TM-30-20 Colour Rendition in C++20
 
+[![CI](https://github.com/xylophoneengine/PyTM30/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xylophoneengine/PyTM30/actions/workflows/ci.yml)
+
 Welcome! ANSI/IES TM-30-20 colour fidelity & gamut metrics implemented from
 the spec in C++20 with zero runtime dependencies, and Python bindings via
 nanobind.
@@ -47,7 +49,7 @@ floating-point noise of colour-science's own values.
   - [Contents](#contents)
   - [Quick Start (Python)](#quick-start-python)
     - [The full result set - `extras=True`](#the-full-result-set---extrastrue)
-    - [Convenience: SPD → XYZ / Yuv](#convenience-spd--xyz--yuv)
+    - [Convenience: SPD -> XYZ / Yuv](#convenience-spd--xyz--yuv)
     - [Configure CMF Observer](#configure-cmf-observer)
     - [Configure Integration Range](#configure-integration-range)
   - [Quick Start (C++)](#quick-start-c)
@@ -106,7 +108,7 @@ build your own TM-30 report or plot:
 ```python
 res = calc.eval(spd, extras=True)
 
-res.rf_hj, res.de_hj                       # local fidelity / mean ΔE′, 16 values each
+res.rf_hj, res.de_hj                       # local fidelity / mean dE', 16 values each
 res.cvg_x_test, res.cvg_y_test             # CVG test-vector plot coordinates, 16 values each
 res.cvg_x_ref,  res.cvg_y_ref              # CVG reference-circle plot coordinates
 res.reference_spd                          # resampled reference-illuminant SPD
@@ -126,11 +128,11 @@ array allocation/copy entirely - a genuine memory/bandwidth win for large
 batches when you only need the scalar fields (`rf`, `rg`, `cct`, `duv`,
 `delta_e_avg`, `rf_skin`).
 
-### Convenience: SPD → XYZ / Yuv
+### Convenience: SPD -> XYZ / Yuv
 
 ```python
-xyz = calc.spd_to_xyz(spd)      # → np.array([X, Y, Z]),    Y=100 (auto)
-yuv = calc.spd_to_Yuv(spd)      # → np.array([Y, u′, v′]),  Y=100 (auto)
+xyz = calc.spd_to_xyz(spd)      # -> np.array([X, Y, Z]),    Y=100 (auto)
+yuv = calc.spd_to_Yuv(spd)      # -> np.array([Y, u', v']),  Y=100 (auto)
 xyz_raw = calc.spd_to_xyz(spd, K=1.0)   # raw integrals
 ```
 
@@ -142,7 +144,7 @@ from tm30_calc import Cmf
 calc = TM30Calc(cmf=Cmf.CIE_1964_10)   # default, enum tab-complete
 calc = TM30Calc(cmf='1931_2')          # string, case-insensitive
 calc = TM30Calc(cmf='data/my_cmf.csv') # custom CSV path
-calc = TM30Calc(cmf_2deg=Cmf.CIE_2015_2)  # separate 2° observer for CCT
+calc = TM30Calc(cmf_2deg=Cmf.CIE_2015_2)  # separate 2-deg observer for CCT
 ```
 
 Available: `CIE_1931_2`, `CIE_1964_10`, `CIE_2006_2`, `CIE_2006_10`,
@@ -175,7 +177,7 @@ auto basis = load_daylight_basis("data/daylight_basis.csv");
 auto lut   = load_planckian_lut("data/planckian_uv.csv");
 
 // Evaluate one SPD
-std::vector<double> wl(401), spd(401);  // … populate …
+std::vector<double> wl(401), spd(401);  // ... populate ...
 tm30::Spd myspd(std::move(wl), std::move(spd));
 tm30::Tm30 m(myspd, cmf2, cmf10, ces, basis, lut);
 
@@ -197,9 +199,9 @@ const auto& colorimetry = m.colorimetry_result();    // full raw result
 
 | Tool           | Version              | Notes                                                                                                                                                  |
 | -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C++20 compiler | GCC ≥11 or Clang ≥14 | Includes Apple Clang on macOS. No compiler-specific extensions - should build clean under `-std=c++20` on Linux, macOS, and Windows, x86_64 and arm64. |
-| CMake          | ≥3.20                | `pip install cmake` works fine if you'd rather not touch your system package manager.                                                                  |
-| Python         | ≥3.10                | Only needed for the Python bindings.                                                                                                                   |
+| C++20 compiler | GCC >=11 or Clang >=14 | Includes Apple Clang on macOS. No compiler-specific extensions - should build clean under `-std=c++20` on Linux, macOS, and Windows, x86_64 and arm64. |
+| CMake          | >=3.20                | `pip install cmake` works fine if you'd rather not touch your system package manager.                                                                  |
+| Python         | >=3.10                | Only needed for the Python bindings.                                                                                                                   |
 
 > **Platform status:** the code is written to be portable (standard C++20,
 > no platform-specific extensions or intrinsics), but it has so far only
@@ -259,8 +261,8 @@ output: `build/libtm30-core.a`, with `include/` on your include path.
 ## Architecture
 
 ```
-spd → [validate] → [resample CES + CMF] → [XYZ] → [CCT + Reference]
-    → [CIECAM02 J'a'b'] → [ΔE′] → [Rf] → [Hue Bins] → [Gamut Rg + Local + CVG]
+spd -> [validate] -> [resample CES + CMF] -> [XYZ] -> [CCT + Reference]
+    -> [CIECAM02 J'a'b'] -> [dE'] -> [Rf] -> [Hue Bins] -> [Gamut Rg + Local + CVG]
 ```
 
 - **Zero heap in the hot path** - `std::array<double,99>` and `std::array<double,16>` throughout the per-SPD pipeline
@@ -300,8 +302,8 @@ calc = TM30Calc(n_workers=4, persistent_workers=True)  # reuse threads across ca
 | One-off *large* batch (a few hundred SPDs or more per call)                                 | `n_workers=4` (spawn per call) - can meaningfully speed up multi-core machines; below ~50 SPDs/call the per-call thread-spawn tax can outweigh the gain   |
 | Many repeated large-batch calls on one long-lived calculator (server loop, mass evaluation) | `n_workers=4, persistent_workers=True` - threads stay alive across calls instead of respawning each time                                                 |
 
-Rule of thumb: **single or small → default · one big batch → `n_workers>1` ·
-repeated big batches → try `persistent_workers=True`**. Speedups are
+Rule of thumb: **single or small -> default * one big batch -> `n_workers>1` *
+repeated big batches -> try `persistent_workers=True`**. Speedups are
 workload- and machine-dependent - on some CPUs or batch sizes parallelizing
 can even be slower than sequential, and the persistent-pool gain over
 spawn-per-call has been small to unmeasurable in this project's own
@@ -314,13 +316,13 @@ a multiplier.
 | File                                                                                             | Description                                                    | Range                |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | -------------------- |
 | `ces.csv` / `ces_5nm.csv`                                                                        | 99 CES reflectance spectra                                     | 380-780 nm           |
-| `cmf_1964_10.csv`                                                                                | CIE 1964 10° CMFs (default observer)                           | 360-830 nm, 1 nm     |
-| `cmf_1931_2.csv` / `cie_1931_2.csv`                                                              | CIE 1931 2° CMFs (general / CCT-default)                       | 360-830 / 380-780 nm |
+| `cmf_1964_10.csv`                                                                                | CIE 1964 10-deg CMFs (default observer)                           | 360-830 nm, 1 nm     |
+| `cmf_1931_2.csv` / `cie_1931_2.csv`                                                              | CIE 1931 2-deg CMFs (general / CCT-default)                       | 360-830 / 380-780 nm |
 | `cmf_2006_2.csv` / `cmf_2006_10.csv`                                                             | CIE 2006 physiologically-based CMFs                            | 360-830 nm           |
 | `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                             | CIE 2015 CMFs                                                  | 360-830 nm           |
-| `daylight_basis.csv`                                                                             | CIE daylight vectors S₀, S₁, S₂                                | 300-830 nm, 5 nm     |
+| `daylight_basis.csv`                                                                             | CIE daylight vectors S0, S1, S2                                | 300-830 nm, 5 nm     |
 | `planckian_uv.csv`                                                                               | Planckian locus LUT (u,v)                                      | 1000-25000 K         |
-| `d65_1nm.csv`, `fl1_1nm.csv`…`fl12_1nm.csv`, `hp1_1nm.csv`…`hp5_1nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |
+| `d65_1nm.csv`, `fl1_1nm.csv`...`fl12_1nm.csv`, `hp1_1nm.csv`...`hp5_1nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |
 
 All data tables are sourced from **[colour-science](https://github.com/colour-science/colour-science)**
 (BSD-3-Clause), not hand-derived - every one is a universal, published CIE
@@ -334,7 +336,7 @@ uses the same oracle to regenerate the golden test fixtures in `tests/fixtures/`
 ## Tests
 
 ```bash
-./build/tm30-tests                  # 191 tests, 5966 assertions
+./build/tm30-tests                  # 252 tests, 9485 assertions
 python3 tools/check_constants.py    # 0 uncited float literals
 ```
 
@@ -360,7 +362,7 @@ rewrites anything, re-stage and commit again. Run it over the whole tree with
 ## Design Principles
 
 - **No magic numbers** - every constant cites its TM-30-20 section
-- **Domain validity ≠ errors** - out-of-range CCT/Duv are result flags, not exceptions
+- **Domain validity != errors** - out-of-range CCT/Duv are result flags, not exceptions
 - **SPD is never interpolated** - resample CES and CMFs to the test SPD's grid
 - **Linear interpolation** per TM-30-20 §3.5
 
@@ -370,18 +372,18 @@ rewrites anything, re-stage and commit again. Run it over the whole tree with
 
 ```
 pytm30/
-├── include/tm30/        # Public headers (standalone-compilable)
-├── src/tm30/            # Implementation
-├── tests/               # Catch2 test suite + golden fixtures
-├── data/                # CSV data tables (CMFs, CES, daylight basis, Planckian LUT, illuminants)
-├── python/              # nanobind bindings + TM30Calc convenience wrapper
-│   ├── tm30_calc.py
-│   └── tm30_bindings.cpp
-├── tools/               # check_constants.py, data/fixture generation scripts
-├── notebooks/           # pytm30_tutorial.ipynb - full walkthrough
-├── benchmarks/          # speed + accuracy benchmarks vs. colour-science
-├── pyproject.toml       # pip-installable via scikit-build-core
-└── CMakeLists.txt       # C++ build
+|-- include/tm30/        # Public headers (standalone-compilable)
+|-- src/tm30/            # Implementation
+|-- tests/               # Catch2 test suite + golden fixtures
+|-- data/                # CSV data tables (CMFs, CES, daylight basis, Planckian LUT, illuminants)
+|-- python/              # nanobind bindings + TM30Calc convenience wrapper
+|   |-- tm30_calc.py
+|   `-- tm30_bindings.cpp
+|-- tools/               # check_constants.py, data/fixture generation scripts
+|-- notebooks/           # pytm30_tutorial.ipynb - full walkthrough
+|-- benchmarks/          # speed + accuracy benchmarks vs. colour-science
+|-- pyproject.toml       # pip-installable via scikit-build-core
+`-- CMakeLists.txt       # C++ build
 ```
 
 ## Author

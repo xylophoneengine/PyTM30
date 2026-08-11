@@ -6,8 +6,8 @@
 /// Provides the ergonomics layer on top of the fully verified color-science
 /// core (Slices 0-10). Two entry points:
 ///
-///   Single SPD → Tm30 handle (lazy evaluation, memoized cache)
-///   Batch SPDs → try_evaluate() with request flags
+///   Single SPD -> Tm30 handle (lazy evaluation, memoized cache)
+///   Batch SPDs -> try_evaluate() with request flags
 ///
 /// Thread safety: The Tm30 handle's `const` accessors mutate an internal
 /// cache and are NOT thread-safe. Callers parallelize across SPDs, not
@@ -28,9 +28,9 @@
 
 namespace tm30 {
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  SpdView - non-owning view of wavelength/value arrays for batch input.
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Non-owning view of a Spectral Power Distribution.
 ///
@@ -38,12 +38,12 @@ namespace tm30 {
 /// Callers are responsible for keeping the underlying data alive.
 struct SpdView {
   std::span<const double> wavelengths; ///< Wavelength grid (nm), monotonic
-  std::span<const double> values;      ///< Spectral power values St(λ)
+  std::span<const double> values;      ///< Spectral power values St(lambda)
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Tm30Request - batch evaluation flags.
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Controls what gets included in batch output.
 ///
@@ -59,31 +59,35 @@ struct Tm30Request {
   bool samples = false;
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Validity - domain-range warning flags (result data, not errors).
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Domain validity flags for TM-30 results.
 ///
 /// These are advisory warnings - the pipeline computes all metrics
 /// regardless. Callers decide how to act on them.
 struct Validity {
-  /// Duv is outside the range where TM-30 metrics are most meaningful.
-  /// TM-30 is designed for sources near the Planckian locus.
-  bool duv_out_of_range = false; // TM-30-20: applicability domain
+  /// Duv is far from the Planckian locus. Advisory only; pytm30 impl
+  /// choice (TM-30-20 §2.0 states the near-locus domain qualitatively and
+  /// prints no numerical Duv bound).
+  bool duv_out_of_range = false;
 
-  /// CCT is outside the stated bounds for TM-30 applicability.
-  /// TM-30-20: intended for white light sources in the stated CCT range.
-  bool cct_out_of_range = false; // TM-30-20: applicability domain
+  /// CCT is far from the range where TM-30 is typically applied. Advisory
+  /// only; pytm30 impl choice (TM-30-20 §2.0 prints no numerical CCT
+  /// bounds).
+  bool cct_out_of_range = false;
 
-  /// The test SPD does not cover the full 380-780 nm range, requiring
-  /// extrapolation (zero-fill or flat-extrapolation per TM-30-20 §3.5).
-  bool extrapolated = false; // TM-30-20 §3.5
+  /// The test SPD does not cover the full 380-780 nm grid. Missing values
+  /// were zero-filled per TM-30-20 §3.5 (which forbids interpolating or
+  /// extrapolating the test SPD). Not the same as CES/CMF flat
+  /// extrapolation (TM-30-20 §1.3 / Annex A).
+  bool extrapolated = false;
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Tm30Result - full TM-30 output for a single SPD.
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Complete TM-30 evaluation result: all colorimetric outputs plus
 /// domain-validity flags.
@@ -92,9 +96,9 @@ struct Tm30Result {
   Validity validity;                ///< Domain-range warning flags
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Tm30 - lazy memoized handle for a single SPD.
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Lazy, memoized TM-30 evaluator for a single SPD.
 ///
@@ -118,18 +122,19 @@ public:
   /// outlive the Tm30 instance.
   ///
   /// @param spd           Test source SPD (owned - moved into the handle).
-  /// @param cmf_2deg      CIE 1931 2° CMF data (for CCT computation).
-  /// @param cmf_10deg     CIE 1964 10° CMF data (for tristimulus integration).
+  /// @param cmf_2deg      CIE 1931 2-deg CMF data (for CCT computation).
+  /// @param cmf_10deg     CIE 1964 10-deg CMF data (for tristimulus
+  /// integration).
   /// @param ces_data      CES reflectance data (99 samples, 1-nm native).
-  /// @param daylight_basis Daylight basis vectors (S₀, S₁, S₂).
-  /// @param planckian_lut Planckian locus LUT (CIE 1931 2° observer).
+  /// @param daylight_basis Daylight basis vectors (S0, S1, S2).
+  /// @param planckian_lut Planckian locus LUT (CIE 1931 2-deg observer).
   ///
   /// @throws InvalidSpd if the SPD fails validation.
   Tm30(Spd spd, const CmfData &cmf_2deg, const CmfData &cmf_10deg,
        const CesData &ces_data, const DaylightBasis &daylight_basis,
        const PlanckianLut &planckian_lut);
 
-  // ── Accessors ──────────────────────────────────────────────────────
+  // -- Accessors ------------------------------------------------------
   // All accessors are const but mutate the internal cache.
   // NOT thread-safe. First call triggers full pipeline computation.
 
@@ -145,7 +150,7 @@ public:
   /// Gamut area index Rg.                                 TM-30-20 §4.4
   double rg() const;
 
-  /// Average color difference ΔE′ across 99 CES.          TM-30-20 §4.1
+  /// Average color difference dE' across 99 CES.          TM-30-20 §4.1
   double delta_e_avg() const;
 
   /// Per-sample fidelity Rf,CESi (99 values).             TM-30-20 §4.2
@@ -172,7 +177,7 @@ public:
   /// The raw CesColorimetryResult (triggers computation if not yet cached).
   const CesColorimetryResult &colorimetry_result() const;
 
-  // ── Cache control ──────────────────────────────────────────────────
+  // -- Cache control --------------------------------------------------
 
   /// True if the pipeline has already been computed and cached.
   bool is_computed() const noexcept { return computed_; }
@@ -184,24 +189,24 @@ private:
   /// Ensure the pipeline has been run. Called by every accessor.
   void ensure_computed() const;
 
-  // ── Owned data ─────────────────────────────────────────────────────
+  // -- Owned data -----------------------------------------------------
   Spd spd_;
 
-  // ── Borrowed references (caller must keep these alive) ─────────────
+  // -- Borrowed references (caller must keep these alive) -------------
   const CmfData &cmf_2deg_;
   const CmfData &cmf_10deg_;
   const CesData &ces_data_;
   const DaylightBasis &daylight_basis_;
   const PlanckianLut &planckian_lut_;
 
-  // ── Mutable cache ──────────────────────────────────────────────────
+  // -- Mutable cache --------------------------------------------------
   mutable bool computed_ = false;
   mutable Tm30Result cached_;
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Batch API
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Evaluate TM-30 for a batch of SPDs.
 ///
@@ -211,10 +216,10 @@ private:
 /// Embarrassingly parallel across SPDs (callers may parallelize the loop).
 ///
 /// @param spds           Non-owning views of test source SPDs.
-/// @param cmf_2deg       CIE 1931 2° CMF data.
-/// @param cmf_10deg      CIE 1964 10° CMF data.
+/// @param cmf_2deg       CIE 1931 2-deg CMF data.
+/// @param cmf_10deg      CIE 1964 10-deg CMF data.
 /// @param ces_data       CES reflectance data (99 samples).
-/// @param daylight_basis Daylight basis vectors (S₀, S₁, S₂).
+/// @param daylight_basis Daylight basis vectors (S0, S1, S2).
 /// @param planckian_lut  Planckian locus LUT.
 /// @param request        Output control flags (bins, samples).
 /// @param n_workers      Number of worker threads to use for this call.

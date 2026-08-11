@@ -23,6 +23,6 @@ struct CsvTable {
 /// Load a CSV file with a header row.
 /// Expects comma-separated values; handles \\r\\n and \\n line endings.
 /// @throws std::runtime_error on file-not-found or parse failure.
-CsvTable load_csv(const std::string& filepath);
+CsvTable load_csv(const std::string &filepath);
 
-}  // namespace tm30
+} // namespace tm30

@@ -44,7 +44,7 @@
 namespace tm30::test {
 namespace {
 
-// ── Test helpers (same pattern as slice_11) ──────────────────────────
+// -- Test helpers (same pattern as slice_11) --------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -164,7 +164,7 @@ SpdView make_spd_view(const std::vector<double> &wl,
                  std::span<const double>(vals.data(), vals.size())};
 }
 
-// ── Bit-identical comparison of two full result vectors ──────────────
+// -- Bit-identical comparison of two full result vectors --------------
 
 bool cam02_equal(const Cam02Ucs &a, const Cam02Ucs &b) {
   return a.J_prime == b.J_prime && a.a_prime == b.a_prime &&
@@ -245,7 +245,7 @@ bool vectors_equal(const std::vector<std::optional<Tm30Result>> &a,
   return true;
 }
 
-// ── Timing helpers ────────────────────────────────────────────────────
+// -- Timing helpers ----------------------------------------------------
 
 using Clock = std::chrono::steady_clock;
 
@@ -277,9 +277,9 @@ double min_median_ms(std::size_t reps, const std::vector<SpdView> &batch,
   return best;
 }
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  1. Determinism - bit-identical across n_workers
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 TEST_CASE("Parallel - results bit-identical across n_workers (cached path)",
           "[parallel][slice13][determinism]") {
@@ -328,9 +328,9 @@ TEST_CASE("Parallel - samples/bins request flags still gate output",
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  2. Failure-position correctness under chunking
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 TEST_CASE("Parallel - InvalidSpd -> nullopt at exact positions under "
           "chunking",
@@ -381,9 +381,9 @@ TEST_CASE("Parallel - InvalidSpd -> nullopt at exact positions under "
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  3. actual_workers capping (n_workers > batch size)
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 TEST_CASE("Parallel - n_workers larger than batch size", "[parallel][slice13]"
                                                          "[capping]") {
@@ -428,9 +428,9 @@ TEST_CASE("Parallel - n_workers larger than batch size", "[parallel][slice13]"
   REQUIRE(vectors_equal(e1, e8));
 }
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  4. Mandatory timing-regression test (n_workers=1 default path)
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //
 // Baselines measured on THIS machine (2026-08-04, AMD Ryzen 3 PRO 3300U,
 // 4 cores, GCC 13.3 -O3) BEFORE the n_workers feature landed, via
@@ -470,9 +470,9 @@ TEST_CASE("Parallel - n_workers=1 timing regression vs pre-change baseline",
   REQUIRE(t19 < 2.86 * 1.10);
 }
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  5. Grid-matrix sanity (parallel == sequential, default + custom grid)
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 TEST_CASE("Parallel - grid matrix: 1 nm cached grid, bit-identical",
           "[parallel][slice13][gridmatrix]") {
@@ -528,9 +528,9 @@ TEST_CASE("Parallel - grid matrix: custom 5 nm grid via per-call path",
   REQUIRE(vectors_equal(seq, par));
 }
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  Phase 2 - persistent workers (TaskPool)
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 TEST_CASE("Parallel - TaskPool partition: every index exactly once",
           "[parallel][slice13][persistent]") {

@@ -1,4 +1,18 @@
 repos:
+  # Runs before clang-format: transliterating a comment can push it past the
+  # column limit, and clang-format should get the final say on the result.
+  - repo: local
+    hooks:
+      - id: fix-unicode
+        name: transliterate non-ASCII to ASCII
+        entry: python3 tools/fix_unicode.py
+        language: system
+        pass_filenames: true
+        # Hand-authored text only. data/*.csv, tests/fixtures/* and generated
+        # benchmark reports are machine-written and excluded in the script too.
+        files: \.(cpp|cc|cxx|hpp|h|py|pyi|md|txt|yaml|yml|cmake|toml|cff)$|(^|/)CMakeLists\.txt$
+        exclude: ^(data/|tests/fixtures/|benchmarks/out_|benchmarks/.*report.*\.txt$|LICENSE$)
+
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v22.1.8
     hooks:

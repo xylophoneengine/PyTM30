@@ -31,9 +31,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -274,7 +274,7 @@ std::vector<XyzTriple> load_xyz_fixture(const std::string &filepath) {
   return result;
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -332,9 +332,9 @@ std::vector<double> wl_1nm() {
 /// Fixture comparison tolerance for CES J'a'b'.
 constexpr double Tol_FixtureJab = 1.0e-3;
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Global fixture data (loaded once)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 struct GlobalFixtures {
   CmfData cmf_2deg;
@@ -358,12 +358,12 @@ private:
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CIECAM02 - D65_1nm matches golden J'a'b' fixtures (direct CIECAM02)
 
 // Uses fixture XYZ directly (bypasses pipeline) to verify that the
 // CIECAM02 transform itself is correct.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - direct transform matches golden fixtures (fixture XYZ)",
           "[ciecam02][slice06]") {
@@ -409,9 +409,9 @@ TEST_CASE("CIECAM02 - direct transform matches golden fixtures (fixture XYZ)",
   CHECK(max_b <= Tol_Jab);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CIECAM02 - D65_1nm matches golden J'a'b' fixtures (pipeline)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - D65_1nm test CES J'a'b' matches golden fixtures",
           "[ciecam02][slice06]") {
@@ -485,17 +485,17 @@ TEST_CASE("CIECAM02 - D65_1nm ref CES J'a'b' matches golden fixtures",
   CHECK(max_b <= Tol_FixtureJab);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Self-consistency: Planckian at 3000K → test ≈ reference J'a'b'
+// -------------------------------------------------------------------------
+// Self-consistency: Planckian at 3000K -> test ~= reference J'a'b'
 //
-// For a perfect Planckian source at T ≤ 4000 K, the reference is also
+// For a perfect Planckian source at T <= 4000 K, the reference is also
 // Planckian at the computed CCT. Due to Ohno 2014 CCT solver imprecision,
-// the test and reference white points differ slightly (ΔCCT ≈ 0.03 K),
+// the test and reference white points differ slightly (dCCT ~= 0.03 K),
 // causing small J'a'b' differences. The test verifies these are bounded.
-// TM-30-20 §3.3 Eq. (14): Tt ≤ 4000 K → pure Planckian
-// ─────────────────────────────────────────────────────────────────────────
+// TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
+// -------------------------------------------------------------------------
 
-TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ≈ reference",
+TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ~= reference",
           "[ciecam02][slice06][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -507,7 +507,7 @@ TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ≈ reference",
                               G.daylight_basis, G.planckian_lut);
 
   // The CCT solver does not recover exactly 3000.0 K for a Planckian
-  // source (≈ 3000.03 K), so test and reference white points differ
+  // source (~= 3000.03 K), so test and reference white points differ
   // slightly. A tolerance of 1e-3 absorbs this CCT solver imprecision.
   // TM-30-20 §3.3
   constexpr double self_consistency_tol = 1.0e-3;
@@ -540,18 +540,18 @@ TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ≈ reference",
   CHECK(max_b <= self_consistency_tol);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Known-value: D65 white point is approximately achromatic
 //
-// The CAT02 matrix was developed for the CIE 1931 2° observer; using it
-// with 10° observer XYZ introduces a small systematic error that makes
+// The CAT02 matrix was developed for the CIE 1931 2-deg observer; using it
+// with 10-deg observer XYZ introduces a small systematic error that makes
 // the white point not perfectly achromatic. This is a known spec behavior
 // (TM-30-20 §3.7.1 footnote). The test verifies that a' and b' are small.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - D65 white point is approximately achromatic",
           "[ciecam02][slice06]") {
-  // D65 test white (10° observer)
+  // D65 test white (10-deg observer)
   // TM-30-20 §3.7.1
   const XyzTriple d65_white{94.81073156061144, 100.0, 107.30398114475764};
 
@@ -561,12 +561,12 @@ TEST_CASE("CIECAM02 - D65 white point is approximately achromatic",
 
   auto result = ciecam02_forward(d65_white, samples);
 
-  // White point adapting to itself: J' ≈ 100
+  // White point adapting to itself: J' ~= 100
   // TM-30-20 §3.7.1 Eq. (48): with J=100, J' = (1+0.7)*100/(1+0.007*100) = 100
   CHECK_THAT(result[0].J_prime, WithinTolerance(Tol_Jab, 100.0));
 
   // a' and b' should be near zero.
-  // Due to 2°/10° observer mismatch (TM-30-20 §3.7.1 footnote),
+  // Due to 2-deg/10-deg observer mismatch (TM-30-20 §3.7.1 footnote),
   // |a'| is typically ~6e-3 and |b'| ~7e-4.
   // We use a generous tolerance appropriate for this known behavior.
   constexpr double white_achromatic_tol = 1.0e-2;
@@ -577,13 +577,13 @@ TEST_CASE("CIECAM02 - D65 white point is approximately achromatic",
                        << " b'=" << result[0].b_prime);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Known-value: D65 reference white point J' ≈ 100, a' ≈ 0, b' ≈ 0
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// Known-value: D65 reference white point J' ~= 100, a' ~= 0, b' ~= 0
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - D65 reference white point is approximately achromatic",
           "[ciecam02][slice06]") {
-  // D65 reference white (10° observer)
+  // D65 reference white (10-deg observer)
   // TM-30-20 §3.7.1
   const XyzTriple d65_ref_white{94.81132408844627, 100.0, 107.2894523722905};
 
@@ -602,14 +602,14 @@ TEST_CASE("CIECAM02 - D65 reference white point is approximately achromatic",
                            << " b'=" << result[0].b_prime);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Spot-check: matrix multiplications against hand-computed values
 //
 // Verify that MCAT02 application to known XYZ produces expected RGB.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - MCAT02 matrix spot-check", "[ciecam02][slice06]") {
-  // Test: D65 test white XYZ → RGB via MCAT02
+  // Test: D65 test white XYZ -> RGB via MCAT02
   // TM-30-20 §3.7.1 Eq. (29)-(30)
   // Hand-computed (Python numpy):
   //   MCAT02 @ [94.81073156, 100.0, 107.30398114]
@@ -628,9 +628,9 @@ TEST_CASE("CIECAM02 - MCAT02 matrix spot-check", "[ciecam02][slice06]") {
   CHECK_THAT(result[0].J_prime, WithinTolerance(Tol_Jab, 100.0));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Output shape: exactly 99 CES results
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - output shape is exactly 99 CES", "[ciecam02][slice06]") {
   auto &G = GlobalFixtures::instance();
@@ -645,9 +645,9 @@ TEST_CASE("CIECAM02 - output shape is exactly 99 CES", "[ciecam02][slice06]") {
   REQUIRE(result.jab_ref_ces.size() == 99);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Edge case: all-zero XYZ produces well-defined output (not NaN)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - zero XYZ does not produce NaN", "[ciecam02][slice06]") {
   const XyzTriple white{100.0, 100.0, 100.0}; // arbitrary white
@@ -662,9 +662,9 @@ TEST_CASE("CIECAM02 - zero XYZ does not produce NaN", "[ciecam02][slice06]") {
   CHECK_FALSE(std::isnan(result[0].b_prime));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Edge case: negative XYZ handled gracefully
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - negative XYZ does not produce NaN",
           "[ciecam02][slice06]") {

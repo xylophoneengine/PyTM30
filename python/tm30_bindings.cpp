@@ -19,9 +19,9 @@
 
 namespace nb = nanobind;
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Data loading helpers
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 namespace {
 
@@ -89,9 +89,9 @@ void require_c_contiguous(const nb::ndarray<> &arr, const char *name) {
 
 } // namespace
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  PyTm30 - Python wrapper owning data + Tm30 handle
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 struct PyTm30 {
   tm30::CmfData cmf_2deg_;
@@ -104,7 +104,7 @@ struct PyTm30 {
   /// Construct from a numpy array of SPD values (and optional wavelengths).
   PyTm30(nb::object spd_values_arg, nb::object spd_wavelengths_arg,
          const std::string &data_dir_arg) {
-    // ── Cast spd_values to ndarray ─────────────────────────────────
+    // -- Cast spd_values to ndarray ---------------------------------
     auto spd_arr = nb::cast<nb::ndarray<>>(spd_values_arg);
     if (spd_arr.ndim() != 1) {
       throw std::invalid_argument("spd_values must be a 1-D array");
@@ -116,7 +116,7 @@ struct PyTm30 {
     size_t n_vals = spd_arr.shape(0);
     const double *spd_data = static_cast<const double *>(spd_arr.data());
 
-    // ── Determine wavelengths ──────────────────────────────────────
+    // -- Determine wavelengths --------------------------------------
     std::vector<double> wl;
     if (spd_wavelengths_arg.is_none()) {
       if (n_vals != 401) {
@@ -139,10 +139,10 @@ struct PyTm30 {
       wl.assign(wl_data, wl_data + nw);
     }
 
-    // ── Copy SPD values ────────────────────────────────────────────
+    // -- Copy SPD values --------------------------------------------
     std::vector<double> vals(spd_data, spd_data + n_vals);
 
-    // ── Load data tables ───────────────────────────────────────────
+    // -- Load data tables -------------------------------------------
     std::string dir = data_dir_arg.empty() ? TM30_DATA_DIR : data_dir_arg;
     cmf_2deg_ = load_cmf(data_file(dir, "cie_1931_2.csv"));
     cmf_10deg_ = load_cmf(data_file(dir, "cmf_1964_10.csv"));
@@ -152,13 +152,13 @@ struct PyTm30 {
     planckian_lut_ =
         tm30::load_planckian_lut(data_file(dir, "planckian_uv.csv"));
 
-    // ── Create Tm30 handle (validates SPD, computes nothing) ───────
+    // -- Create Tm30 handle (validates SPD, computes nothing) -------
     tm30_ = std::make_unique<tm30::Tm30>(
         tm30::Spd(std::move(wl), std::move(vals)), cmf_2deg_, cmf_10deg_,
         ces_data_, daylight_basis_, planckian_lut_);
   }
 
-  // ── Properties ───────────────────────────────────────────────────
+  // -- Properties ---------------------------------------------------
 
   double rf() const { return tm30_->rf(); }
   double rg() const { return tm30_->rg(); }
@@ -217,7 +217,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-bin mean ΔE′, DE_hj (16 values) - returns numpy array.
+  /// Per-bin mean dE', DE_hj (16 values) - returns numpy array.
   nb::object de_hj() const {
     const auto &lcm = tm30_->local_chroma_shift();
     auto np = nb::module_::import_("numpy");
@@ -315,7 +315,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-CES XYZ under the test source (99×3) - returns numpy array.
+  /// Per-CES XYZ under the test source (99x3) - returns numpy array.
   nb::object xyz_test_ces() const {
     const auto &cr = tm30_->colorimetry_result();
     auto np = nb::module_::import_("numpy");
@@ -331,7 +331,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-CES XYZ under the reference illuminant (99×3) - returns numpy array.
+  /// Per-CES XYZ under the reference illuminant (99x3) - returns numpy array.
   nb::object xyz_ref_ces() const {
     const auto &cr = tm30_->colorimetry_result();
     auto np = nb::module_::import_("numpy");
@@ -347,7 +347,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-CES CAM02-UCS J'a'b' under the test source (99×3) - numpy array.
+  /// Per-CES CAM02-UCS J'a'b' under the test source (99x3) - numpy array.
   /// TM-30-20 §3.7.1 Eq. (48)-(50).
   nb::object jab_test_ces() const {
     const auto &cr = tm30_->colorimetry_result();
@@ -364,7 +364,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-CES CAM02-UCS J'a'b' under the reference illuminant (99×3) - numpy
+  /// Per-CES CAM02-UCS J'a'b' under the reference illuminant (99x3) - numpy
   /// array. TM-30-20 §3.7.1 Eq. (48)-(50).
   nb::object jab_ref_ces() const {
     const auto &cr = tm30_->colorimetry_result();
@@ -400,9 +400,9 @@ struct PyTm30 {
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 //  Batch evaluate() - Python wrapper
-// ══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 struct BatchContext {
   tm30::CmfData cmf_2deg;
@@ -476,7 +476,7 @@ struct BatchContext {
 
   void prepare_batch(nb::ndarray<> spd_matrix, nb::object wl_arg) {
     if (spd_matrix.ndim() != 2)
-      throw std::invalid_argument("spd_matrix must be 2-D (N_spds × N_wl)");
+      throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
     require_c_contiguous(spd_matrix, "spd_matrix");
     size_t N = spd_matrix.shape(0);
     size_t nwl = spd_matrix.shape(1);
@@ -644,7 +644,7 @@ struct BatchContext {
         std::copy(ref_spd.begin(), ref_spd.end(), buf_refspd);
         d["reference_spd"] = arr_refspd;
 
-        // Per-CES XYZ under test / reference illuminant (99×3 each)
+        // Per-CES XYZ under test / reference illuminant (99x3 each)
         auto copy99x3 = [&](const std::array<tm30::XyzTriple, 99> &src) {
           auto arr = np.attr("empty")(nb::make_tuple(99, 3),
                                       nb::arg("dtype") = "float64");
@@ -661,7 +661,7 @@ struct BatchContext {
         d["xyz_ref_ces"] = copy99x3(opt->colorimetry.xyz_ref_ces);
 
         // Per-CES CAM02-UCS [J', a', b'] under test / reference illuminant
-        // (99×3 each)
+        // (99x3 each)
         auto copy99x3_jab = [&](const std::array<tm30::Cam02Ucs, 99> &src) {
           auto arr = np.attr("empty")(nb::make_tuple(99, 3),
                                       nb::arg("dtype") = "float64");
@@ -803,7 +803,7 @@ struct BatchContext {
         std::copy(ref_spd.begin(), ref_spd.end(), buf_refspd);
         d["reference_spd"] = arr_refspd;
 
-        // Per-CES XYZ under test / reference illuminant (99×3 each)
+        // Per-CES XYZ under test / reference illuminant (99x3 each)
         auto copy99x3 = [&](const std::array<tm30::XyzTriple, 99> &src) {
           auto arr = np.attr("empty")(nb::make_tuple(99, 3),
                                       nb::arg("dtype") = "float64");
@@ -820,7 +820,7 @@ struct BatchContext {
         d["xyz_ref_ces"] = copy99x3(opt->colorimetry.xyz_ref_ces);
 
         // Per-CES CAM02-UCS [J', a', b'] under test / reference illuminant
-        // (99×3 each)
+        // (99x3 each)
         auto copy99x3_jab = [&](const std::array<tm30::Cam02Ucs, 99> &src) {
           auto arr = np.attr("empty")(nb::make_tuple(99, 3),
                                       nb::arg("dtype") = "float64");
@@ -1141,9 +1141,9 @@ struct BatchContext {
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Module
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 NB_MODULE(tm30_core, m) {
   m.doc() = R"pbdoc(
@@ -1164,33 +1164,38 @@ NB_MODULE(tm30_core, m) {
   )pbdoc";
   m.attr("__version__") = "0.1.0";
 
-  // ── Validity ──────────────────────────────────────────────────────
+  // -- Validity ------------------------------------------------------
 
   nb::class_<tm30::Validity>(
       m, "Validity",
       "Domain validity flags for TM-30 results (advisory warnings).")
       .def(nb::init<>())
       .def_rw("duv_out_of_range", &tm30::Validity::duv_out_of_range,
-              "Duv outside the range where TM-30 is most meaningful.")
+              "Duv far from the Planckian locus (pytm30 advisory; TM-30-20 "
+              "§2.0 prints no numerical Duv bound).")
       .def_rw("cct_out_of_range", &tm30::Validity::cct_out_of_range,
-              "CCT outside the stated bounds for TM-30 applicability.")
+              "CCT far from the range where TM-30 is typically applied "
+              "(pytm30 advisory; TM-30-20 §2.0 prints no numerical CCT "
+              "bounds).")
       .def_rw("extrapolated", &tm30::Validity::extrapolated,
-              "Test SPD does not cover 380-780 nm; extrapolation was used.");
+              "Test SPD does not cover 380-780 nm; zero-fill was applied "
+              "per TM-30-20 §3.5. CES/CMF tables are flat-extrapolated "
+              "per §1.3 / Annex A -- unrelated to this flag.");
 
-  // ── Tm30 class ──────────────────────────────────────────────────
+  // -- Tm30 class --------------------------------------------------
 
   nb::class_<PyTm30>(m, "Tm30",
                      R"pbdoc(
       Lazy, memoized TM-30 evaluator for a single SPD.
 
       Construction validates the SPD but computes nothing.  The full
-      pipeline runs on first property access (rf, rg, cct, duv, …)
+      pipeline runs on first property access (rf, rg, cct, duv, ...)
       and results are cached.
 
       Parameters
       ----------
       spd_values : numpy.ndarray (1-D, float64)
-          Spectral power values St(λ).
+          Spectral power values St(lambda).
       spd_wavelengths : numpy.ndarray (1-D, float64) or None, optional
           Wavelength grid in nm.  If None, defaults to 380-780 nm at 1 nm step.
       data_dir : str, optional
@@ -1211,7 +1216,7 @@ NB_MODULE(tm30_core, m) {
           "duv", &PyTm30::duv,
           "Distance from Planckian locus in CIE 1960 UCS.  TM-30-20 §3.3.")
       .def_prop_ro("delta_e_avg", &PyTm30::delta_e_avg,
-                   "Average ΔE′ across 99 CES.  TM-30-20 §4.1.")
+                   "Average dE' across 99 CES.  TM-30-20 §4.1.")
       .def_prop_ro(
           "rf_skin", &PyTm30::rf_skin,
           "Skin fidelity Rf,skin (average of CES15 + CES18).  TM-30-20 §4.2.")
@@ -1229,10 +1234,10 @@ NB_MODULE(tm30_core, m) {
                    "TM-30-20 §4.8.")
       .def_prop_ro(
           "de_hj", &PyTm30::de_hj,
-          "Per-bin mean ΔE′, DE_hj - numpy array of 16 values.  TM-30-20 §4.8.")
+          "Per-bin mean dE', DE_hj - numpy array of 16 values.  TM-30-20 §4.8.")
       .def_prop_ro(
           "cvg_j_test", &PyTm30::cvg_j_test,
-          "CVG test-vector J′ - numpy array of 16 values.  TM-30-20 §4.5.")
+          "CVG test-vector J' - numpy array of 16 values.  TM-30-20 §4.5.")
       .def_prop_ro("cvg_x_test", &PyTm30::cvg_x_test,
                    "CVG test-vector x - numpy array of 16 values.  TM-30-20 "
                    "§4.5 Eq. (60).")
@@ -1241,7 +1246,7 @@ NB_MODULE(tm30_core, m) {
                    "§4.5 Eq. (61).")
       .def_prop_ro(
           "cvg_j_ref", &PyTm30::cvg_j_ref,
-          "CVG reference-circle J′ - numpy array of 16 values.  TM-30-20 §4.5.")
+          "CVG reference-circle J' - numpy array of 16 values.  TM-30-20 §4.5.")
       .def_prop_ro("cvg_x_ref", &PyTm30::cvg_x_ref,
                    "CVG reference-circle x - numpy array of 16 values.  "
                    "TM-30-20 §4.5 Eq. (58).")
@@ -1276,7 +1281,7 @@ NB_MODULE(tm30_core, m) {
       .def_prop_ro("validity", &PyTm30::validity,
                    "Domain validity flags (Validity named tuple).");
 
-  // ── Batch evaluation ───────────────────────────────────────────
+  // -- Batch evaluation -------------------------------------------
 
   nb::class_<BatchContext>(
       m, "BatchContext",
@@ -1297,15 +1302,15 @@ NB_MODULE(tm30_core, m) {
            nb::arg("cmf_10deg_path"), nb::arg("n_workers") = 1,
            nb::arg("persistent_workers") = false,
            "Create a batch context with explicit CMF file paths.\n"
-           "cmf_2deg_path: path to the 2° CMF CSV (for CCT).\n"
-           "cmf_10deg_path: path to the 10° CMF CSV (for tristimulus).\n"
+           "cmf_2deg_path: path to the 2-deg CMF CSV (for CCT).\n"
+           "cmf_10deg_path: path to the 10-deg CMF CSV (for tristimulus).\n"
            "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
            "persistent_workers=true (with n_workers>1) keeps the worker\n"
            "threads alive across calls instead of spawning per call;\n"
            "persistent_workers with n_workers<=1 is silently inert.")
       .def("prepare_batch", &BatchContext::prepare_batch, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(),
-           "Load SPDs from a 2-D numpy array (N_spds × N_wl). "
+           "Load SPDs from a 2-D numpy array (N_spds x N_wl). "
            "wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
            nb::arg("samples") = true, nb::arg("extras") = false,
@@ -1374,7 +1379,7 @@ NB_MODULE(tm30_core, m) {
            "(default): radiometric (W), unweighted. photometric=True: "
            "Km=683.0 x ybar-weighted (lm).");
 
-  // ── Exception translation ────────────────────────────────────────
+  // -- Exception translation ----------------------------------------
 
   nb::register_exception_translator(
       [](const std::exception_ptr &p, void * /*payload*/) {

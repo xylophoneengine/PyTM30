@@ -1,4 +1,4 @@
-// TM-30-20: Color difference (ΔE') and fidelity index (Rf).
+// TM-30-20: Color difference (dE') and fidelity index (Rf).
 //
 // TM-30-20 §3.8: Color Difference Formula
 // TM-30-20 §4.1: Fidelity Index (Rf)
@@ -30,7 +30,7 @@ compute_delta_e(const std::array<Cam02Ucs, 99> &jab_test,
 RfResult compute_rf(const std::array<double, 99> &delta_e_array) {
   RfResult result{};
 
-  // Step 1: arithmetic mean of 99 ΔE′ values
+  // Step 1: arithmetic mean of 99 dE' values
   // TM-30-20 §4.1
   const double sum =
       std::accumulate(delta_e_array.begin(), delta_e_array.end(), 0.0);
@@ -51,10 +51,10 @@ std::array<double, 99>
 compute_rf_cesi(const std::array<double, 99> &delta_e_array) {
   std::array<double, 99> result;
   for (std::size_t i = 0; i < 99; ++i) {
-    // TM-30-20 §4.2 Eq. (55): Rf,CESi' = 100 - 6.73 · ΔE'_i
+    // TM-30-20 §4.2 Eq. (55): Rf,CESi' = 100 - 6.73 * dE'_i
     const double rf_prime = 100.0 - 6.73 * delta_e_array[i];
 
-    // TM-30-20 §4.2 Eq. (56): Rf,CESi = 10 · ln(exp(Rf,CESi'/10) + 1)
+    // TM-30-20 §4.2 Eq. (56): Rf,CESi = 10 * ln(exp(Rf,CESi'/10) + 1)
     result[i] = 10.0 * std::log(std::exp(rf_prime / 10.0) + 1.0);
   }
   return result;
@@ -62,7 +62,7 @@ compute_rf_cesi(const std::array<double, 99> &delta_e_array) {
 
 double compute_rf_skin(const std::array<double, 99> &rf_cesi) {
   // TM-30-20 §4.2: Rf,skin = (Rf,CES15 + Rf,CES18) / 2
-  // CES indices are 1-based: CES15 → index 14, CES18 → index 17
+  // CES indices are 1-based: CES15 -> index 14, CES18 -> index 17
   return (rf_cesi[14] + rf_cesi[17]) / 2.0;
 }
 

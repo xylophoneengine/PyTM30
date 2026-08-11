@@ -32,14 +32,14 @@ std::vector<double> lerp_vector(const std::vector<double> &target_wl,
 
   for (double tw : target_wl) {
     // Flat extrapolation - low side
-    // TM-30-20 §1.3: flat extrapolation for λ < first CES λ
+    // TM-30-20 §1.3: flat extrapolation for lambda < first CES lambda
     if (tw <= source_wl.front()) {
       result.push_back(source_vals.front());
       continue;
     }
 
     // Flat extrapolation - high side
-    // TM-30-20 §1.3: flat extrapolation for λ > last CES λ
+    // TM-30-20 §1.3: flat extrapolation for lambda > last CES lambda
     if (tw >= source_wl.back()) {
       result.push_back(source_vals.back());
       continue;

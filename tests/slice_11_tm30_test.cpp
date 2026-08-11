@@ -31,7 +31,7 @@
 namespace tm30::test {
 namespace {
 
-// ── Test helpers ─────────────────────────────────────────────────────
+// -- Test helpers -----------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -96,7 +96,7 @@ Tables &tables() {
   return t;
 }
 
-// ── SpdView helpers ──────────────────────────────────────────────────
+// -- SpdView helpers --------------------------------------------------
 
 SpdView make_spd_view(const std::vector<double> &wl,
                       const std::vector<double> &vals) {
@@ -104,7 +104,7 @@ SpdView make_spd_view(const std::vector<double> &wl,
                  std::span<const double>(vals.data(), vals.size())};
 }
 
-// ── Tm30 construction ────────────────────────────────────────────────
+// -- Tm30 construction ------------------------------------------------
 
 TEST_CASE("Tm30 - construction does not compute", "[tm30][slice11][lazy]") {
   auto &t = tables();
@@ -127,7 +127,7 @@ TEST_CASE("Tm30 - SPD validation at construction",
                     InvalidSpd);
 }
 
-// ── Memoization ──────────────────────────────────────────────────────
+// -- Memoization ------------------------------------------------------
 
 TEST_CASE("Tm30 - first access triggers computation", "[tm30][slice11][memo]") {
   auto &t = tables();
@@ -210,7 +210,7 @@ TEST_CASE("Tm30 - multiple accessors all work from cache",
   REQUIRE(full.validity.duv_out_of_range == val.duv_out_of_range);
 }
 
-// ── Cache invalidation ───────────────────────────────────────────────
+// -- Cache invalidation -----------------------------------------------
 
 TEST_CASE("Tm30 - invalidate clears cache", "[tm30][slice11][memo]") {
   auto &t = tables();
@@ -230,10 +230,10 @@ TEST_CASE("Tm30 - invalidate clears cache", "[tm30][slice11][memo]") {
   // Next access recomputes.
   double rf2 = m.rf();
   REQUIRE(m.is_computed());
-  REQUIRE(rf1 == rf2); // Same SPD → same result.
+  REQUIRE(rf1 == rf2); // Same SPD -> same result.
 }
 
-// ── Accessor consistency with pipeline ───────────────────────────────
+// -- Accessor consistency with pipeline -------------------------------
 
 TEST_CASE("Tm30 - results match direct pipeline call",
           "[tm30][slice11][consistency]") {
@@ -256,7 +256,7 @@ TEST_CASE("Tm30 - results match direct pipeline call",
   REQUIRE_THAT(m.rf_skin(), WithinTolerance(1e-12, direct.rf_skin));
 }
 
-// ── Validity flags ───────────────────────────────────────────────────
+// -- Validity flags ---------------------------------------------------
 
 TEST_CASE("Validity - D65 (reference illuminant) is fully valid",
           "[tm30][slice11][validity]") {
@@ -268,7 +268,7 @@ TEST_CASE("Validity - D65 (reference illuminant) is fully valid",
 
   const auto &v = m.validity();
 
-  // D65 has CCT ≈ 6500 K - well within [1000, 25000].
+  // D65 has CCT ~= 6500 K - well within [1000, 25000].
   REQUIRE_FALSE(v.cct_out_of_range);
 
   // D65 is on the daylight locus, near Planckian - Duv should be small.
@@ -286,7 +286,7 @@ TEST_CASE("Validity - D65 self-consistency values",
 
   Tm30 m(std::move(spd), t.cmf_2deg, t.cmf_10deg, t.ces, t.basis, t.lut);
 
-  // D65 is a reference illuminant → Rf/Rg should be near 100.
+  // D65 is a reference illuminant -> Rf/Rg should be near 100.
   REQUIRE_THAT(m.rf(), WithinTolerance(Tol_Rf, 100.0));
   REQUIRE_THAT(m.rg(), WithinTolerance(Tol_Rg, 100.0));
 
@@ -335,7 +335,7 @@ TEST_CASE("Validity - struct can be set", "[tm30][slice11][validity]") {
   REQUIRE(v.extrapolated);
 }
 
-// ── Batch API ────────────────────────────────────────────────────────
+// -- Batch API --------------------------------------------------------
 
 TEST_CASE("Batch - evaluate single D65 SPD", "[tm30][slice11][batch]") {
   auto &t = tables();
@@ -440,7 +440,7 @@ TEST_CASE("Batch - batch output matches single Tm30 handle",
   REQUIRE(results[0]->validity.extrapolated == m.validity().extrapolated);
 }
 
-// ── Request flags ────────────────────────────────────────────────────
+// -- Request flags ----------------------------------------------------
 
 TEST_CASE("Tm30Request - default values", "[tm30][slice11][request]") {
   Tm30Request req;
@@ -477,7 +477,7 @@ TEST_CASE("Batch - accepts request flags", "[tm30][slice11][request]") {
   REQUIRE(r.colorimetry.rf_cesi[0] >= 0.0);
 }
 
-// ── SpdView ──────────────────────────────────────────────────────────
+// -- SpdView ----------------------------------------------------------
 
 TEST_CASE("SpdView - from vector data", "[tm30][slice11][spdview]") {
   std::vector<double> wl = {380.0, 385.0, 390.0};
@@ -497,7 +497,7 @@ TEST_CASE("SpdView - empty spans", "[tm30][slice11][spdview]") {
   REQUIRE(sv.values.empty());
 }
 
-// ── Tm30Result ───────────────────────────────────────────────────────
+// -- Tm30Result -------------------------------------------------------
 
 TEST_CASE("Tm30Result - contains colorimetry and validity",
           "[tm30][slice11][result]") {
@@ -517,12 +517,12 @@ TEST_CASE("Tm30Result - contains colorimetry and validity",
   REQUIRE(r.colorimetry.gamut.Rg >= 0.0);
 
   // validity fields are populated.
-  // D65 is fully in range → no warnings.
+  // D65 is fully in range -> no warnings.
   REQUIRE_FALSE(r.validity.duv_out_of_range);
   REQUIRE_FALSE(r.validity.cct_out_of_range);
 }
 
-// ── Error model ──────────────────────────────────────────────────────
+// -- Error model ------------------------------------------------------
 
 TEST_CASE("Error model - batch never throws", "[tm30][slice11][errors]") {
   auto &t = tables();
@@ -546,7 +546,7 @@ TEST_CASE("Error model - batch never throws", "[tm30][slice11][errors]") {
   }());
 }
 
-// ── Memoization correctness ──────────────────────────────────────────
+// -- Memoization correctness ------------------------------------------
 
 TEST_CASE("Tm30 - colorimetry_result() accessor", "[tm30][slice11][memo]") {
   auto &t = tables();

@@ -21,8 +21,8 @@ Usage:
     print(result.valid)              # shape (N,) bool -- which rows succeeded
 
 DataFrame support:
-    df = result.to_dataframe()       # single → 1-row DataFrame
-    df = batch_result.to_dataframe() # batch  → N-row DataFrame
+    df = result.to_dataframe()       # single -> 1-row DataFrame
+    df = batch_result.to_dataframe() # batch  -> N-row DataFrame
 
     # Multi-level columns, backwards-compatible with the luxpy
     # tm30_dict_to_dataframe() convention (lx_util.py): per-CES arrays get
@@ -49,7 +49,7 @@ from enum import Enum
 import os
 
 
-# ── CMF Observer Enum ──────────────────────────────────────────────────
+# -- CMF Observer Enum --------------------------------------------------
 
 
 class Cmf(Enum):
@@ -58,15 +58,15 @@ class Cmf(Enum):
     String values are accepted interchangeably (case-insensitive).
     Examples: Cmf.CIE_1964_10, Cmf.CIE_2015_2, Cmf('1931_2'), Cmf('2015_10').
 
-    ── Standard observers ──
-    CIE_1931_2      - CIE 1931 2° (luxpy default)
-    CIE_1964_10     - CIE 1964 10° (TM-30-20 standard, pytm30 default)
-    CIE_2006_2      - CIE 2006 2°
-    CIE_2006_10     - CIE 2006 10°
-    CIE_2015_2      - CIE 2015 2°
-    CIE_2015_10     - CIE 2015 10°
+    -- Standard observers --
+    CIE_1931_2      - CIE 1931 2-deg (luxpy default)
+    CIE_1964_10     - CIE 1964 10-deg (TM-30-20 standard, pytm30 default)
+    CIE_2006_2      - CIE 2006 2-deg
+    CIE_2006_10     - CIE 2006 10-deg
+    CIE_2015_2      - CIE 2015 2-deg
+    CIE_2015_10     - CIE 2015 10-deg
 
-    ── Usage ──
+    -- Usage --
         calc = TM30Calc(cmf=Cmf.CIE_1964_10)
         calc = TM30Calc(cmf='1931_2')         # string also works
         calc = TM30Calc(cmf='cmf_1931_2.csv') # custom CSV path
@@ -92,7 +92,7 @@ class Cmf(Enum):
         return None
 
 
-# ── Internal: resolve cmf to CSV path ─────────────────────────────────
+# -- Internal: resolve cmf to CSV path ---------------------------------
 
 
 def _resolve_cmf(
@@ -103,15 +103,15 @@ def _resolve_cmf(
     Parameters
     ----------
     cmf : Cmf, str, Path, or None
-        - Cmf enum member → 'data/cmf_1931_2.csv'
-        - str matching an enum value → same
-        - str containing '/' or '.csv' → treated as file path
-        - None → defaults to 'data/cmf_1964_10.csv' (for 10°) or
-                 'data/cie_1931_2.csv' (for 2°, if suffix='2deg')
+        - Cmf enum member -> 'data/cmf_1931_2.csv'
+        - str matching an enum value -> same
+        - str containing '/' or '.csv' -> treated as file path
+        - None -> defaults to 'data/cmf_1964_10.csv' (for 10-deg) or
+                 'data/cie_1931_2.csv' (for 2-deg, if suffix='2deg')
     data_dir : str
         Path to the data directory.
     suffix : str
-        '2deg' → default cmf_2deg path. Empty → default cmf_10deg path.
+        '2deg' -> default cmf_2deg path. Empty -> default cmf_10deg path.
 
     Returns
     -------
@@ -144,12 +144,12 @@ def _resolve_cmf(
     return os.path.join(data_dir, f"cmf_{key}.csv")
 
 
-# ── Public re-exports ──────────────────────────────────────────────────
+# -- Public re-exports --------------------------------------------------
 
 __all__ = ["TM30Calc", "Tm30Result", "Tm30BatchResult", "to_dataframe", "Cmf"]
 
 
-# ── Multi-level column support (luxpy lx_util.py backwards compatibility) ──
+# -- Multi-level column support (luxpy lx_util.py backwards compatibility) --
 #
 # Mirrors the column-naming convention of lx_util.py's tm30_dict_to_dataframe():
 # per-CES arrays (99 values/row) -> 'CES_01'..'CES_99', per-bin arrays (16
@@ -257,7 +257,7 @@ class Tm30Result:
 
     __slots__ = ("_d", "_wavelengths")
 
-    # ── Scalar property names in display order ──
+    # -- Scalar property names in display order --
     _SCALAR_KEYS = ("rf", "rg", "cct", "duv", "delta_e_avg", "rf_skin")
     # samples=True-only / bins=True-only array keys; absent otherwise.
     _SAMPLES_ARRAY_KEYS = ("rf_cesi",)
@@ -322,7 +322,7 @@ class Tm30Result:
     def rf_cesi(self) -> np.ndarray:
         if "rf_cesi" not in self._d:
             raise AttributeError(
-                "rf_cesi is not available on this result — call "
+                "rf_cesi is not available on this result -- call "
                 "eval(..., samples=True) to include it (samples defaults "
                 "to True; this result came from an explicit samples=False)."
             )
@@ -332,7 +332,7 @@ class Tm30Result:
     def rcs_hj(self) -> np.ndarray:
         if "rcs_hj" not in self._d:
             raise AttributeError(
-                "rcs_hj is not available on this result — call "
+                "rcs_hj is not available on this result -- call "
                 "eval(..., bins=True) to include it (bins defaults "
                 "to True; this result came from an explicit bins=False)."
             )
@@ -342,13 +342,13 @@ class Tm30Result:
     def rhs_hj(self) -> np.ndarray:
         if "rhs_hj" not in self._d:
             raise AttributeError(
-                "rhs_hj is not available on this result — call "
+                "rhs_hj is not available on this result -- call "
                 "eval(..., bins=True) to include it (bins defaults "
                 "to True; this result came from an explicit bins=False)."
             )
         return np.asarray(self._d["rhs_hj"])
 
-    # ── Extras (only present if eval(..., extras=True)) ──
+    # -- Extras (only present if eval(..., extras=True)) --
 
     @property
     def rf_hj(self) -> np.ndarray:
@@ -357,12 +357,14 @@ class Tm30Result:
 
     @property
     def de_hj(self) -> np.ndarray:
-        """Per-bin mean ΔE′, DE_hj - 16 values.  TM-30-20 §4.8."""
+        """Per-bin mean dE', DE_hj - 16 values.  TM-30-20 §4.8."""
         return np.asarray(self._d["de_hj"])
 
     @property
     def cvg_j_test(self) -> np.ndarray:
-        """CVG test-vector J′ - 16 values.  TM-30-20 §4.5."""
+        """Test-vector J' - 16 values.  pytm30 extension of the §4.4 bin
+        averages (§4.4 explicitly discards J'; §4.5 CVG geometry is 2-D in
+        (a',b') only, per Eqs. 58-61)."""
         return np.asarray(self._d["cvg_j_test"])
 
     @property
@@ -377,7 +379,9 @@ class Tm30Result:
 
     @property
     def cvg_j_ref(self) -> np.ndarray:
-        """CVG reference-circle J′ - 16 values.  TM-30-20 §4.5."""
+        """Reference-circle J' - 16 values.  pytm30 extension of the §4.4
+        bin averages (§4.4 discards J'; §4.5 CVG geometry is 2-D in (a',b')
+        only, per Eqs. 58-61)."""
         return np.asarray(self._d["cvg_j_ref"])
 
     @property
@@ -446,7 +450,7 @@ class Tm30Result:
             f"CCT={self.cct:.0f} K, Duv={self.duv:.6f})"
         )
 
-    # ── DataFrame / dict support ──────────────────────────────────
+    # -- DataFrame / dict support ----------------------------------
 
     def to_dict(self, *, arrays: bool = False) -> dict[str, float | list[float]]:
         """Return a flat dict of this result.
@@ -609,7 +613,7 @@ class Tm30BatchResult:
 
     @property
     def delta_e_avg(self) -> np.ndarray:
-        """Average ΔE′ across 99 CES - shape (N,).  TM-30-20 §4.1."""
+        """Average dE' across 99 CES - shape (N,).  TM-30-20 §4.1."""
         return self._d["delta_e_avg"]
 
     @property
@@ -622,7 +626,7 @@ class Tm30BatchResult:
         """Per-sample fidelity Rf,CESi - shape (N, 99).  TM-30-20 §4.2."""
         if "rf_cesi" not in self._d:
             raise AttributeError(
-                "rf_cesi is not available on this result — call "
+                "rf_cesi is not available on this result -- call "
                 "eval(..., samples=True) to include it (samples defaults "
                 "to True; this result came from an explicit samples=False)."
             )
@@ -633,7 +637,7 @@ class Tm30BatchResult:
         """Per-bin chroma shift Rcs,hj - shape (N, 16).  TM-30-20 §4.6."""
         if "rcs_hj" not in self._d:
             raise AttributeError(
-                "rcs_hj is not available on this result — call "
+                "rcs_hj is not available on this result -- call "
                 "eval(..., bins=True) to include it (bins defaults "
                 "to True; this result came from an explicit bins=False)."
             )
@@ -644,13 +648,13 @@ class Tm30BatchResult:
         """Per-bin hue shift Rhs,hj - shape (N, 16).  TM-30-20 §4.7."""
         if "rhs_hj" not in self._d:
             raise AttributeError(
-                "rhs_hj is not available on this result — call "
+                "rhs_hj is not available on this result -- call "
                 "eval(..., bins=True) to include it (bins defaults "
                 "to True; this result came from an explicit bins=False)."
             )
         return self._d["rhs_hj"]
 
-    # ── Extras (only present if eval(..., extras=True)) ──
+    # -- Extras (only present if eval(..., extras=True)) --
 
     @property
     def rf_hj(self) -> np.ndarray:
@@ -659,12 +663,14 @@ class Tm30BatchResult:
 
     @property
     def de_hj(self) -> np.ndarray:
-        """Per-bin mean ΔE′, DE_hj - shape (N, 16).  TM-30-20 §4.8."""
+        """Per-bin mean dE', DE_hj - shape (N, 16).  TM-30-20 §4.8."""
         return self._d["de_hj"]
 
     @property
     def cvg_j_test(self) -> np.ndarray:
-        """CVG test-vector J′ - shape (N, 16).  TM-30-20 §4.5."""
+        """Test-vector J' - shape (N, 16).  pytm30 extension of the §4.4
+        bin averages (§4.4 discards J'; §4.5 CVG geometry is 2-D in (a',b')
+        only, per Eqs. 58-61)."""
         return self._d["cvg_j_test"]
 
     @property
@@ -679,7 +685,9 @@ class Tm30BatchResult:
 
     @property
     def cvg_j_ref(self) -> np.ndarray:
-        """CVG reference-circle J′ - shape (N, 16).  TM-30-20 §4.5."""
+        """Reference-circle J' - shape (N, 16).  pytm30 extension of the
+        §4.4 bin averages (§4.4 discards J'; §4.5 CVG geometry is 2-D in
+        (a',b') only, per Eqs. 58-61)."""
         return self._d["cvg_j_ref"]
 
     @property
@@ -763,7 +771,7 @@ class Tm30BatchResult:
             Ignored if multiindex=True.
         expand_arrays : bool
             If True, expand rf_cesi into 99 individual columns
-            (rf_cesi_1 … rf_cesi_99).  Implies arrays=True.  Ignored if
+            (rf_cesi_1 ... rf_cesi_99).  Implies arrays=True.  Ignored if
             multiindex=True.
         multiindex : bool
             If True, return a DataFrame with a multi-level pd.MultiIndex
@@ -818,7 +826,7 @@ def to_dataframe(
     which has its own .to_dataframe() method - use that one for actual
     batch calls; this free function is for a list you assembled yourself.
 
-    Uses numpy arrays internally for speed - ~1 µs/SPD overhead.
+    Uses numpy arrays internally for speed - ~1 us/SPD overhead.
 
     Parameters
     ----------
@@ -829,7 +837,7 @@ def to_dataframe(
         Ignored if multiindex=True.
     expand_arrays : bool
         If True, expand rf_cesi into 99 individual columns
-        (rf_cesi_1 … rf_cesi_99).  Implies arrays=True.  Ignored if
+        (rf_cesi_1 ... rf_cesi_99).  Implies arrays=True.  Ignored if
         multiindex=True.
     multiindex : bool
         If True, return a DataFrame with a multi-level pd.MultiIndex for
@@ -867,7 +875,7 @@ def to_dataframe(
         data["rhs_hj"] = [list(r.rhs_hj) for r in results]
 
     if expand_arrays:
-        # rf_cesi → 99 individual columns
+        # rf_cesi -> 99 individual columns
         cesi_matrix = np.array([r.rf_cesi for r in results], dtype=np.float64)
         for i in range(99):
             data[f"rf_cesi_{i + 1}"] = cesi_matrix[:, i]
@@ -889,15 +897,15 @@ class TM30Calc:
         Directory containing the TM-30 data CSV files.
         Defaults to the built-in path.
     cmf : Cmf, str, Path, or None
-        CIE observer for tristimulus integration (10° CMF).
+        CIE observer for tristimulus integration (10-deg CMF).
         - Cmf.CIE_1964_10 (default) - TM-30-20 standard
         - Cmf.CIE_1931_2, Cmf.CIE_2006_10, Cmf.CIE_2015_2, Cmf.CIE_2015_10
         - '1931_2' (string lookup, case-insensitive)
         - '/path/to/my_cmf.csv' (custom CSV)
-        Default: CIE 1964 10° (cmf='1964_10').
+        Default: CIE 1964 10-deg (cmf='1964_10').
     cmf_2deg : Cmf, str, Path, or None
-        CIE observer for CCT computation (2° CMF).
-        Same format as `cmf`.  Default: CIE 1931 2° (cmf_2deg='1931_2').
+        CIE observer for CCT computation (2-deg CMF).
+        Same format as `cmf`.  Default: CIE 1931 2-deg (cmf_2deg='1931_2').
     wavelengths : np.ndarray or None
         Fixed wavelength grid (nm) this calculator is bound to.  Defaults to
         380-780 nm at 1 nm steps (401 points, the implicit default used
@@ -968,7 +976,7 @@ class TM30Calc:
         self._cmf = cmf
         self._cmf_2deg = cmf_2deg
 
-        # ── Fixed wavelength grid: normalize, cache, precompute tables ──
+        # -- Fixed wavelength grid: normalize, cache, precompute tables --
         if wavelengths is None:
             wavelengths = np.arange(380.0, 781.0, 1.0)
         wavelengths = np.asarray(wavelengths)
@@ -980,12 +988,12 @@ class TM30Calc:
 
     @property
     def cmf(self) -> Cmf | str | os.PathLike | None:
-        """Configured 10° CMF observer (tristimulus integration)."""
+        """Configured 10-deg CMF observer (tristimulus integration)."""
         return self._cmf
 
     @property
     def cmf_2deg(self) -> Cmf | str | os.PathLike | None:
-        """Configured 2° CMF observer (CCT computation)."""
+        """Configured 2-deg CMF observer (CCT computation)."""
         return self._cmf_2deg
 
     @property
@@ -1007,8 +1015,8 @@ class TM30Calc:
         Parameters
         ----------
         spd : np.ndarray, shape (N_wl,) or (N_spds, N_wl)
-            1-D → single SPD → single Tm30Result (scalar fields)
-            2-D → batch of N_spds → single Tm30BatchResult (every field is
+            1-D -> single SPD -> single Tm30Result (scalar fields)
+            2-D -> batch of N_spds -> single Tm30BatchResult (every field is
             a numpy array with the batch as its leading axis, e.g. `.rf`
             has shape (N_spds,) - see Tm30BatchResult's docstring)
         wavelengths : np.ndarray or None
@@ -1105,7 +1113,7 @@ class TM30Calc:
                 parts.append(f"cmf_2deg={cmf2_str}")
         return f"TM30Calc({', '.join(parts)})"
 
-    # ── Convenience: SPD → XYZ / Yuv ────────────────────────────────
+    # -- Convenience: SPD -> XYZ / Yuv --------------------------------
 
     def spd_to_xyz(
         self,
@@ -1119,21 +1127,21 @@ class TM30Calc:
     ) -> np.ndarray:
         """Compute source XYZ for one or many SPDs.
 
-        Uses CIE 1964 10° CMFs.
+        Uses CIE 1964 10-deg CMFs.
 
         Parameters
         ----------
         spd : np.ndarray, shape (N_wl,) or (N_spds, N_wl)
-            1-D → single SPD → returns (3,) array [X, Y, Z]
-            2-D → batch of N_spds → returns (N_spds, 3) array
+            1-D -> single SPD -> returns (3,) array [X, Y, Z]
+            2-D -> batch of N_spds -> returns (N_spds, 3) array
         wavelengths : np.ndarray or None
-            Wavelength grid (nm).  None (the common case) → use this
+            Wavelength grid (nm).  None (the common case) -> use this
             calculator's fixed wavelength grid (see the `wavelengths`
-            parameter of ``TM30Calc.__init__``).  Explicit array → a
+            parameter of ``TM30Calc.__init__``).  Explicit array -> a
             one-off different grid for this call only.
         K : float or None
             Normalisation constant.  None (default): auto-compute
-            k = 100/∫St·ȳ dλ → Y = 100 (TM-30-20 §3.2 Eq. 4).
+            k = 100/integral St*ybar dlambda -> Y = 100 (TM-30-20 §3.2 Eq. 4).
             K = 1.0: raw tristimulus integrals.
             K = 683.0: photometric absolute (matches luxpy's relative=False).
         cmf : Cmf, str, Path, or None
@@ -1141,7 +1149,7 @@ class TM30Calc:
             calculator's bound CMF. Explicit value: load+resample a
             different CMF for this call only.
         lambda_min, lambda_max : float or None
-            Per-call override of integration bounds.  None → integrate
+            Per-call override of integration bounds.  None -> integrate
             over the full wavelength grid.
 
         Returns
@@ -1180,19 +1188,19 @@ class TM30Calc:
         lambda_min: float | None = None,
         lambda_max: float | None = None,
     ) -> np.ndarray:
-        """Compute CIE 1976 Y,u′,v′ for one or many SPDs.
+        """Compute CIE 1976 Y,u',v' for one or many SPDs.
 
-        Chains spd_to_xyz → xyz_to_Yuv (CIE 15:2004 §8.2.1).
+        Chains spd_to_xyz -> xyz_to_Yuv (CIE 15:2004 §8.2.1).
 
         Parameters
         ----------
         spd : np.ndarray, shape (N_wl,) or (N_spds, N_wl)
-            1-D → single SPD → returns (3,) array [Y, u′, v′]
-            2-D → batch of N_spds → returns (N_spds, 3) array
+            1-D -> single SPD -> returns (3,) array [Y, u', v']
+            2-D -> batch of N_spds -> returns (N_spds, 3) array
         wavelengths : np.ndarray or None
-            Wavelength grid (nm).  None (the common case) → use this
+            Wavelength grid (nm).  None (the common case) -> use this
             calculator's fixed wavelength grid (see the `wavelengths`
-            parameter of ``TM30Calc.__init__``).  Explicit array → a
+            parameter of ``TM30Calc.__init__``).  Explicit array -> a
             one-off different grid for this call only.
         K : float or None
             Normalisation constant passed to spd_to_xyz.
@@ -1203,7 +1211,7 @@ class TM30Calc:
             calculator's bound CMF. Explicit value: load+resample a
             different CMF for this call only.
         lambda_min, lambda_max : float or None
-            Per-call override of integration bounds.  None → integrate
+            Per-call override of integration bounds.  None -> integrate
             over the full wavelength grid.
 
         Returns

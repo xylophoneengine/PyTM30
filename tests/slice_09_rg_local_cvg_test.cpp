@@ -31,6 +31,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <numbers>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
@@ -40,9 +41,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers (same pattern as other slice tests)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -54,7 +55,7 @@ std::string fixture_path(const std::string &spd_name,
          stage + ".json";
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -109,9 +110,9 @@ std::vector<double> wl_1nm() {
   return wl;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // JSON fixture parsers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /// Load a single double value for a given key from a JSON fixture.
 double load_json_double(const std::string &filepath, const std::string &key) {
@@ -320,9 +321,9 @@ JabTripleArray load_json_jab_triples(const std::string &filepath,
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Global fixture data (loaded once)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 struct GlobalFixtures {
   CmfData cmf_2deg;
@@ -346,9 +347,9 @@ private:
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Helper: run pipeline and compute gamut for an SPD
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 struct GamutFromSpd {
   GamutResult gamut;
@@ -363,7 +364,7 @@ GamutFromSpd run_gamut_for_spd(const std::vector<double> &spd_wl,
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // Compute ΔE′
+  // Compute dE'
   auto delta_e = compute_delta_e(result.jab_test_ces, result.jab_ref_ces);
 
   // Compute gamut
@@ -373,22 +374,22 @@ GamutFromSpd run_gamut_for_spd(const std::vector<double> &spd_wl,
   return {gamut, result};
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Helper: verify all metrics for an SPD against fixtures
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 void verify_gamut_for_spd(const std::string &fixture_subdir,
                           const GamutFromSpd &gfs) {
   const auto &gamut = gfs.gamut;
 
-  // ── Rg ─────────────────────────────────────────────────────────
+  // -- Rg ---------------------------------------------------------
   double golden_rg =
       load_json_double(fixture_path(fixture_subdir, "13_rg"), "Rg");
   INFO(fixture_subdir << ": computed Rg = " << gamut.Rg
                       << " golden Rg = " << golden_rg);
   CHECK_THAT(gamut.Rg, WithinTolerance(Tol_Rg, golden_rg));
 
-  // ── Per-bin Rf,hj ──────────────────────────────────────────────
+  // -- Per-bin Rf,hj ----------------------------------------------
   auto golden_rfhj = load_json_array_16(
       fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rfhj");
 
@@ -401,7 +402,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
   INFO(fixture_subdir << ": max Rf,hj delta = " << max_rfhj_delta);
   CHECK(max_rfhj_delta <= Tol_Rf);
 
-  // ── Per-bin Rcs,hj ─────────────────────────────────────────────
+  // -- Per-bin Rcs,hj ---------------------------------------------
   auto golden_rcshj = load_json_array_16(
       fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rcshj");
 
@@ -414,7 +415,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
   INFO(fixture_subdir << ": max Rcs,hj delta = " << max_rcshj_delta);
   CHECK(max_rcshj_delta <= Tol_LocalShift);
 
-  // ── Per-bin Rhs,hj ─────────────────────────────────────────────
+  // -- Per-bin Rhs,hj ---------------------------------------------
   auto golden_rhshj = load_json_array_16(
       fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rhshj");
 
@@ -427,7 +428,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
   INFO(fixture_subdir << ": max Rhs,hj delta = " << max_rhshj_delta);
   CHECK(max_rhshj_delta <= Tol_LocalShift);
 
-  // ── CVG: test average J'a'b' (jabt_hj) ─────────────────────────
+  // -- CVG: test average J'a'b' (jabt_hj) -------------------------
   auto golden_jabt = load_json_jab_triples(
       fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabt_hj");
 
@@ -446,7 +447,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
   INFO(fixture_subdir << ": max jabt_hj delta = " << max_jabt_delta);
   CHECK(max_jabt_delta <= Tol_Jab);
 
-  // ── CVG: reference average J'a'b' (jabr_hj) ────────────────────
+  // -- CVG: reference average J'a'b' (jabr_hj) --------------------
   auto golden_jabr = load_json_jab_triples(
       fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabr_hj");
 
@@ -468,7 +469,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
   // Tol_Jab (0.001) remains the standard; bin-average comparisons use 0.002.
   CHECK(max_jabr_delta <= 0.002);
 
-  // ── CVG normalized test coordinates (jabtn_hj) ─────────────────
+  // -- CVG normalized test coordinates (jabtn_hj) -----------------
   auto golden_jabtn = load_json_jab_triples(
       fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabtn_hj");
 
@@ -485,10 +486,10 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
       max_jabtn_delta = dy;
   }
   INFO(fixture_subdir << ": max jabtn_hj delta = " << max_jabtn_delta);
-  // CVG scale is 100×, so Tol_Jab × 100 for the scaled coordinates
+  // CVG scale is 100x, so Tol_Jab x 100 for the scaled coordinates
   CHECK(max_jabtn_delta <= Tol_Jab * 100.0);
 
-  // ── CVG normalized reference coordinates (jabrn_hj) ────────────
+  // -- CVG normalized reference coordinates (jabrn_hj) ------------
   auto golden_jabrn = load_json_jab_triples(
       fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabrn_hj");
 
@@ -508,12 +509,12 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
   CHECK(max_jabrn_delta <= Tol_Jab * 100.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Self-consistency tests
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE(
-    "Gamut - planckian 3000K self-consistency: Rg≈100, shifts≈0, Rf,hj≈100",
+    "Gamut - planckian 3000K self-consistency: Rg~=100, shifts~=0, Rf,hj~=100",
     "[gamut][rg][slice09][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -523,13 +524,13 @@ TEST_CASE(
   auto gfs = run_gamut_for_spd(wl, spd_vals);
   const auto &gamut = gfs.gamut;
 
-  // Rg ≈ 100
-  // TM-30-20 §4.4: Self-consistency → Rg ≈ 100
+  // Rg ~= 100
+  // TM-30-20 §4.4: Self-consistency -> Rg ~= 100
   INFO("Planckian 3000K: Rg = " << gamut.Rg);
   CHECK_THAT(gamut.Rg, WithinTolerance(Tol_Rg, 100.0));
 
-  // All Rcs,hj ≈ 0
-  // TM-30-20 §4.6: Self-consistency → shifts near zero
+  // All Rcs,hj ~= 0
+  // TM-30-20 §4.6: Self-consistency -> shifts near zero
   double max_rcs = 0.0;
   for (int j = 0; j < 16; ++j) {
     double v = std::abs(gamut.local.Rcs_hj[j]);
@@ -539,8 +540,8 @@ TEST_CASE(
   INFO("Planckian 3000K: max |Rcs,hj| = " << max_rcs);
   CHECK(max_rcs <= Tol_LocalShift);
 
-  // All Rhs,hj ≈ 0
-  // TM-30-20 §4.7: Self-consistency → shifts near zero
+  // All Rhs,hj ~= 0
+  // TM-30-20 §4.7: Self-consistency -> shifts near zero
   double max_rhs = 0.0;
   for (int j = 0; j < 16; ++j) {
     double v = std::abs(gamut.local.Rhs_hj[j]);
@@ -550,8 +551,8 @@ TEST_CASE(
   INFO("Planckian 3000K: max |Rhs,hj| = " << max_rhs);
   CHECK(max_rhs <= Tol_LocalShift);
 
-  // All Rf,hj ≈ 100
-  // TM-30-20 §4.8: Self-consistency → per-bin fidelity ≈ 100
+  // All Rf,hj ~= 100
+  // TM-30-20 §4.8: Self-consistency -> per-bin fidelity ~= 100
   double min_rfhj = 100.0;
   for (int j = 0; j < 16; ++j) {
     if (gamut.local.Rf_hj[j] < min_rfhj)
@@ -561,7 +562,7 @@ TEST_CASE(
   CHECK_THAT(min_rfhj, WithinTolerance(Tol_Rf, 100.0));
 }
 
-TEST_CASE("Gamut - D65 self-consistency: Rg≈100, shifts≈0",
+TEST_CASE("Gamut - D65 self-consistency: Rg~=100, shifts~=0",
           "[gamut][rg][slice09][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -574,9 +575,9 @@ TEST_CASE("Gamut - D65 self-consistency: Rg≈100, shifts≈0",
   CHECK_THAT(gamut.Rg, WithinTolerance(Tol_Rg, 100.0));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Golden fixture tests
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Gamut - D65 gamut metrics match golden fixtures",
           "[gamut][rg][slice09][fixture]") {
@@ -619,9 +620,9 @@ TEST_CASE("Gamut - planckian 3000K gamut metrics match golden fixtures",
   verify_gamut_for_spd("planckian_3000K", gfs);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Range sanity checks
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Gamut - Rg is positive for various SPDs",
           "[gamut][rg][slice09][range]") {
@@ -673,17 +674,17 @@ TEST_CASE("Gamut - Rf,hj in [0, 100] for all SPDs",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Unit tests: individual sub-functions
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Gamut - polygon_area handles degenerate polygon",
           "[gamut][rg][slice09][unit]") {
-  // Empty bins → fewer than 3 vertices → area = 0
+  // Empty bins -> fewer than 3 vertices -> area = 0
   BinAverages avg{};
   for (int j = 0; j < 16; ++j) {
     if (j >= 2) {
-      // Only 2 valid bins → degenerate
+      // Only 2 valid bins -> degenerate
       avg.a_prime[j] = std::numeric_limits<double>::quiet_NaN();
       avg.b_prime[j] = std::numeric_limits<double>::quiet_NaN();
     }
@@ -699,7 +700,7 @@ TEST_CASE("Gamut - polygon_area handles degenerate polygon",
 
 TEST_CASE("Gamut - polygon_area of unit square in (a',b') plane",
           "[gamut][rg][slice09][unit]") {
-  // 4 vertices forming a 2×2 square
+  // 4 vertices forming a 2x2 square
   BinAverages avg{};
   // Set first 4 bins (rest NaN)
   for (int j = 0; j < 16; ++j) {
@@ -727,7 +728,7 @@ TEST_CASE("Gamut - compute_rg gives 100 for identical polygons",
           "[gamut][rg][slice09][unit]") {
   BinAverages avg{};
   for (int j = 0; j < 16; ++j) {
-    double angle = static_cast<double>(j) * M_PI / 8.0;
+    double angle = static_cast<double>(j) * std::numbers::pi / 8.0;
     avg.a_prime[j] = std::cos(angle) * 10.0;
     avg.b_prime[j] = std::sin(angle) * 10.0;
     avg.J_prime[j] = 50.0;

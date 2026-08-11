@@ -1,15 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
 project(tm30-python LANGUAGES CXX)
 
-# ── C++20 ────────────────────────────────────────────────────────────────
+# -- C++20 ----------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# ── Paths ────────────────────────────────────────────────────────────────
+# -- Paths ----------------------------------------------------------------
 set(TM30_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
-# ── Find Python + nanobind ──────────────────────────────────────────────
+# -- Find Python + nanobind ----------------------------------------------
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -22,7 +22,7 @@ execute_process(
 list(APPEND CMAKE_PREFIX_PATH "${NB_CMAKE_DIR}")
 find_package(nanobind CONFIG REQUIRED)
 
-# ── Core library (same sources as parent CMakeLists) ────────────────────
+# -- Core library (same sources as parent CMakeLists) --------------------
 add_library(tm30-core STATIC
   ${TM30_ROOT}/src/tm30/version.cpp
   ${TM30_ROOT}/src/tm30/spd.cpp
@@ -48,10 +48,10 @@ target_compile_features(tm30-core PUBLIC cxx_std_20)
 target_link_libraries(tm30-core PUBLIC Threads::Threads)
 set_target_properties(tm30-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# ── Data directory path ─────────────────────────────────────────────────
+# -- Data directory path -------------------------------------------------
 set(TM30_DATA_DIR "${TM30_ROOT}/data")
 
-# ── nanobind extension module ───────────────────────────────────────────
+# -- nanobind extension module -------------------------------------------
 nanobind_add_module(tm30_core
   tm30_bindings.cpp
 )
@@ -60,6 +60,6 @@ target_compile_definitions(tm30_core PRIVATE
   TM30_DATA_DIR="${TM30_DATA_DIR}"
 )
 
-# ── Install into the wheel ───────────────────────────────────────────────
+# -- Install into the wheel -----------------------------------------------
 install(TARGETS tm30_core LIBRARY DESTINATION .)
 install(FILES tm30_calc.py DESTINATION .)

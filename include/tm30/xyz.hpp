@@ -1,14 +1,14 @@
 #pragma once
 
 /// @file xyz.hpp
-/// CIE 1964 10° tristimulus value computation.
+/// CIE 1964 10-deg tristimulus value computation.
 ///
 /// Computes XYZ tristimulus values for sources and for the 99 CES samples
-/// under a given source SPD, using the CIE 1964 10° standard colorimetric
+/// under a given source SPD, using the CIE 1964 10-deg standard colorimetric
 /// observer.
 ///
 /// TM-30-20 §3.1: Colorimetric Observer - all color rendition calculations
-///                use the CIE 1964 10° standard colorimetric observer.
+///                use the CIE 1964 10-deg standard colorimetric observer.
 /// TM-30-20 §3.2: Test Source - tristimulus values for the source itself.
 /// TM-30-20 §3.6: Calculation of Tristimulus Values - CES tristimulus values.
 
@@ -44,7 +44,8 @@ struct SourceXyz {
   double Y; // TM-30-20 §3.2 Eq. (2)
   double Z; // TM-30-20 §3.2 Eq. (3)
 
-  // TM-30-20 §3.2 Eq. (4): kt = 100 / ∫ St(λ) · ȳ₁₀(λ) dλ
+  // TM-30-20 §3.2 Eq. (4): kt = 100 / integral St(lambda) * ybar10(lambda)
+  // dlambda
   double k; // TM-30-20 §3.2 Eq. (4)
 };
 
@@ -52,13 +53,13 @@ struct SourceXyz {
 ///
 /// @param spd_wavelengths  The SPD wavelength grid (nm), monotonically
 /// increasing.
-/// @param spd_values       The SPD spectral power values St(λ).
-/// @param cmf_x_bar        CIE 1964 10° x̄₁₀(λ) values, resampled to match
-/// spd_wavelengths.
-/// @param cmf_y_bar        CIE 1964 10° ȳ₁₀(λ) values, resampled to match
-/// spd_wavelengths.
-/// @param cmf_z_bar        CIE 1964 10° z̄₁₀(λ) values, resampled to match
-/// spd_wavelengths.
+/// @param spd_values       The SPD spectral power values St(lambda).
+/// @param cmf_x_bar        CIE 1964 10-deg xbar10(lambda) values, resampled to
+/// match spd_wavelengths.
+/// @param cmf_y_bar        CIE 1964 10-deg ybar10(lambda) values, resampled to
+/// match spd_wavelengths.
+/// @param cmf_z_bar        CIE 1964 10-deg zbar10(lambda) values, resampled to
+/// match spd_wavelengths.
 ///
 /// @return SourceXyz with X, Y, Z (Y = 100.0) and normalisation constant k.
 ///
@@ -76,12 +77,12 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
 /// The CMF data must also be pre-resampled to match spd_wavelengths.
 ///
 /// @param spd_wavelengths  The SPD wavelength grid (nm).
-/// @param spd_values       The SPD spectral power values St(λ).
+/// @param spd_values       The SPD spectral power values St(lambda).
 /// @param ces_data         CES reflectance data, resampled to spd_wavelengths.
 ///                         Must contain exactly 99 CES samples.
-/// @param cmf_x_bar        CIE 1964 10° x̄₁₀(λ), resampled.
-/// @param cmf_y_bar        CIE 1964 10° ȳ₁₀(λ), resampled.
-/// @param cmf_z_bar        CIE 1964 10° z̄₁₀(λ), resampled.
+/// @param cmf_x_bar        CIE 1964 10-deg xbar10(lambda), resampled.
+/// @param cmf_y_bar        CIE 1964 10-deg ybar10(lambda), resampled.
+/// @param cmf_z_bar        CIE 1964 10-deg zbar10(lambda), resampled.
 /// @param k                Source normalisation constant from
 /// compute_source_xyz.
 ///
@@ -95,7 +96,7 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
                 const std::vector<double> &cmf_y_bar,
                 const std::vector<double> &cmf_z_bar, double k);
 
-// ── Convenience functions (handle CMF resampling internally) ──────────
+// -- Convenience functions (handle CMF resampling internally) ----------
 
 /// Compute source XYZ from an SPD, with automatic CMF resampling.
 ///
@@ -104,12 +105,12 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
 ///
 /// @param spd_wavelengths  SPD wavelength grid (nm).
 /// @param spd_values       SPD spectral power values.
-/// @param cmf_data         CIE 1964 10° CMF data (will be resampled to
+/// @param cmf_data         CIE 1964 10-deg CMF data (will be resampled to
 /// spd_wavelengths).
 /// @param K                Normalisation constant.
 ///                         If std::nullopt (default): auto-compute k =
-///                         100/∫St·ȳ dλ
-///                           → Y = 100 (TM-30-20 §3.2 Eq. 4).
+///                         100/integral St*ybar dlambda
+///                           -> Y = 100 (TM-30-20 §3.2 Eq. 4).
 ///                         If a value is provided, it is used directly as the
 ///                           multiplier for the raw tristimulus integrals.
 ///                           K = 1.0 returns raw integrals.
@@ -131,7 +132,7 @@ XyzTriple spd_to_xyz(const std::vector<double> &spd_wavelengths,
 ///
 /// @param spd_wavelengths  SPD wavelength grid (nm), shared by all SPDs.
 /// @param spd_matrix       Vector of SPD value vectors (one per SPD).
-/// @param cmf_data         CIE 1964 10° CMF data.
+/// @param cmf_data         CIE 1964 10-deg CMF data.
 /// @param K                Normalisation constant (see single-SPD version).
 /// @param lambda_min       Lower integration bound (nm).
 /// @param lambda_max       Upper integration bound (nm).
@@ -144,17 +145,17 @@ spd_to_xyz_batch(const std::vector<double> &spd_wavelengths,
                  std::optional<double> lambda_min = std::nullopt,
                  std::optional<double> lambda_max = std::nullopt);
 
-/// Compute CIE 1976 Y,u′,v′ from an SPD.
+/// Compute CIE 1976 Y,u',v' from an SPD.
 ///
-/// Chains spd_to_xyz → xyz_to_Yuv.
+/// Chains spd_to_xyz -> xyz_to_Yuv.
 ///
 /// @param spd_wavelengths  SPD wavelength grid (nm).
 /// @param spd_values       SPD spectral power values.
-/// @param cmf_data         CIE 1964 10° CMF data.
+/// @param cmf_data         CIE 1964 10-deg CMF data.
 /// @param K                Normalisation constant (see spd_to_xyz).
 /// @param lambda_min       Lower integration bound (nm).
 /// @param lambda_max       Upper integration bound (nm).
-/// @return                 YuvTriple with Y, u′, v′.
+/// @return                 YuvTriple with Y, u', v'.
 YuvTriple spd_to_Yuv(const std::vector<double> &spd_wavelengths,
                      const std::vector<double> &spd_values,
                      const CmfData &cmf_data,
@@ -162,11 +163,11 @@ YuvTriple spd_to_Yuv(const std::vector<double> &spd_wavelengths,
                      std::optional<double> lambda_min = std::nullopt,
                      std::optional<double> lambda_max = std::nullopt);
 
-/// Compute CIE 1976 Y,u′,v′ for multiple SPDs sharing the same wavelength grid.
+/// Compute CIE 1976 Y,u',v' for multiple SPDs sharing the same wavelength grid.
 ///
 /// @param spd_wavelengths  SPD wavelength grid (nm).
 /// @param spd_matrix       Vector of SPD value vectors.
-/// @param cmf_data         CIE 1964 10° CMF data.
+/// @param cmf_data         CIE 1964 10-deg CMF data.
 /// @param K                Normalisation constant (see spd_to_xyz).
 /// @param lambda_min       Lower integration bound (nm).
 /// @param lambda_max       Upper integration bound (nm).
@@ -179,7 +180,7 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
                  std::optional<double> lambda_min = std::nullopt,
                  std::optional<double> lambda_max = std::nullopt);
 
-/// Convert multiple XYZ tristimulus triples to CIE 1976 Y,u′,v′.
+/// Convert multiple XYZ tristimulus triples to CIE 1976 Y,u',v'.
 ///
 /// A plain per-row loop over the existing xyz_to_Yuv() scalar function -
 /// there's no CMF or wavelength dependency to resample or cache here, so
@@ -226,23 +227,24 @@ XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
 /// @param cmf_data     CMF data (resampled once, reused for every CCT).
 /// @param K            Normalisation constant - see spd_to_xyz().
 /// @return             Vector of XyzTriple, one per input CCT.
-std::vector<XyzTriple>
-cct_to_xyz_batch(const std::vector<double> &ccts,
-                 const std::vector<double> &wavelengths,
-                 const DaylightBasis &basis, const CmfData &cmf_data,
-                 std::optional<double> K = std::nullopt);
+std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
+                                        const std::vector<double> &wavelengths,
+                                        const DaylightBasis &basis,
+                                        const CmfData &cmf_data,
+                                        std::optional<double> K = std::nullopt);
 
 /// Compute the total power of an SPD - radiometric (unweighted) or
 /// photometric (CIE luminous-efficiency-weighted).
 ///
-/// Radiometric (photometric=false): integral_st = ∫ S(λ) dλ over
-/// [lambda_min, lambda_max] - no CMF weighting at all; units follow
+/// Radiometric (photometric=false): integral_st = integral S(lambda) dlambda
+/// over [lambda_min, lambda_max] - no CMF weighting at all; units follow
 /// whatever units the SPD's own values are in (e.g. W if S is in W/nm).
 ///
-/// Photometric (photometric=true): Km · ∫ S(λ) · ȳ(λ) dλ, where ȳ is
-/// cmf_data's y-bar (resampled to the clipped grid) and Km = 683.0 lm/W is
-/// the CIE/SI maximum luminous efficacy constant (matches this codebase's
-/// existing K=683.0 "photometric absolute" convention on spd_to_xyz).
+/// Photometric (photometric=true): Km * integral S(lambda) * ybar(lambda)
+/// dlambda, where ybar is cmf_data's y-bar (resampled to the clipped grid) and
+/// Km = 683.0 lm/W is the CIE/SI maximum luminous efficacy constant (matches
+/// this codebase's existing K=683.0 "photometric absolute" convention on
+/// spd_to_xyz).
 ///
 /// @param wavelengths  SPD wavelength grid (nm).
 /// @param values       SPD spectral power values.

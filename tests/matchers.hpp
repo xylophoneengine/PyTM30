@@ -10,14 +10,14 @@
 
 namespace tm30::test {
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  WithinTolerance - Catch2 matcher for absolute tolerance.
 //
 //  Usage:
 //    REQUIRE_THAT(result, WithinTolerance(Tol_Xyz, 95.047));
 //
 //  On failure, prints expected, actual, delta, and tolerance.
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 template <typename T>
 class WithinTolerance final : public Catch::Matchers::MatcherGenericBase {
 
@@ -46,7 +46,7 @@ private:
   mutable T actual_{};
 };
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  WithinRelTolerance - Catch2 matcher for relative tolerance.
 //
 //  Usage:
@@ -54,7 +54,7 @@ private:
 //
 //  Passes when |actual - expected| / expected <= relative_tolerance.
 //  On failure, prints expected, actual, relative delta, and tolerance.
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 template <typename T>
 class WithinRelTolerance final : public Catch::Matchers::MatcherGenericBase {
 

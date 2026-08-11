@@ -2,8 +2,7 @@
 // Validates bin_by_hue against golden fixtures, self-consistency,
 // complete coverage (all 99 CES assigned), and boundary handling.
 //
-// TM-30-20 §4.3: Hue-Angle Bins
-// TM-30-20 Annex B
+// TM-30-20 §4.3 + Figure 3: Hue-Angle Bins
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -24,6 +23,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <numbers>
 #include <numeric>
 #include <set>
 #include <sstream>
@@ -34,9 +34,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers (same pattern as other slice tests)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -48,7 +48,7 @@ std::string fixture_path(const std::string &spd_name,
          stage + ".json";
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -170,9 +170,9 @@ std::array<int, 99> flatten_bins(const HueBins &bins) {
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Global fixture data (loaded once)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 struct GlobalFixtures {
   CmfData cmf_2deg;
@@ -196,9 +196,9 @@ private:
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Fixture-based tests: bin assignments match golden data for various SPDs
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 void verify_hue_bins_for_spd(const std::string &spd_name,
                              const std::string &csv_file,
@@ -290,9 +290,9 @@ TEST_CASE("Hue binning - planckian 3000K bin assignments match fixture",
   CHECK(mismatches == 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Coverage: all 99 CES assigned exactly once
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - all 99 CES assigned exactly once (D65)",
           "[hue_bins][slice08][coverage]") {
@@ -333,9 +333,9 @@ TEST_CASE("Hue binning - no duplicate assignments (D65)",
   CHECK(seen.size() == 99);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // No empty bins for well-populated SPDs
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - no empty bins for D65",
           "[hue_bins][slice08][coverage]") {
@@ -386,19 +386,19 @@ TEST_CASE("Hue binning - no empty bins for HP1",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Boundary handling tests
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - boundary: hr = 0 maps to bin 0",
           "[hue_bins][slice08][boundary]") {
   // Create a single CES at hr = 0 (positive a' axis).
-  // Set all others to a coordinate in bin 8 (180°) to avoid polluting bin 0.
+  // Set all others to a coordinate in bin 8 (180-deg) to avoid polluting bin 0.
   std::array<Cam02Ucs, 99> jab_ref{};
   for (int i = 0; i < 99; ++i) {
-    jab_ref[i] = Cam02Ucs{50.0, -1.0, 0.0}; // hr = π → bin 8
+    jab_ref[i] = Cam02Ucs{50.0, -1.0, 0.0}; // hr = pi -> bin 8
   }
-  jab_ref[0] = Cam02Ucs{50.0, 1.0, 0.0}; // hr = atan2(0, 1) = 0 → bin 0
+  jab_ref[0] = Cam02Ucs{50.0, 1.0, 0.0}; // hr = atan2(0, 1) = 0 -> bin 0
 
   HueBins bins = bin_by_hue(jab_ref);
 
@@ -407,17 +407,18 @@ TEST_CASE("Hue binning - boundary: hr = 0 maps to bin 0",
   CHECK(bins[0][0] == 0);
 }
 
-TEST_CASE(
-    "Hue binning - boundary: hr exactly at 22.5° maps to bin 1 (higher index)",
-    "[hue_bins][slice08][boundary]") {
-  // Bin 0 spans [0°, 22.5°), bin 1 spans [22.5°, 45.0°)
-  // CES exactly at 22.5° should go to bin 1 (boundary tie-break: [start, end))
-  double angle_rad = 22.5 * M_PI / 180.0; // 0.392699... rad
+TEST_CASE("Hue binning - boundary: hr exactly at 22.5-deg maps to bin 1 "
+          "(higher index)",
+          "[hue_bins][slice08][boundary]") {
+  // Bin 0 spans [0-deg, 22.5-deg), bin 1 spans [22.5-deg, 45.0-deg)
+  // CES exactly at 22.5-deg should go to bin 1 (boundary tie-break: [start,
+  // end))
+  double angle_rad = 22.5 * std::numbers::pi / 180.0; // 0.392699... rad
 
-  // Set all others to a coordinate in bin 8 (180°) to avoid polluting.
+  // Set all others to a coordinate in bin 8 (180-deg) to avoid polluting.
   std::array<Cam02Ucs, 99> jab_ref{};
   for (int i = 0; i < 99; ++i) {
-    jab_ref[i] = Cam02Ucs{50.0, -1.0, 0.0}; // hr = π → bin 8
+    jab_ref[i] = Cam02Ucs{50.0, -1.0, 0.0}; // hr = pi -> bin 8
   }
   jab_ref[0] = Cam02Ucs{50.0, std::cos(angle_rad), std::sin(angle_rad)};
 
@@ -429,15 +430,15 @@ TEST_CASE(
   CHECK(bins[0].empty());
 }
 
-TEST_CASE("Hue binning - boundary: hr just below 22.5° maps to bin 0",
+TEST_CASE("Hue binning - boundary: hr just below 22.5-deg maps to bin 0",
           "[hue_bins][slice08][boundary]") {
-  // hr = 22.49° should be in bin 0
-  double angle_rad = 22.49 * M_PI / 180.0;
+  // hr = 22.49-deg should be in bin 0
+  double angle_rad = 22.49 * std::numbers::pi / 180.0;
 
-  // Set all others to a coordinate in bin 8 (180°) to avoid polluting.
+  // Set all others to a coordinate in bin 8 (180-deg) to avoid polluting.
   std::array<Cam02Ucs, 99> jab_ref{};
   for (int i = 0; i < 99; ++i) {
-    jab_ref[i] = Cam02Ucs{50.0, -1.0, 0.0}; // hr = π → bin 8
+    jab_ref[i] = Cam02Ucs{50.0, -1.0, 0.0}; // hr = pi -> bin 8
   }
   jab_ref[0] = Cam02Ucs{50.0, std::cos(angle_rad), std::sin(angle_rad)};
 
@@ -447,55 +448,55 @@ TEST_CASE("Hue binning - boundary: hr just below 22.5° maps to bin 0",
   CHECK(bins[0][0] == 0);
 }
 
-TEST_CASE("Hue binning - boundary: hr = 360° (= 2π) maps to bin 15",
+TEST_CASE("Hue binning - boundary: hr = 360-deg (= 2pi) maps to bin 15",
           "[hue_bins][slice08][boundary]") {
-  // hr just above 337.5° goes to bin 15
-  double angle_rad = 350.0 * M_PI / 180.0;
+  // hr just above 337.5-deg goes to bin 15
+  double angle_rad = 350.0 * std::numbers::pi / 180.0;
 
   // Set all others to a coordinate in bin 0.
   std::array<Cam02Ucs, 99> jab_ref{};
   for (int i = 0; i < 99; ++i) {
-    jab_ref[i] = Cam02Ucs{50.0, 1.0, 0.0}; // hr = 0 → bin 0
+    jab_ref[i] = Cam02Ucs{50.0, 1.0, 0.0}; // hr = 0 -> bin 0
   }
   jab_ref[0] = Cam02Ucs{50.0, std::cos(angle_rad), std::sin(angle_rad)};
 
   HueBins bins = bin_by_hue(jab_ref);
 
-  // 350° / 22.5° = 15.55 → bin 15
+  // 350-deg / 22.5-deg = 15.55 -> bin 15
   CHECK(bins[15].size() == 1);
   CHECK(bins[15][0] == 0);
 }
 
 TEST_CASE("Hue binning - boundary: negative hr normalized correctly",
           "[hue_bins][slice08][boundary]") {
-  // a' = 1, b' = -0.1 → hr ≈ -0.0997 rad → normalized to ~6.183 rad (≈ 354.3°)
-  // Should be in bin 15 (337.5° to 360°)
-  double angle_rad = -0.099668652; // ≈ -5.71° → ~354.29°
+  // a' = 1, b' = -0.1 -> hr ~= -0.0997 rad -> normalized to ~6.183 rad (~=
+  // 354.3-deg) Should be in bin 15 (337.5-deg to 360-deg)
+  double angle_rad = -0.099668652; // ~= -5.71-deg -> ~354.29-deg
 
   // Set all others to a coordinate in bin 0.
   std::array<Cam02Ucs, 99> jab_ref{};
   for (int i = 0; i < 99; ++i) {
-    jab_ref[i] = Cam02Ucs{50.0, 1.0, 0.0}; // hr = 0 → bin 0
+    jab_ref[i] = Cam02Ucs{50.0, 1.0, 0.0}; // hr = 0 -> bin 0
   }
   jab_ref[0] = Cam02Ucs{50.0, std::cos(angle_rad), std::sin(angle_rad)};
 
   HueBins bins = bin_by_hue(jab_ref);
 
-  // After normalization: angle ≈ 2π - 0.0997 ≈ 6.183 rad
-  // 6.183 / 0.3927 ≈ 15.75 → bin 15
+  // After normalization: angle ~= 2pi - 0.0997 ~= 6.183 rad
+  // 6.183 / 0.3927 ~= 15.75 -> bin 15
   CHECK(bins[15].size() == 1);
   CHECK(bins[15][0] == 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // bin_by_hue returns exactly 16 bins
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - bin_by_hue returns 16 bins",
           "[hue_bins][slice08][unit]") {
   std::array<Cam02Ucs, 99> jab_ref{};
   for (int i = 0; i < 99; ++i) {
-    jab_ref[i] = Cam02Ucs{50.0, 1.0, 0.0}; // all at 0°, all in bin 0
+    jab_ref[i] = Cam02Ucs{50.0, 1.0, 0.0}; // all at 0-deg, all in bin 0
   }
 
   HueBins bins = bin_by_hue(jab_ref);
@@ -504,10 +505,10 @@ TEST_CASE("Hue binning - bin_by_hue returns 16 bins",
   CHECK(bins[0].size() == 99);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Self-consistency: reference = test → bins should be same
+// -------------------------------------------------------------------------
+// Self-consistency: reference = test -> bins should be same
 // (Binning is based on reference only, but we verify consistency)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - planckian 3000K self-consistency bins non-empty",
           "[hue_bins][slice08][self-consistency]") {
@@ -529,9 +530,9 @@ TEST_CASE("Hue binning - planckian 3000K self-consistency bins non-empty",
   CHECK(total == 99);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Per-bin sample count within expected range (2 to 11 per spec)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - per-bin sample count in [2, 11] for D65",
           "[hue_bins][slice08][range]") {
@@ -551,9 +552,9 @@ TEST_CASE("Hue binning - per-bin sample count in [2, 11] for D65",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CES indices are within valid range
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Hue binning - all CES indices in valid range [0, 98]",
           "[hue_bins][slice08][range]") {

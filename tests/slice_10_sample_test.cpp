@@ -68,7 +68,7 @@ CmfData load_cmf(const std::string &path) {
 CesData load_ces(const std::string &path) {
   CsvTable table = load_csv(path);
   // ces.csv format: wavelength, CES01, CES02, ..., CES99
-  // 401 rows × 100 columns
+  // 401 rows x 100 columns
   CesData data;
   std::size_t n_ces = table.headers.size() - 1; // 99 CES columns
 
@@ -84,21 +84,21 @@ CesData load_ces(const std::string &path) {
   return data;
 }
 
-// ── Rf,CESi ────────────────────────────────────────────────────────
+// -- Rf,CESi --------------------------------------------------------
 
 TEST_CASE("Sample fidelity - Rf,CESi for known deltaE values",
           "[sample][slice10]") {
-  // If all ΔE' = 0, Rf,CESi should be ≈100 (log rescaling gives ~100.00045)
+  // If all dE' = 0, Rf,CESi should be ~=100 (log rescaling gives ~100.00045)
   std::array<double, 99> zero_de;
   zero_de.fill(0.0);
   auto rf_cesi = compute_rf_cesi(zero_de);
   for (int i = 0; i < 99; ++i) {
-    // Rf' = 100, Rf = 10·ln(exp(10)+1) ≈ 100.00045
+    // Rf' = 100, Rf = 10*ln(exp(10)+1) ~= 100.00045
     REQUIRE_THAT(rf_cesi[i], WithinTolerance(0.001, 100.0));
   }
 
-  // If ΔE' = 10, Rf,CESi' = 100 - 6.73*10 = 32.7
-  // Rf,CESi = 10 * ln(exp(3.27) + 1) ≈ 10 * ln(26.31 + 1) = 10 * 3.309 = 33.09
+  // If dE' = 10, Rf,CESi' = 100 - 6.73*10 = 32.7
+  // Rf,CESi = 10 * ln(exp(3.27) + 1) ~= 10 * ln(26.31 + 1) = 10 * 3.309 = 33.09
   std::array<double, 99> de10;
   de10.fill(10.0);
   auto rf_cesi10 = compute_rf_cesi(de10);
@@ -107,7 +107,7 @@ TEST_CASE("Sample fidelity - Rf,CESi for known deltaE values",
   REQUIRE_THAT(rf_cesi10[0], WithinTolerance(1e-4, expected));
 }
 
-// ── Rf,skin ─────────────────────────────────────────────────────────
+// -- Rf,skin ---------------------------------------------------------
 
 TEST_CASE("Skin fidelity - Rf,skin from CES15 and CES18", "[sample][slice10]") {
   std::array<double, 99> rf_cesi;
@@ -119,7 +119,7 @@ TEST_CASE("Skin fidelity - Rf,skin from CES15 and CES18", "[sample][slice10]") {
   REQUIRE_THAT(rf_skin, WithinTolerance(1e-10, 80.0)); // (90+70)/2 = 80
 }
 
-// ── Pipeline integration ────────────────────────────────────────────
+// -- Pipeline integration --------------------------------------------
 
 TEST_CASE("Sample fidelity - D65 pipeline produces valid Rf,CESi",
           "[sample][slice10]") {
@@ -149,7 +149,7 @@ TEST_CASE("Sample fidelity - D65 pipeline produces valid Rf,CESi",
   REQUIRE_THAT(result.rf_skin, WithinTolerance(Tol_Rf, 100.0));
 }
 
-// ── Annex E ─────────────────────────────────────────────────────────
+// -- Annex E ---------------------------------------------------------
 
 TEST_CASE("Annex E - priority level constants", "[sample][slice10]") {
   // TM-30-20 Annex E: three priority levels

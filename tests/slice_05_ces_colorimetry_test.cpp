@@ -30,9 +30,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -170,7 +170,7 @@ std::vector<XyzTriple> load_xyz_fixture(const std::string &filepath) {
   return result;
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -251,13 +251,13 @@ void check_xyz_match(const std::array<XyzTriple, 99> &computed,
 
 // Fixture comparison tolerance - documented in PARITY.md Slice 5 entry.
 // CES XYZ values have larger accumulated numerical deltas than source
-// white-point XYZ due to multiplication chain (SPD × reflectance × CMF)
+// white-point XYZ due to multiplication chain (SPD x reflectance x CMF)
 // and reference-SPD propagation. Tol_Xyz (5e-5) is for source XYZ.
 constexpr double Tol_FixtureXyz = 1.0e-3;
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Global fixture data (loaded once)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 // Lazy-init globals to avoid static init ordering issues
 struct GlobalFixtures {
@@ -282,9 +282,9 @@ private:
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Golden fixture tests
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CES colorimetry - D65_1nm matches golden fixtures",
           "[pipeline][slice05]") {
@@ -298,7 +298,7 @@ TEST_CASE("CES colorimetry - D65_1nm matches golden fixtures",
                               G.daylight_basis, G.planckian_lut);
 
   // Verify CCT/Duv against golden
-  // D65_1nm: cct ≈ 6501.90, duv ≈ 0.00321
+  // D65_1nm: cct ~= 6501.90, duv ~= 0.00321
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 6501.89789213571));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.0032144638144609994));
 
@@ -324,7 +324,7 @@ TEST_CASE("CES colorimetry - F1 matches golden fixtures",
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // F1: cct ≈ 6425.40, duv ≈ 0.00719 (recomputed against the current,
+  // F1: cct ~= 6425.40, duv ~= 0.00719 (recomputed against the current,
   // colour-science-sourced fl1_1nm.csv; independent oracle, see
   // tools/oracle_recompute_12.py)
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 6425.401524207265));
@@ -349,8 +349,8 @@ TEST_CASE("CES colorimetry - HP1 matches golden fixtures",
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // HP1: cct ≈ 1959.24, duv ≈ 0.00078
-  // TM-30-20 §3.3 Eq. (14): Tt ≤ 4000 K → pure Planckian
+  // HP1: cct ~= 1959.24, duv ~= 0.00078
+  // TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 1959.2357303373917));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.0007823644283656693));
 
@@ -373,7 +373,7 @@ TEST_CASE("CES colorimetry - planckian 3000K matches golden fixtures",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // planckian_3000K: cct ≈ 3000.03, duv ≈ 3.62e-6
+  // planckian_3000K: cct ~= 3000.03, duv ~= 3.62e-6
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 3000.0304058052598));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 3.622599766511914e-06));
 
@@ -388,11 +388,11 @@ TEST_CASE("CES colorimetry - planckian 3000K matches golden fixtures",
                   "planckian_3000K ref");
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Self-consistency: Planckian at 3000K → test ≈ reference
+// -------------------------------------------------------------------------
+// Self-consistency: Planckian at 3000K -> test ~= reference
 //
 // NOTE: The CCT algorithm does not perfectly recover the input temperature
-// for a Planckian source (e.g., Planckian at 3000.00 K → CCT ≈ 3000.03 K).
+// for a Planckian source (e.g., Planckian at 3000.00 K -> CCT ~= 3000.03 K).
 // This causes the reference illuminant (Planckian at 3000.03 K) to differ
 // slightly from the test SPD (Planckian at 3000.00 K), producing CES XYZ
 // deltas up to ~6e-4. The golden fixtures from luxpy exhibit the same
@@ -400,9 +400,9 @@ TEST_CASE("CES colorimetry - planckian 3000K matches golden fixtures",
 // check, reflecting the inherent CCT algorithm imprecision rather than
 // an implementation error.
 // TM-30-20 §3.3: CCT of a perfect Planckian is not identity.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("CES colorimetry - planckian self-consistency: test ≈ reference",
+TEST_CASE("CES colorimetry - planckian self-consistency: test ~= reference",
           "[pipeline][slice05][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -413,11 +413,11 @@ TEST_CASE("CES colorimetry - planckian self-consistency: test ≈ reference",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // For a perfect Planckian source at Tt ≤ 4000 K, the reference is also
+  // For a perfect Planckian source at Tt <= 4000 K, the reference is also
   // Planckian at the computed CCT.  Due to Ohno 2014 CCT solver imprecision,
   // the recovered CCT differs from the input temperature by ~0.03 K, causing
   // small CES XYZ differences.
-  // TM-30-20 §3.3 Eq. (14): Tt ≤ 4000 K → pure Planckian
+  // TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   constexpr double self_consistency_tol = 1.0e-3;
 
   for (std::size_t i = 0; i < 99; ++i) {
@@ -431,9 +431,9 @@ TEST_CASE("CES colorimetry - planckian self-consistency: test ≈ reference",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Output shape: exactly 99 CES results
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CES colorimetry - output shape is exactly 99 CES",
           "[pipeline][slice05]") {
@@ -449,9 +449,9 @@ TEST_CASE("CES colorimetry - output shape is exactly 99 CES",
   REQUIRE(result.xyz_ref_ces.size() == 99);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Y normalisation: test source and reference both Y=100
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CES colorimetry - Y normalisation: white Y = 100",
           "[pipeline][slice05]") {
@@ -461,7 +461,7 @@ TEST_CASE("CES colorimetry - Y normalisation: white Y = 100",
   {
     auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
 
-    // Compute test source 10° XYZ directly
+    // Compute test source 10-deg XYZ directly
     CmfData cmf10 = resample_cmf(spd_wl, G.cmf_10deg);
     SourceXyz test_xyz = compute_source_xyz(spd_wl, spd_vals, cmf10.x_bar,
                                             cmf10.y_bar, cmf10.z_bar);
@@ -472,7 +472,7 @@ TEST_CASE("CES colorimetry - Y normalisation: white Y = 100",
         compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg,
                                 G.ces, G.daylight_basis, G.planckian_lut);
 
-    // Reference source 10° XYZ should also have Y=100
+    // Reference source 10-deg XYZ should also have Y=100
     CmfData cmf10_r = resample_cmf(spd_wl, G.cmf_10deg);
     SourceXyz ref_xyz =
         compute_source_xyz(spd_wl, result.reference_spd_values, cmf10_r.x_bar,
@@ -502,9 +502,9 @@ TEST_CASE("CES colorimetry - Y normalisation: white Y = 100",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Reference SPD shape
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CES colorimetry - reference SPD has correct shape",
           "[pipeline][slice05]") {
@@ -528,7 +528,7 @@ TEST_CASE("CES colorimetry - reference SPD has correct shape",
 } // namespace
 } // namespace tm30::test
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Grid-matrix pipeline equivalence tests.
 //
 // `compute_ces_xyz` was rewritten (see slice_02's "CES weights-based
@@ -541,14 +541,14 @@ TEST_CASE("CES colorimetry - reference SPD has correct shape",
 //   (B) compute_ces_colorimetry_cached()  - cached, resamples once via
 //                                           prepare_resampled_tables()
 // Neither pipeline.cpp nor xyz.cpp is modified by this test file.
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Grid builders
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /// Uniform grid from lo to hi inclusive (hi assumed reachable from lo by an
 /// integer number of `step`s), used for grid rows 2, 4, 5.
@@ -575,7 +575,7 @@ std::vector<double> wl_nonuniform_1_2() {
   return wl;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Two "real" SPDs on a shared grid, for the (A)-vs-(B) and batch checks.
 //
 // Where a native measured CSV already sits on the exact grid under test
@@ -588,7 +588,7 @@ std::vector<double> wl_nonuniform_1_2() {
 // interpolation of arbitrary data. generate_cie_d() internally resamples
 // the daylight basis via resample_daylight_basis() (existing library
 // function) to the target grid.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::pair<std::vector<double>, std::vector<double>>
 two_synthetic_illuminants(const std::vector<double> &wl,
@@ -598,17 +598,17 @@ two_synthetic_illuminants(const std::vector<double> &wl,
   return {planckian_2700, cie_d_6500};
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Result comparison helpers
 //
 // Field set and tolerances match this file's/this suite's established
 // conventions (see tolerances.hpp and existing usage in
 // slice_09_rg_local_cvg_test.cpp, slice_10_sample_test.cpp): Rf-scale
 // quantities (Rf itself, per-sample rf_cesi, rf_skin, per-bin Rf_hj) use
-// Tol_Rf; ΔE'-scale quantities (delta_e_avg, per-bin DE_hj) use
+// Tol_Rf; dE'-scale quantities (delta_e_avg, per-bin DE_hj) use
 // Tol_DeltaE; per-bin local shift fields use Tol_LocalShift; Rg uses
 // Tol_Rg. No new tolerances are introduced.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /// NaN-aware absolute-tolerance comparison. Per gamut.hpp's documented
 /// contract ("Skips empty bins (stores NaN for averages)"), per-bin gamut
@@ -736,10 +736,10 @@ void check_row_both_paths(const std::vector<double> &wl,
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 1: Default 1 nm, 380-780 nm (401 pts) - standard case.
 // Real measured SPDs already native to this exact grid: D65, F1.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 1 - default 1nm 380-780nm: cached matches "
           "non-cached (D65, F1)",
@@ -755,10 +755,10 @@ TEST_CASE("Grid matrix row 1 - default 1nm 380-780nm: cached matches "
   check_row_both_paths(wl, d65_vals, "D65", f1_vals, "F1", "row1-1nm");
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 2: Uniform 5 nm, 380-780 nm (81 pts) - coarser native grid (HP
 // lamps). HP1 and HP2 are real measured SPDs already native to this grid.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 2 - uniform 5nm 380-780nm: cached matches "
           "non-cached (HP1, HP2)",
@@ -772,13 +772,13 @@ TEST_CASE("Grid matrix row 2 - uniform 5nm 380-780nm: cached matches "
   check_row_both_paths(hp1_wl, hp1_vals, "HP1", hp2_vals, "HP2", "row2-5nm");
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 3: Non-uniform grid - 1 nm below 500 nm, 2 nm at/above 500 nm,
-// full 380-780 nm span. Exercises non-uniform Δλ end-to-end (resample_ces/
+// full 380-780 nm span. Exercises non-uniform dlambda end-to-end (resample_ces/
 // resample_cmf/resample_daylight_basis, called internally by
 // prepare_resampled_tables() and compute_ces_colorimetry(), handle the
 // non-uniform target grid transparently).
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 3 - non-uniform 1nm/2nm grid: cached matches "
           "non-cached (Planckian 2700K, CIE D 6500K)",
@@ -795,10 +795,10 @@ TEST_CASE("Grid matrix row 3 - non-uniform 1nm/2nm grid: cached matches "
                        "row3-nonuniform");
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 4: Narrow custom range, 450-650 nm, 1 nm steps (201 pts) - boundary
 // handling.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 4 - narrow 450-650nm range: cached matches "
           "non-cached (Planckian 2700K, CIE D 6500K)",
@@ -813,10 +813,10 @@ TEST_CASE("Grid matrix row 4 - narrow 450-650nm range: cached matches "
                        "row4-narrow450-650");
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 5: Very fine grid, 0.5 nm over 450-650 nm (401 pts, 200 nm wide) -
 // high point-count performance/precision.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 5 - fine 0.5nm grid over 450-650nm: cached "
           "matches non-cached (Planckian 2700K, CIE D 6500K)",
@@ -831,7 +831,7 @@ TEST_CASE("Grid matrix row 5 - fine 0.5nm grid over 450-650nm: cached "
                        "row5-fine0.5nm");
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 6: Minimal 2-point grid - edge case. Empirically (verified while
 // developing this test), a 2-point grid does not throw in either call
 // path: it produces finite (if physically nonsensical, given only 2
@@ -839,7 +839,7 @@ TEST_CASE("Grid matrix row 5 - fine 0.5nm grid over 450-650nm: cached "
 // (either both throw the same way, or both succeed with equivalent
 // results) - this guards against the two code paths diverging on this
 // edge case even though it's outside normal operating range.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 6 - minimal 2-point grid: cached/non-cached "
           "agree (no crash either way)",
@@ -889,14 +889,14 @@ TEST_CASE("Grid matrix row 6 - minimal 2-point grid: cached/non-cached "
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Row 7: All-zero SPD on the default 1 nm grid - degenerate input.
 //
 // Empirically (verified while developing this test, including an
 // UndefinedBehaviorSanitizer run), an all-zero SPD does NOT throw in
-// either call path. compute_source_xyz's normalisation k = 100/∫St·ȳ dλ
-// divides by zero (∫ = 0 for an all-zero SPD), producing k = +inf, and
-// the subsequent inf*0 multiplications propagate IEEE-754 NaN through
+// either call path. compute_source_xyz's normalisation k = 100/integral St*ybar
+// dlambda divides by zero (integral = 0 for an all-zero SPD), producing k =
+// +inf, and the subsequent inf*0 multiplications propagate IEEE-754 NaN through
 // cct/duv/Rf/Rg/rf_cesi/gamut - deterministically, not a crash, in the
 // plain (non-sanitized) build this suite runs.
 //
@@ -912,7 +912,7 @@ TEST_CASE("Grid matrix row 6 - minimal 2-point grid: cached/non-cached "
 // this plan's compute_ces_xyz/trapezoidal_weights rewrite (Tasks 1-2);
 // hue_bins.cpp is not touched by this task's scope. Flagged here as a
 // discovered issue for a future fix, not fixed in this test-only change.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid matrix row 7 - all-zero SPD: cached/non-cached agree (no "
           "crash either way)",
@@ -966,7 +966,7 @@ TEST_CASE("Grid matrix row 7 - all-zero SPD: cached/non-cached agree (no "
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Tables immutability regression guard (grid row 1's grid): building
 // `tables` once and calling compute_ces_colorimetry_cached against it
 // twice - with an unrelated compute_ces_colorimetry() call (its own fresh
@@ -976,7 +976,7 @@ TEST_CASE("Grid matrix row 7 - all-zero SPD: cached/non-cached agree (no "
 // itself, so it cannot mutate `tables`; this test asserts that invariant
 // explicitly rather than relying on reading the (correct, const-ref)
 // function signatures.
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Tables immutability - unrelated compute_ces_colorimetry call "
           "does not perturb a cached ResampledTables",

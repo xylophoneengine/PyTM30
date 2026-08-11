@@ -1,12 +1,24 @@
 cmake_minimum_required(VERSION 3.20)
 project(tm30 VERSION 0.1.0 LANGUAGES CXX)
 
-# ── C++20 ────────────────────────────────────────────────────────────────
+# -- C++20 ----------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# ── Catch2 v3 via FetchContent ──────────────────────────────────────────
+# -- MSVC source encoding -------------------------------------------------
+# 40 tracked sources carry U+00A7 in spec citations ("TM-30-20 §4.5") -- the
+# one non-ASCII glyph tools/fix_unicode.py preserves, because
+# tools/check_constants.py matches the literal glyph. Without /utf-8, MSVC
+# decodes source in the active code page and emits C4819 for every one of
+# them, drowning out the warnings worth reading. Unconditional and before
+# FetchContent, so Catch2 inherits it too: this is an encoding fix, not
+# warning policy.
+if(MSVC)
+  add_compile_options(/utf-8)
+endif()
+
+# -- Catch2 v3 via FetchContent ------------------------------------------
 include(FetchContent)
 FetchContent_Declare(
   Catch2
@@ -18,14 +30,14 @@ FetchContent_MakeAvailable(Catch2)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)
 
-# ── Data directory path (for test file loading) ─────────────────────────
+# -- Data directory path (for test file loading) -------------------------
 set(TM30_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data")
 set(TM30_FIXTURE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
 
-# ── Threads (std::thread in tm30.cpp batch path) ─────────────────────────
+# -- Threads (std::thread in tm30.cpp batch path) -------------------------
 find_package(Threads REQUIRED)
 
-# ── Core library ─────────────────────────────────────────────────────────
+# -- Core library ---------------------------------------------------------
 add_library(tm30-core STATIC
   src/tm30/version.cpp
   src/tm30/spd.cpp
@@ -52,7 +64,7 @@ target_include_directories(tm30-core
 target_compile_features(tm30-core PUBLIC cxx_std_20)
 target_link_libraries(tm30-core PUBLIC Threads::Threads)
 
-# ── Tests ────────────────────────────────────────────────────────────────
+# -- Tests ----------------------------------------------------------------
 add_executable(tm30-tests
   tests/slice_00_harness_test.cpp
   tests/slice_01_resample_test.cpp
@@ -79,7 +91,22 @@ target_compile_definitions(tm30-tests PRIVATE
   TM30_FIXTURE_DIR="${TM30_FIXTURE_DIR}"
 )
 
-# ── CTest integration ────────────────────────────────────────────────────
+# -- Warnings -------------------------------------------------------------
+# Off by default, on in CI. Deliberately NOT fatal (-Werror / /WX): four
+# compilers across two architectures see this code for the first time, and
+# the point is to surface what they say, not to block on it.
+option(TM30_ENABLE_WARNINGS "Enable compiler warnings (non-fatal)" OFF)
+if(TM30_ENABLE_WARNINGS)
+  if(MSVC)
+    target_compile_options(tm30-core PRIVATE /W4)
+    target_compile_options(tm30-tests PRIVATE /W4)
+  else()
+    target_compile_options(tm30-core PRIVATE -Wall -Wextra)
+    target_compile_options(tm30-tests PRIVATE -Wall -Wextra)
+  endif()
+endif()
+
+# -- CTest integration ----------------------------------------------------
 include(CTest)
 # Option so sanitizer builds (whose binaries cannot run test discovery -
 # e.g. GCC TSan crashes on Ubuntu 24.04's ASLR entropy) can skip it.

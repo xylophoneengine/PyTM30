@@ -5,11 +5,11 @@
 ///
 /// Orchestrates the full sequence:
 ///   1. Resample CES to SPD grid (Slice 1)
-///   2. Compute 2° XYZ for test source → CCT/Duv (Slice 3)
-///   3. Generate reference SPD from CCT + basis + 10° CMF y_bar (Slice 4)
-///   4. Compute source XYZ for test → normalisation constant kt (Slice 2)
+///   2. Compute 2-deg XYZ for test source -> CCT/Duv (Slice 3)
+///   3. Generate reference SPD from CCT + basis + 10-deg CMF y_bar (Slice 4)
+///   4. Compute source XYZ for test -> normalisation constant kt (Slice 2)
 ///   5. Compute CES XYZ under test source (Slice 2)
-///   6. Compute source XYZ for reference → normalisation kr
+///   6. Compute source XYZ for reference -> normalisation kr
 ///   7. Compute CES XYZ under reference illuminant
 ///
 /// TM-30-20 §3.4: Color Evaluation Samples
@@ -46,7 +46,7 @@ struct CesColorimetryResult {
   std::array<Cam02Ucs, 99>
       jab_ref_ces;    // TM-30-20 §3.7.1 (reference adaptation)
   HueBins hue_bins;   // TM-30-20 §4.3 (16 hue-angle bins)
-  double delta_e_avg; // TM-30-20 §4.1 - mean of 99 ΔE′ values
+  double delta_e_avg; // TM-30-20 §4.1 - mean of 99 dE' values
   double Rf;          // TM-30-20 §4.1 Eq. (54) - fidelity index
   GamutResult gamut;  // TM-30-20 §4.4-§4.8 - gamut, local metrics, CVG
   std::array<double, 99>
@@ -58,25 +58,26 @@ struct CesColorimetryResult {
 ///
 /// Steps (TM-30-20 §3.4, §3.6):
 ///   1. Resample CES reflectance data to the SPD wavelength grid.
-///   2. Resample both 2° and 10° CMF data to the SPD wavelength grid.
-///   3. Compute the test source's own 2° XYZ → CCT and Duv.
+///   2. Resample both 2-deg and 10-deg CMF data to the SPD wavelength grid.
+///   3. Compute the test source's own 2-deg XYZ -> CCT and Duv.
 ///   4. Generate the reference illuminant SPD from the CCT.
-///   5. Compute the test source's 10° XYZ → normalisation constant kt.
+///   5. Compute the test source's 10-deg XYZ -> normalisation constant kt.
 ///   6. Compute CES XYZ under the test source (with kt).
-///   7. Compute the reference source's 10° XYZ → normalisation kr.
+///   7. Compute the reference source's 10-deg XYZ -> normalisation kr.
 ///   8. Compute CES XYZ under the reference illuminant (with kr).
 ///   9. Compute CIECAM02 J'a'b' under test source adaptation.
 ///  10. Compute CIECAM02 J'a'b' under reference illuminant adaptation.
-///  11. Compute ΔE′ color differences and Rf fidelity index.
+///  11. Compute dE' color differences and Rf fidelity index.
 ///
 /// @param spd_wavelengths  Test SPD wavelength grid (nm), monotonically
 /// increasing.
-/// @param spd_values       Test SPD spectral power values St(λ).
-/// @param cmf_2deg         CIE 1931 2° CMF data (for CCT computation).
-/// @param cmf_10deg        CIE 1964 10° CMF data (for tristimulus integration).
+/// @param spd_values       Test SPD spectral power values St(lambda).
+/// @param cmf_2deg         CIE 1931 2-deg CMF data (for CCT computation).
+/// @param cmf_10deg        CIE 1964 10-deg CMF data (for tristimulus
+/// integration).
 /// @param ces_data         CES reflectance data (99 samples, 1-nm native).
-/// @param daylight_basis   Daylight basis vectors (S₀, S₁, S₂).
-/// @param planckian_lut    Planckian locus LUT (CIE 1931 2° observer).
+/// @param daylight_basis   Daylight basis vectors (S0, S1, S2).
+/// @param planckian_lut    Planckian locus LUT (CIE 1931 2-deg observer).
 ///
 /// @return CesColorimetryResult with CCT, Duv, reference SPD, and all CES XYZ
 /// values.
@@ -88,10 +89,10 @@ CesColorimetryResult compute_ces_colorimetry(
     const CmfData &cmf_10deg, const CesData &ces_data,
     const DaylightBasis &daylight_basis, const PlanckianLut &planckian_lut);
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Grid-fixed caching - precompute once, reuse across many SPDs that share
 //  the same wavelength grid (the overwhelmingly common case in practice).
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 /// Wavelength-grid-dependent tables, precomputed once and reused across
 /// many SPD evaluations that share the same grid.
@@ -102,8 +103,8 @@ CesColorimetryResult compute_ces_colorimetry(
 struct ResampledTables {
   std::vector<double> wavelengths; // Target grid these tables are resampled to.
   CesData ces;       // CES reflectance data, resampled to `wavelengths`.
-  CmfData cmf_2deg;  // CIE 1931 2° CMF, resampled to `wavelengths`.
-  CmfData cmf_10deg; // CIE 1964 10° CMF, resampled to `wavelengths`.
+  CmfData cmf_2deg;  // CIE 1931 2-deg CMF, resampled to `wavelengths`.
+  CmfData cmf_10deg; // CIE 1964 10-deg CMF, resampled to `wavelengths`.
   DaylightBasis
       daylight_basis; // Daylight basis (S0,S1,S2), resampled to `wavelengths`.
 };
@@ -112,8 +113,8 @@ struct ResampledTables {
 /// target grid, from the raw (native-grid) source tables.
 ///
 /// @param target_wavelengths  The wavelength grid to resample everything to.
-/// @param cmf_2deg_src        Raw (native-grid) CIE 1931 2° CMF data.
-/// @param cmf_10deg_src       Raw (native-grid) CIE 1964 10° CMF data.
+/// @param cmf_2deg_src        Raw (native-grid) CIE 1931 2-deg CMF data.
+/// @param cmf_10deg_src       Raw (native-grid) CIE 1964 10-deg CMF data.
 /// @param ces_src             Raw (native-grid) CES reflectance data (99
 /// samples).
 /// @param daylight_basis_src  Raw (native-grid, 5 nm) daylight basis vectors.
@@ -136,11 +137,11 @@ prepare_resampled_tables(const std::vector<double> &target_wavelengths,
 /// `spd_values` is aligned with `tables.wavelengths` (same length, same
 /// grid); this function does not re-check that invariant.
 ///
-/// @param spd_values    Test SPD spectral power values St(λ), aligned with
+/// @param spd_values    Test SPD spectral power values St(lambda), aligned with
 ///                      tables.wavelengths.
 /// @param tables        Pre-resampled CES/CMF/daylight-basis tables (see
 ///                      prepare_resampled_tables()).
-/// @param planckian_lut Planckian locus LUT (CIE 1931 2° observer).
+/// @param planckian_lut Planckian locus LUT (CIE 1931 2-deg observer).
 ///
 /// @return CesColorimetryResult, numerically identical to what
 ///         compute_ces_colorimetry() would produce for the same SPD on

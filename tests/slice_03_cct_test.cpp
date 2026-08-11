@@ -1,6 +1,6 @@
-// Slice 3 - CCT and Duv via Ohno 2014 method (CIE 1931 2° observer).
+// Slice 3 - CCT and Duv via Ohno 2014 method (CIE 1931 2-deg observer).
 //
-// TM-30-20 §3.1: CCT uses CIE 1931 2° observer (exception).
+// TM-30-20 §3.1: CCT uses CIE 1931 2-deg observer (exception).
 // TM-30-20 §3.3: CCT determination - Ohno 2013 method.
 
 #include <catch2/catch_test_macros.hpp>
@@ -24,9 +24,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -45,7 +45,7 @@ load_spd_csv(const std::string &path) {
   return {wl, vals};
 }
 
-/// Load CIE 1931 2° CMF data from CSV (wavelength, x_bar, y_bar, z_bar).
+/// Load CIE 1931 2-deg CMF data from CSV (wavelength, x_bar, y_bar, z_bar).
 CmfData load_cmf_2deg(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -58,7 +58,7 @@ CmfData load_cmf_2deg(const std::string &path) {
   return data;
 }
 
-/// Compute 2° XYZ for a source SPD using CIE 1931 2° CMFs.
+/// Compute 2-deg XYZ for a source SPD using CIE 1931 2-deg CMFs.
 /// Returns normalized XYZ (Y=100) since chromaticity is scale-invariant.
 XyzTriple compute_xyz_2deg(const std::vector<double> &spd_wl,
                            const std::vector<double> &spd_vals,
@@ -72,23 +72,23 @@ XyzTriple compute_xyz_2deg(const std::vector<double> &spd_wl,
   return XyzTriple{src.X, src.Y, src.Z};
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // (u,v) chromaticity from XYZ
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Chromaticity - xyz_to_uv for known illuminants",
           "[chromaticity][slice03]") {
   // CIE 1960 UCS transformation: u = 4X/(X+15Y+3Z), v = 6Y/(X+15Y+3Z)
 
-  // Illuminant E (equal energy): X=Y=Z → u=4/19≈0.2105, v=6/19≈0.3158
+  // Illuminant E (equal energy): X=Y=Z -> u=4/19~=0.2105, v=6/19~=0.3158
   {
     UvCoord uv = xyz_to_uv(100.0, 100.0, 100.0);
     REQUIRE_THAT(uv.u, Catch::Matchers::WithinAbs(0.21052631578947367, 1e-12));
     REQUIRE_THAT(uv.v, Catch::Matchers::WithinAbs(0.3157894736842105, 1e-12));
   }
 
-  // D65 10°: X≈94.81, Y=100, Z≈107.30
-  // u ≈ 4*94.81 / (94.81 + 1500 + 321.9) = 379.24 / 1916.71 ≈ 0.19786
+  // D65 10-deg: X~=94.81, Y=100, Z~=107.30
+  // u ~= 4*94.81 / (94.81 + 1500 + 321.9) = 379.24 / 1916.71 ~= 0.19786
   {
     UvCoord uv = xyz_to_uv(94.81, 100.0, 107.30);
     // u = 4*94.81 / (94.81 + 1500 + 321.9) = 379.24 / 1916.71
@@ -106,9 +106,9 @@ TEST_CASE("Chromaticity - xyz_to_uv for known illuminants",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CCT - LUT loading
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CCT - Planckian LUT loads correctly", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
@@ -146,11 +146,11 @@ TEST_CASE("CCT - LUT loading fails on missing file", "[cct][slice03]") {
                     std::runtime_error);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// CCT - D65 and Illuminant A (2° observer)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// CCT - D65 and Illuminant A (2-deg observer)
+// -------------------------------------------------------------------------
 
-TEST_CASE("CCT - D65 (2° observer)", "[cct][slice03]") {
+TEST_CASE("CCT - D65 (2-deg observer)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
@@ -164,7 +164,7 @@ TEST_CASE("CCT - D65 (2° observer)", "[cct][slice03]") {
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00321446));
 }
 
-TEST_CASE("CCT - Illuminant A (2° observer)", "[cct][slice03]") {
+TEST_CASE("CCT - Illuminant A (2-deg observer)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
@@ -178,9 +178,9 @@ TEST_CASE("CCT - Illuminant A (2° observer)", "[cct][slice03]") {
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00000315));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CCT - FL1-FL12 (full CIE F-series illuminants)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CCT - FL1", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl1_1nm.csv"));
@@ -314,9 +314,9 @@ TEST_CASE("CCT - FL12", "[cct][slice03]") {
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00013385));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CCT - HP1-HP5 (narrowband sources that stress the solver)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CCT - HP1 (high-pressure sodium, narrowband)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
@@ -373,9 +373,9 @@ TEST_CASE("CCT - HP5", "[cct][slice03]") {
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, -0.00170818));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CCT - Self-consistency (Planckian sources should recover their own CCT)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CCT - self-consistency: Planckian at 3000 K", "[cct][slice03]") {
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
@@ -383,7 +383,7 @@ TEST_CASE("CCT - self-consistency: Planckian at 3000 K", "[cct][slice03]") {
 
   // For a pure Planckian radiator, the (u,v) is exactly on the locus.
   // Interpolate LUT (u,v) at 3000 K.
-  // The CCT should recover close to 3000 K with Duv ≈ 0.
+  // The CCT should recover close to 3000 K with Duv ~= 0.
   // Find the exact (u,v) from the LUT for T near 3000.
   // Since the test point is exactly on the LUT curve, the solver
   // should recover the temperature precisely.
@@ -414,9 +414,9 @@ TEST_CASE("CCT - self-consistency: Planckian at 3000 K", "[cct][slice03]") {
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.0));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CCT - Boundary temperature regions
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /// Helper: test CCT at a specific Planckian (u,v) from the LUT.
 void test_planckian_self(double T_target, const PlanckianLut &lut) {
@@ -459,9 +459,9 @@ TEST_CASE("CCT - boundary: 5000.1 K region", "[cct][slice03]") {
   test_planckian_self(5000.1, lut);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CCT - Duv sign convention
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("CCT - Duv is signed distance", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));

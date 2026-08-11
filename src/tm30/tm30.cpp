@@ -12,24 +12,26 @@
 
 namespace tm30 {
 
-// ══════════════════════════════════════════════════════════════════════════
-//  Validity thresholds - TM-30-20 applicability domain for white light.
+// ==========================================================================
+//  Validity thresholds - pytm30 implementation choice (NOT in TM-30-20 text).
 //
-//  TM-30-20: The method is designed for white light sources with CCT
-//  in the stated range and chromaticities near the Planckian locus.
-//  These thresholds define the boundary of that applicability domain.
-// ══════════════════════════════════════════════════════════════════════════
+//  TM-30-20 §2.0 Scope: the method "is best suited to characterize nominally
+//  white light sources (i.e., those that fall on or near the Planckian
+//  locus)"; sources whose chromaticity "falls outside of the chromaticity
+//  bins defined in ANSI C78.377-2017... should be interpreted with caution."
+//  The standard states the domain qualitatively; it does NOT print numerical
+//  CCT bounds or a Duv threshold anywhere. The constants below are pytm30's
+//  own sanity bounds -- whitelisted in tools/check_constants_whitelist.txt
+//  because no honest "§x.y" citation exists.
+// ==========================================================================
 
 namespace {
-// TM-30-20 §1: Applicability domain for CCT (white light sources).
-// Sources outside this range produce metrics of reduced interpretability.
-constexpr double kCctMin = 1000.0;  // TM-30-20 §1
-constexpr double kCctMax = 25000.0; // TM-30-20 §1
+// pytm30 impl choice (NOT in TM-30-20 text). See banner above.
+constexpr double kCctMin = 1000.0;
+constexpr double kCctMax = 25000.0;
 
-// TM-30-20 §1: Applicability domain for Duv.
-// TM-30 is designed for sources near the Planckian locus;
-// large Duv values reduce metric interpretability.
-constexpr double kDuvMaxAbs = 0.05; // TM-30-20 §1
+// pytm30 impl choice (NOT in TM-30-20 text). See banner above.
+constexpr double kDuvMaxAbs = 0.05;
 
 // TM-30-20 §3.5: Full CES wavelength range is 380-780 nm.
 // If the test SPD does not cover this range, extrapolation is needed.
@@ -37,34 +39,37 @@ constexpr double kFullRangeMin = 380.0; // TM-30-20 §3.5
 constexpr double kFullRangeMax = 780.0; // TM-30-20 §3.5
 } // namespace
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Validity computation
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 static Validity compute_validity(const CesColorimetryResult &cr,
                                  const Spd &spd) {
   Validity v;
 
-  // TM-30-20: CCT applicability domain
-  // Flag sources whose CCT is outside the range where TM-30 is designed.
+  // Advisory: CCT far from the range where TM-30 is typically applied.
+  // pytm30 impl choice; TM-30-20 §2.0 gives no numerical bounds.
   v.cct_out_of_range = (cr.cct < kCctMin || cr.cct > kCctMax);
 
-  // TM-30-20: Duv applicability domain
-  // Flag sources with chromaticities far from the Planckian locus.
+  // Advisory: chromaticity far from the Planckian locus. pytm30 impl choice;
+  // TM-30-20 §2.0 states the domain qualitatively (near-locus, ANSI
+  // C78.377-2017 white bins), no numerical Duv threshold.
   v.duv_out_of_range = (std::abs(cr.duv) > kDuvMaxAbs);
 
-  // TM-30-20 §3.5: Extrapolation
-  // The test SPD must cover 380-780 nm. If it doesn't, the pipeline
-  // fills missing edges with zeros or flat-extrapolates.
+  // Test SPD does not cover the full 380-780 nm grid -> zero-fill applied
+  // per TM-30-20 §3.5 ("missing values shall be replaced by zeros"; the test
+  // SPD "shall never be interpolated or extrapolated"). Flat-extrapolation
+  // of CES/CMF reference tables from 400-700 to 380-780 is a separate
+  // provision (TM-30-20 §1.3 / Annex A) and is unrelated to this flag.
   v.extrapolated = (spd.min_wavelength() > kFullRangeMin ||
                     spd.max_wavelength() < kFullRangeMax);
 
   return v;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Tm30 constructor
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 Tm30::Tm30(Spd spd, const CmfData &cmf_2deg, const CmfData &cmf_10deg,
            const CesData &ces_data, const DaylightBasis &daylight_basis,
@@ -76,16 +81,16 @@ Tm30::Tm30(Spd spd, const CmfData &cmf_2deg, const CmfData &cmf_10deg,
   // No computation performed here - fully lazy.
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  ensure_computed - run the full pipeline if not yet cached
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 void Tm30::ensure_computed() const {
   if (computed_)
     return;
 
   // Run the full CES colorimetry pipeline.
-  // TM-30-20 §3.4, §3.6: All steps including CIECAM02, ΔE′, Rf,
+  // TM-30-20 §3.4, §3.6: All steps including CIECAM02, dE', Rf,
   // hue binning, gamut, and per-sample fidelity.
   cached_.colorimetry = compute_ces_colorimetry(
       spd_.wavelengths(), spd_.values(), cmf_2deg_, cmf_10deg_, ces_data_,
@@ -97,9 +102,9 @@ void Tm30::ensure_computed() const {
   computed_ = true;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Accessors
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 double Tm30::cct() const {
   ensure_computed();
@@ -166,9 +171,9 @@ const CesColorimetryResult &Tm30::colorimetry_result() const {
   return cached_.colorimetry;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Batch evaluate
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 std::vector<std::optional<Tm30Result>>
 try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
@@ -181,14 +186,14 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
   results.resize(spds.size());
 
   if (n_workers <= 1) {
-    // ══════════════════════════════════════════════════════════════════
+    // ==================================================================
     // Sequential path - the project's default. MUST stay free of any
     // std::thread construction: spawning+joining even one thread costs
     // ~40 us on real hardware against a ~140 us per-SPD workload here -
     // a double-digit-percent regression on the exact path every test
     // and benchmark has run against. Keep this loop body in sync with
     // the worker lambda in the parallel path below.
-    // ══════════════════════════════════════════════════════════════════
+    // ==================================================================
     for (std::size_t i = 0; i < spds.size(); i++) {
       const auto &sv = spds[i];
       try {
@@ -210,7 +215,7 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
 
         results[i] = std::move(result);
       } catch (const InvalidSpd &) {
-        // Per-SPD validation failure → nullopt.
+        // Per-SPD validation failure -> nullopt.
         // Batch never throws.
         results[i] = std::nullopt;
       }
@@ -218,7 +223,7 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
     return results;
   }
 
-  // ══════════════════════════════════════════════════════════════════
+  // ==================================================================
   // Parallel path - only reachable when n_workers > 1. Task-parallel:
   // each SPD's whole computation runs start-to-finish on one thread, so
   // results are bit-identical to the sequential path. Static contiguous
@@ -226,7 +231,7 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
   // writes only its own results[i] indices; all tables are const& -
   // no locks, no shared mutable state. InvalidSpd is still caught
   // locally per iteration; nothing crosses a thread boundary.
-  // ══════════════════════════════════════════════════════════════════
+  // ==================================================================
 
   // Persistent path (Phase 2): route around the spawn-per-call path
   // when a worker pool is active. run_chunked() uses the same partition
@@ -300,9 +305,9 @@ try_evaluate(std::span<const SpdView> spds, const CmfData &cmf_2deg,
   return results;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 //  Batch evaluate - pre-resampled, grid-fixed tables
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 std::vector<std::optional<Tm30Result>>
 try_evaluate_cached(std::span<const SpdView> spds,
@@ -314,10 +319,10 @@ try_evaluate_cached(std::span<const SpdView> spds,
   results.resize(spds.size());
 
   if (n_workers <= 1) {
-    // ══════════════════════════════════════════════════════════════════
+    // ==================================================================
     // Sequential path - mirrors try_evaluate() exactly; same zero-thread
     // rule applies (see the comment there).
-    // ══════════════════════════════════════════════════════════════════
+    // ==================================================================
     for (std::size_t i = 0; i < spds.size(); i++) {
       const auto &sv = spds[i];
       try {
@@ -339,7 +344,7 @@ try_evaluate_cached(std::span<const SpdView> spds,
 
         results[i] = std::move(result);
       } catch (const InvalidSpd &) {
-        // Per-SPD validation failure → nullopt.
+        // Per-SPD validation failure -> nullopt.
         // Batch never throws.
         results[i] = std::nullopt;
       }

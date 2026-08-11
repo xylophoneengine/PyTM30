@@ -53,9 +53,9 @@ def report(filename, source, note):
     print(f"[{filename}] {source}\n    -> {note}")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 1. CES 99 reflectance spectra (1 nm and 5 nm)
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 ces1 = load_TCS_CIE2017(colour.SpectralShape(380, 780, 1))
 wl1 = ces1.wavelengths
 vals1 = ces1.values  # (401, 99)
@@ -78,9 +78,9 @@ report("ces_5nm.csv",
        "5nm-native loads agree exactly.")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 2. CMF 1964 10-degree (380-780 @ 1nm) -- TM-30-20 primary observer
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 def cmf_cols(name, shape):
     ds = colour.MSDS_CMFS[name].copy().align(shape)
     return ds.wavelengths, ds.values  # values shape (n, 3)
@@ -97,9 +97,9 @@ report("cmf_1964_10.csv",
        "file and the task brief -- not the 380-780nm trim implied by an earlier, stale "
        "note.")
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 3. CMF 1931 2-degree: general-purpose 360-830 @ 1nm, native range (no trim)
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 wl, v = cmf_cols("CIE 1931 2 Degree Standard Observer", colour.SpectralShape(360, 830, 1))
 write_csv("cmf_1931_2.csv", ["wavelength", "x_bar", "y_bar", "z_bar"], wl,
           [v[:, 0], v[:, 1], v[:, 2]])
@@ -118,7 +118,7 @@ report("cie_1931_2.csv",
        "repo's cie_1931_2.csv (max|delta|=0.0).")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 4. CMF 2015 (== 2006 physiologically-based) 2-degree / 10-degree
 #    Native colour-science domain is 390-830nm; original repo zero-pads
 #    360-389nm (cone fundamentals are defined as zero outside their
@@ -128,7 +128,7 @@ report("cie_1931_2.csv",
 #    also demonstrates CIE2006 == CIE2015 for this observer (the 2015
 #    standard formally adopted the 2006 physiologically-based proposal
 #    unchanged).
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 from colour.colorimetry.transformations import (
     LMS_2_degree_cmfs_to_XYZ_2_degree_cmfs,
     LMS_10_degree_cmfs_to_XYZ_10_degree_cmfs,
@@ -189,9 +189,9 @@ for tag_2015, tag_2006 in [("2015_10", "2006_10")]:
            "repo's cmf_2006_10.csv / cmf_2015_10.csv.")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 5. Daylight basis functions S0/S1/S2 (380-780 @ 5nm)
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 basis = colour.colorimetry.SDS_BASIS_FUNCTIONS_CIE_ILLUMINANT_D_SERIES
 s0 = basis["S0"].copy().align(colour.SpectralShape(380, 780, 5))
 s1 = basis["S1"].copy().align(colour.SpectralShape(380, 780, 5))
@@ -204,7 +204,7 @@ report("daylight_basis.csv",
        "Confirmed bit-identical (max|delta|~2e-13) -- pre-verified by task requester.")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 6. CIE D-series illuminants at 1nm (D65 data file; D50/D65/D75 also
 #    needed by the fixture generator). Reproduced via the documented CIE
 #    015:2004 formula (M1/M2 from CCT_to_xy_CIE_D, rounded to 3dp) applied
@@ -217,7 +217,7 @@ report("daylight_basis.csv",
 #    reference.cpp uses plain linear interpolation for this exact purpose
 #    (TM-30-20 Sec 3.5 mandates linear interpolation), so linear is also
 #    the "spec-correct" choice, not just the empirically-matching one.
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 def cie_d_1nm(cct_nominal):
     """Generate a CIE D-series SPD at 1nm via linear interpolation of the
     5nm daylight basis functions (matches TM-30-20 Sec 3.5 + Sec 3.3)."""
@@ -251,9 +251,9 @@ report("d65_1nm.csv",
        "value(380nm)=49.9755, matching to 6 sig figs).")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 7. CIE Standard Illuminant A (380-780 @ 1nm)
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 sd_a = colour.sd_CIE_standard_illuminant_A(colour.SpectralShape(380, 780, 1))
 write_csv("illuminant_a_1nm.csv", ["wavelength", "value"], sd_a.wavelengths, [sd_a.values])
 report("illuminant_a_1nm.csv",
@@ -263,11 +263,11 @@ report("illuminant_a_1nm.csv",
        "closed-form CIE formula (T=2848K, c2=1.435e7 nm*K).")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 8. High-pressure discharge lamps HP1-5 (already native 5nm, 380-780;
 #    despite the "1nm" filename these files hold 81 rows / 5nm data in
 #    the original repo too -- TM-30/CIE only tabulate these at 5nm).
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 for i in range(1, 6):
     sd = colour.SDS_ILLUMINANTS[f"HP{i}"].copy().align(colour.SpectralShape(380, 780, 5))
     write_csv(f"hp{i}_1nm.csv", ["wavelength", "value"], sd.wavelengths, [sd.values])
@@ -279,7 +279,7 @@ report("hp1_1nm.csv .. hp5_1nm.csv",
        "81 tabulated points, vs the original repo's hp{1..5}_1nm.csv.")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # 9. Fluorescent lamps FL1-FL12 (need genuine 1nm resolution -- C++ tests
 #    hard-require spd_wl.size() == 401 for fl1_1nm.csv). colour-science
 #    only bundles these at 5nm. Sprague-interpolate to 1nm (CIE 167:2005
@@ -293,7 +293,7 @@ report("hp1_1nm.csv .. hp5_1nm.csv",
 #    represents them smeared/averaged over the coarser grid -- no
 #    interpolation method can recover a genuine sub-5nm feature from a
 #    5nm-sampled source.
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 for i in range(1, 13):
     sd5 = colour.SDS_ILLUMINANTS[f"FL{i}"].copy()
     sd1 = sd5.align(colour.SpectralShape(380, 780, 1))  # default interpolator = Sprague

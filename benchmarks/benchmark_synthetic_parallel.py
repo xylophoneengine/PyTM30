@@ -75,7 +75,7 @@ def make_corpus(n_spds: int = N_SPDS, seed: int = 42):
 def stats_ms(t_s: np.ndarray) -> str:
     t = np.asarray(t_s) * 1000.0
     return (
-        f"mean {t.mean():7.2f} ± {t.std():6.2f} ms | "
+        f"mean {t.mean():7.2f} +/- {t.std():6.2f} ms | "
         f"median {np.median(t):7.2f} | min {t.min():7.2f} | "
         f"max {t.max():7.2f} | ms/SPD {t.mean() / N_SPDS * 1000:.4f}"
     )
@@ -114,7 +114,7 @@ def main() -> int:
 
     times = {}  # case -> np.array(reps) seconds
 
-    # ── Case a: strict sequential, one SPD per call ──────────────────
+    # -- Case a: strict sequential, one SPD per call ------------------
     print(f"a) strict sequential ({n_spds} single evals/rep) ...", flush=True)
     calc_seq.eval(matrix[:50])  # warm tables
     ta = np.empty(reps)
@@ -126,7 +126,7 @@ def main() -> int:
     times["a_sequential"] = ta
     print(f"   {stats_ms(ta)}\n")
 
-    # ── Case b: batch, n_workers=1 ───────────────────────────────────
+    # -- Case b: batch, n_workers=1 -----------------------------------
     print(f"b) batch n_workers=1 ({n_spds} SPDs/call) ...", flush=True)
     calc_b.eval(matrix[:50])
     tb = np.empty(reps)
@@ -137,7 +137,7 @@ def main() -> int:
     times["b_batch_n1"] = tb
     print(f"   {stats_ms(tb)}\n")
 
-    # ── Case c: batch, spawn-per-call threads ────────────────────────
+    # -- Case c: batch, spawn-per-call threads ------------------------
     print(f"c) batch n_workers={nw} (spawn per call) ...", flush=True)
     calc_c.eval(matrix[:50])
     tc = np.empty(reps)
@@ -148,7 +148,7 @@ def main() -> int:
     times["c_batch_threads"] = tc
     print(f"   {stats_ms(tc)}\n")
 
-    # ── Case d: batch, persistent threads ────────────────────────────
+    # -- Case d: batch, persistent threads ----------------------------
     print(f"d) batch n_workers={nw} persistent ...", flush=True)
     calc_d.eval(matrix[:50])
     td = np.empty(reps)
@@ -159,7 +159,7 @@ def main() -> int:
     times["d_batch_persistent"] = td
     print(f"   {stats_ms(td)}\n")
 
-    # ── Save raw times (Feather) ─────────────────────────────────────
+    # -- Save raw times (Feather) -------------------------------------
     rows = []
     for case, t in times.items():
         for r, v in enumerate(t):
@@ -168,7 +168,7 @@ def main() -> int:
     feather_path = OUT_DIR / "times.feather"
     df.to_feather(feather_path)
 
-    # ── Plots ────────────────────────────────────────────────────────
+    # -- Plots --------------------------------------------------------
     import matplotlib
 
     matplotlib.use("Agg")
@@ -245,7 +245,7 @@ def main() -> int:
     fig2.savefig(kde_path, dpi=130, bbox_inches="tight")
     plt.close(fig2)
 
-    # ── Report ───────────────────────────────────────────────────────
+    # -- Report -------------------------------------------------------
     med_b = np.median(times["b_batch_n1"])
     med_a = np.median(times["a_sequential"])
     med_c = np.median(times["c_batch_threads"])

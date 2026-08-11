@@ -1,4 +1,4 @@
-// Slice 7 - ΔE′ color difference and Rf fidelity index tests.
+// Slice 7 - dE' color difference and Rf fidelity index tests.
 // Validates compute_delta_e and compute_rf against golden fixtures,
 // self-consistency, and range constraints.
 //
@@ -34,9 +34,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -152,7 +152,7 @@ std::vector<double> load_double_array_fixture(const std::string &filepath) {
   return result;
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -207,9 +207,9 @@ std::vector<double> wl_1nm() {
   return wl;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Global fixture data (loaded once)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 struct GlobalFixtures {
   CmfData cmf_2deg;
@@ -233,14 +233,14 @@ private:
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// Self-consistency: Planckian at 3000K → Rf ≈ 100, all ΔE′ ≈ 0
+// -------------------------------------------------------------------------
+// Self-consistency: Planckian at 3000K -> Rf ~= 100, all dE' ~= 0
 //
-// TM-30-20 §3.8: When test = reference illuminant, all ΔE′ = 0
+// TM-30-20 §3.8: When test = reference illuminant, all dE' = 0
 // TM-30-20 §4.1: Rf = 100 for perfect fidelity
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - planckian 3000K self-consistency: ΔE′≈0, Rf≈100",
+TEST_CASE("dE' & Rf - planckian 3000K self-consistency: dE'~=0, Rf~=100",
           "[delta_e][rf][slice07][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -251,7 +251,7 @@ TEST_CASE("ΔE′ & Rf - planckian 3000K self-consistency: ΔE′≈0, Rf≈100"
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // Check all 99 ΔE′ values are near zero
+  // Check all 99 dE' values are near zero
   const auto delta_e = compute_delta_e(result.jab_test_ces, result.jab_ref_ces);
 
   double max_de = 0.0;
@@ -260,11 +260,11 @@ TEST_CASE("ΔE′ & Rf - planckian 3000K self-consistency: ΔE′≈0, Rf≈100"
       max_de = delta_e[i];
   }
 
-  INFO("Planckian 3000K self-consistency: max ΔE′ = "
+  INFO("Planckian 3000K self-consistency: max dE' = "
        << max_de << " (tolerance = " << Tol_DeltaE << ")");
   CHECK(max_de <= Tol_DeltaE);
 
-  // Check Rf ≈ 100
+  // Check Rf ~= 100
   INFO("Planckian 3000K: Rf = " << result.Rf << " (tolerance = " << Tol_Rf
                                 << ")");
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
@@ -276,12 +276,12 @@ TEST_CASE("ΔE′ & Rf - planckian 3000K self-consistency: ΔE′≈0, Rf≈100"
   CHECK_THAT(result.Rf, WithinTolerance(1e-12, rf_direct.Rf));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Self-consistency at multiple CCTs
 // TM-30-20 §3.8: Valid across the full CCT range
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - planckian 2700K self-consistency: Rf ≈ 100",
+TEST_CASE("dE' & Rf - planckian 2700K self-consistency: Rf ~= 100",
           "[delta_e][rf][slice07][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -292,22 +292,22 @@ TEST_CASE("ΔE′ & Rf - planckian 2700K self-consistency: Rf ≈ 100",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // TM-30-20 §4.1: Self-consistency → Rf ≈ 100
+  // TM-30-20 §4.1: Self-consistency -> Rf ~= 100
   INFO("Planckian 2700K: Rf = " << result.Rf);
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
-  // ΔE′ values should be near zero
+  // dE' values should be near zero
   const auto delta_e = compute_delta_e(result.jab_test_ces, result.jab_ref_ces);
   double max_de = 0.0;
   for (std::size_t i = 0; i < 99; ++i) {
     if (delta_e[i] > max_de)
       max_de = delta_e[i];
   }
-  INFO("Planckian 2700K: max ΔE′ = " << max_de);
+  INFO("Planckian 2700K: max dE' = " << max_de);
   CHECK(max_de <= Tol_DeltaE);
 }
 
-TEST_CASE("ΔE′ & Rf - planckian 3500K self-consistency: Rf ≈ 100",
+TEST_CASE("dE' & Rf - planckian 3500K self-consistency: Rf ~= 100",
           "[delta_e][rf][slice07][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -318,22 +318,22 @@ TEST_CASE("ΔE′ & Rf - planckian 3500K self-consistency: Rf ≈ 100",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // TM-30-20 §4.1: Self-consistency → Rf ≈ 100
+  // TM-30-20 §4.1: Self-consistency -> Rf ~= 100
   INFO("Planckian 3500K: Rf = " << result.Rf);
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
-  // ΔE′ values should be near zero
+  // dE' values should be near zero
   const auto delta_e = compute_delta_e(result.jab_test_ces, result.jab_ref_ces);
   double max_de = 0.0;
   for (std::size_t i = 0; i < 99; ++i) {
     if (delta_e[i] > max_de)
       max_de = delta_e[i];
   }
-  INFO("Planckian 3500K: max ΔE′ = " << max_de);
+  INFO("Planckian 3500K: max dE' = " << max_de);
   CHECK(max_de <= Tol_DeltaE);
 }
 
-TEST_CASE("ΔE′ & Rf - D65 self-consistency: Rf ≈ 100",
+TEST_CASE("dE' & Rf - D65 self-consistency: Rf ~= 100",
           "[delta_e][rf][slice07][self-consistency]") {
   auto &G = GlobalFixtures::instance();
 
@@ -343,26 +343,26 @@ TEST_CASE("ΔE′ & Rf - D65 self-consistency: Rf ≈ 100",
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // TM-30-20 §4.1: D65 is a daylight → reference is also D65-like
+  // TM-30-20 §4.1: D65 is a daylight -> reference is also D65-like
   INFO("D65: Rf = " << result.Rf);
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
-  // ΔE′ values should be very small
+  // dE' values should be very small
   const auto delta_e = compute_delta_e(result.jab_test_ces, result.jab_ref_ces);
   double max_de = 0.0;
   for (std::size_t i = 0; i < 99; ++i) {
     if (delta_e[i] > max_de)
       max_de = delta_e[i];
   }
-  INFO("D65: max ΔE′ = " << max_de);
+  INFO("D65: max dE' = " << max_de);
   CHECK(max_de <= Tol_DeltaE);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Golden fixture: D65 Rf matches luxpy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - D65 Rf matches golden fixture",
+TEST_CASE("dE' & Rf - D65 Rf matches golden fixture",
           "[delta_e][rf][slice07][fixture]") {
   auto &G = GlobalFixtures::instance();
 
@@ -379,11 +379,11 @@ TEST_CASE("ΔE′ & Rf - D65 Rf matches golden fixture",
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, golden_rf));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Golden fixture: D65 ΔE′ values match luxpy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// Golden fixture: D65 dE' values match luxpy
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - D65 ΔE′ values match golden fixture",
+TEST_CASE("dE' & Rf - D65 dE' values match golden fixture",
           "[delta_e][rf][slice07][fixture]") {
   auto &G = GlobalFixtures::instance();
 
@@ -393,7 +393,7 @@ TEST_CASE("ΔE′ & Rf - D65 ΔE′ values match golden fixture",
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // Compute ΔE′ directly
+  // Compute dE' directly
   const auto delta_e = compute_delta_e(result.jab_test_ces, result.jab_ref_ces);
 
   // Load golden values
@@ -408,16 +408,16 @@ TEST_CASE("ΔE′ & Rf - D65 ΔE′ values match golden fixture",
       max_de = d;
   }
 
-  INFO("D65_1nm ΔE′: max delta = " << max_de << " (tolerance = " << Tol_DeltaE
+  INFO("D65_1nm dE': max delta = " << max_de << " (tolerance = " << Tol_DeltaE
                                    << ")");
   CHECK(max_de <= Tol_DeltaE);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Golden fixture: F1 Rf matches luxpy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - F1 Rf matches golden fixture",
+TEST_CASE("dE' & Rf - F1 Rf matches golden fixture",
           "[delta_e][rf][slice07][fixture]") {
   auto &G = GlobalFixtures::instance();
 
@@ -433,11 +433,11 @@ TEST_CASE("ΔE′ & Rf - F1 Rf matches golden fixture",
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, golden_rf));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Golden fixture: HP1 Rf matches luxpy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - HP1 Rf matches golden fixture",
+TEST_CASE("dE' & Rf - HP1 Rf matches golden fixture",
           "[delta_e][rf][slice07][fixture]") {
   auto &G = GlobalFixtures::instance();
 
@@ -453,12 +453,12 @@ TEST_CASE("ΔE′ & Rf - HP1 Rf matches golden fixture",
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, golden_rf));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Rf range: verify 0 ≤ Rf ≤ 100 for various SPDs
-// TM-30-20 §4.1: Eq. (54) ensures Rf ≥ 0
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// Rf range: verify 0 <= Rf <= 100 for various SPDs
+// TM-30-20 §4.1: Eq. (54) ensures Rf >= 0
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - Rf in [0, 100] for various SPDs",
+TEST_CASE("dE' & Rf - Rf in [0, 100] for various SPDs",
           "[delta_e][rf][slice07][range]") {
   auto &G = GlobalFixtures::instance();
 
@@ -485,16 +485,16 @@ TEST_CASE("ΔE′ & Rf - Rf in [0, 100] for various SPDs",
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Unit tests: compute_delta_e and compute_rf functions directly
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - compute_delta_e: zero when J'a'b' identical",
+TEST_CASE("dE' & Rf - compute_delta_e: zero when J'a'b' identical",
           "[delta_e][rf][slice07][unit]") {
   std::array<Cam02Ucs, 99> jab_test{};
   std::array<Cam02Ucs, 99> jab_ref{};
 
-  // All zeros → all ΔE′ = 0
+  // All zeros -> all dE' = 0
   for (std::size_t i = 0; i < 99; ++i) {
     jab_test[i] = Cam02Ucs{50.0, 0.0, 0.0};
     jab_ref[i] = Cam02Ucs{50.0, 0.0, 0.0};
@@ -507,43 +507,43 @@ TEST_CASE("ΔE′ & Rf - compute_delta_e: zero when J'a'b' identical",
   }
 }
 
-TEST_CASE("ΔE′ & Rf - compute_rf: Rf = 100 when all ΔE′ = 0",
+TEST_CASE("dE' & Rf - compute_rf: Rf = 100 when all dE' = 0",
           "[delta_e][rf][slice07][unit]") {
   std::array<double, 99> delta_e{};
-  // All zeros → Rf = 100
+  // All zeros -> Rf = 100
 
   auto result = compute_rf(delta_e);
 
   // TM-30-20 §4.1 Eq. (53): Rf' = 100 - 6.73 * 0 = 100
   CHECK(result.Rf_prime == 100.0);
 
-  // TM-30-20 §4.1 Eq. (54): Rf = 10 * ln(exp(10) + 1) ≈ 100.00045
+  // TM-30-20 §4.1 Eq. (54): Rf = 10 * ln(exp(10) + 1) ~= 100.00045
   // (not exactly 100 due to the exp/ln rounding; within Tol_Rf)
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
   CHECK(result.delta_e_avg == 0.0);
 }
 
-TEST_CASE("ΔE′ & Rf - compute_rf: large ΔE′ gives low Rf",
+TEST_CASE("dE' & Rf - compute_rf: large dE' gives low Rf",
           "[delta_e][rf][slice07][unit]") {
   std::array<double, 99> delta_e{};
-  // Large constant ΔE′ → low Rf
+  // Large constant dE' -> low Rf
   delta_e.fill(15.0);
 
   auto result = compute_rf(delta_e);
 
-  // ΔE_avg ≈ 15 → Rf' = 100 - 6.73 * 15 = 100 - 100.95 = -0.95
-  // Rf = 10 * ln(exp(-0.095) + 1) ≈ 10 * ln(1.909) ≈ 6.47
+  // dE_avg ~= 15 -> Rf' = 100 - 6.73 * 15 = 100 - 100.95 = -0.95
+  // Rf = 10 * ln(exp(-0.095) + 1) ~= 10 * ln(1.909) ~= 6.47
   INFO("Rf_prime = " << result.Rf_prime << " Rf = " << result.Rf);
   CHECK(result.Rf_prime < 0.0); // Should be negative
   CHECK(result.Rf > 0.0);       // Eq. (54) ensures non-negative
   CHECK(result.Rf < 100.0);
 }
 
-TEST_CASE("ΔE′ & Rf - compute_rf: Eq. (54) ensures Rf ≥ 0 even for huge ΔE′",
+TEST_CASE("dE' & Rf - compute_rf: Eq. (54) ensures Rf >= 0 even for huge dE'",
           "[delta_e][rf][slice07][unit]") {
   std::array<double, 99> delta_e{};
-  // Very large ΔE′ → Rf' very negative, but Rf ≥ 0
+  // Very large dE' -> Rf' very negative, but Rf >= 0
   delta_e.fill(100.0);
 
   auto result = compute_rf(delta_e);
@@ -553,11 +553,11 @@ TEST_CASE("ΔE′ & Rf - compute_rf: Eq. (54) ensures Rf ≥ 0 even for huge ΔE
   CHECK(result.Rf >= 0.0);         // Eq. (54): always non-negative
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Pipeline: result contains Rf and delta_e_avg
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - pipeline populates Rf and delta_e_avg",
+TEST_CASE("dE' & Rf - pipeline populates Rf and delta_e_avg",
           "[delta_e][rf][slice07][pipeline]") {
   auto &G = GlobalFixtures::instance();
 
@@ -575,11 +575,11 @@ TEST_CASE("ΔE′ & Rf - pipeline populates Rf and delta_e_avg",
   CHECK(result.delta_e_avg >= 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// ΔE′ array length: must be exactly 99
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// dE' array length: must be exactly 99
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - compute_delta_e returns exactly 99 values",
+TEST_CASE("dE' & Rf - compute_delta_e returns exactly 99 values",
           "[delta_e][rf][slice07][unit]") {
   std::array<Cam02Ucs, 99> jab_test{};
   std::array<Cam02Ucs, 99> jab_ref{};
@@ -589,11 +589,11 @@ TEST_CASE("ΔE′ & Rf - compute_delta_e returns exactly 99 values",
   CHECK(delta_e.size() == 99);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // NaN handling: zero/zero doesn't produce NaN
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-TEST_CASE("ΔE′ & Rf - zero J'a'b' does not produce NaN",
+TEST_CASE("dE' & Rf - zero J'a'b' does not produce NaN",
           "[delta_e][rf][slice07][unit]") {
   std::array<Cam02Ucs, 99> jab_test{};
   std::array<Cam02Ucs, 99> jab_ref{};

@@ -1,6 +1,6 @@
 // Tests for spd_to_xyz, spd_to_Yuv, and xyz_to_Yuv convenience functions.
 //
-// CIE 15:2004 §8.2.1: CIE 1976 Y,u′,v′
+// CIE 15:2004 §8.2.1: CIE 1976 Y,u',v'
 // TM-30-20 §3.2: Test Source Tristimulus Values
 
 #include <catch2/catch_test_macros.hpp>
@@ -22,7 +22,7 @@
 namespace tm30::test {
 namespace {
 
-// ── Test helpers ─────────────────────────────────────────────────────────
+// -- Test helpers ---------------------------------------------------------
 
 std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
@@ -41,7 +41,7 @@ load_spd_csv(const std::string &path) {
   return {wl, vals};
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -63,18 +63,18 @@ std::vector<double> full_1nm_grid() {
   return wl;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// xyz_to_Yuv - CIE 1976 Y,u′,v′
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// xyz_to_Yuv - CIE 1976 Y,u',v'
+// -------------------------------------------------------------------------
 
 TEST_CASE("xyz_to_Yuv - known XYZ values", "[xyz][Yuv]") {
-  // CIE 15:2004 §8.2.1: u′ = 4X/(X+15Y+3Z), v′ = 9Y/(X+15Y+3Z)
+  // CIE 15:2004 §8.2.1: u' = 4X/(X+15Y+3Z), v' = 9Y/(X+15Y+3Z)
 
   // Equal-energy white: X=Y=Z=100
   YuvTriple eew = xyz_to_Yuv(100.0, 100.0, 100.0);
   // denom = 100 + 1500 + 300 = 1900
-  // u′ = 400/1900 = 0.21052631578947367
-  // v′ = 900/1900 = 0.47368421052631576
+  // u' = 400/1900 = 0.21052631578947367
+  // v' = 900/1900 = 0.47368421052631576
   REQUIRE_THAT(eew.Y, Catch::Matchers::WithinAbs(100.0, 1e-12));
   REQUIRE_THAT(eew.u_prime, Catch::Matchers::WithinAbs(400.0 / 1900.0, 1e-15));
   REQUIRE_THAT(eew.v_prime, Catch::Matchers::WithinAbs(900.0 / 1900.0, 1e-15));
@@ -95,16 +95,16 @@ TEST_CASE("xyz_to_Yuv - known XYZ values", "[xyz][Yuv]") {
 }
 
 TEST_CASE("xyz_to_Yuv - relationship to CIE 1960 uv", "[xyz][Yuv]") {
-  // CIE 1976 u′ equals CIE 1960 u (same numerator/denominator for u).
-  // CIE 1976 v′ = 1.5 × CIE 1960 v.
+  // CIE 1976 u' equals CIE 1960 u (same numerator/denominator for u).
+  // CIE 1976 v' = 1.5 x CIE 1960 v.
 
   UvCoord uv = xyz_to_uv(95.0, 100.0, 108.9);
   YuvTriple yuv = xyz_to_Yuv(95.0, 100.0, 108.9);
 
-  // u′ == u
+  // u' == u
   REQUIRE_THAT(yuv.u_prime, Catch::Matchers::WithinAbs(uv.u, 1e-15));
 
-  // v′ == 1.5 × v
+  // v' == 1.5 x v
   REQUIRE_THAT(yuv.v_prime, Catch::Matchers::WithinAbs(uv.v * 1.5, 1e-15));
 }
 
@@ -138,9 +138,9 @@ TEST_CASE("xyz_to_Yuv_batch - empty input returns empty output",
   REQUIRE(results.empty());
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // spd_to_xyz - convenience wrapper
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_xyz - D65 agrees with compute_source_xyz",
           "[xyz][spd_to_xyz]") {
@@ -192,9 +192,9 @@ TEST_CASE("spd_to_xyz - scale invariance", "[xyz][spd_to_xyz]") {
   REQUIRE_THAT(xyz1.Z, WithinTolerance(Tol_Xyz, xyz2.Z));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // spd_to_xyz_batch - multiple SPDs
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_xyz_batch - single SPD matches scalar", "[xyz][batch]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
@@ -231,9 +231,9 @@ TEST_CASE("spd_to_xyz_batch - multiple SPDs", "[xyz][batch]") {
   REQUIRE_THAT(results[0].Z, WithinTolerance(Tol_Xyz, results[1].Z));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// spd_to_Yuv - convenience wrapper (chains spd_to_xyz → xyz_to_Yuv)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// spd_to_Yuv - convenience wrapper (chains spd_to_xyz -> xyz_to_Yuv)
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_Yuv - D65", "[xyz][Yuv]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
@@ -262,7 +262,7 @@ TEST_CASE("spd_to_Yuv - Illuminant A", "[xyz][Yuv]") {
   // Y = 100
   REQUIRE_THAT(yuv.Y, WithinTolerance(Tol_Xyz, 100.0));
 
-  // Self-consistency: chain spd_to_xyz → xyz_to_Yuv
+  // Self-consistency: chain spd_to_xyz -> xyz_to_Yuv
   XyzTriple xyz = spd_to_xyz(spd_wl, spd_vals, cmf);
   YuvTriple expected = xyz_to_Yuv(xyz.X, xyz.Y, xyz.Z);
   REQUIRE_THAT(yuv.u_prime,
@@ -271,9 +271,9 @@ TEST_CASE("spd_to_Yuv - Illuminant A", "[xyz][Yuv]") {
                Catch::Matchers::WithinAbs(expected.v_prime, 1e-14));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // spd_to_Yuv_batch
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_Yuv_batch - matches scalar chain", "[xyz][Yuv][batch]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
@@ -312,9 +312,9 @@ TEST_CASE("spd_to_Yuv_batch - two different SPDs", "[xyz][Yuv][batch]") {
   REQUIRE(std::abs(results[0].v_prime - results[1].v_prime) > 1e-4);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // K parameter - user-specified normalisation constant
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_xyz - K=nullopt returns Y=100", "[xyz][K]") {
   CmfData cmf = load_cmf(data_path("cmf_1964_10.csv"));
@@ -331,8 +331,8 @@ TEST_CASE("spd_to_xyz - K=1.0 returns raw integrals", "[xyz][K]") {
   auto wl = full_1nm_grid();
   std::vector<double> vals(wl.size(), 1.0); // flat SPD
 
-  XyzTriple rel = spd_to_xyz(wl, vals, cmf);      // K = nullopt → Y=100
-  XyzTriple raw = spd_to_xyz(wl, vals, cmf, 1.0); // K = 1.0 → raw
+  XyzTriple rel = spd_to_xyz(wl, vals, cmf);      // K = nullopt -> Y=100
+  XyzTriple raw = spd_to_xyz(wl, vals, cmf, 1.0); // K = 1.0 -> raw
 
   // raw * k = rel (where k = 100 / raw.Y)
   double k = 100.0 / raw.Y;
@@ -382,7 +382,7 @@ TEST_CASE("spd_to_Yuv - K parameter passes through", "[xyz][Yuv][K]") {
   // Auto: Y = 100
   REQUIRE_THAT(yuv_auto.Y, WithinTolerance(Tol_Xyz, 100.0));
 
-  // Raw: Y ≠ 100, but u',v' identical (Y cancels in ratio)
+  // Raw: Y != 100, but u',v' identical (Y cancels in ratio)
   REQUIRE(yuv_raw.Y != 100.0);
   REQUIRE_THAT(yuv_raw.u_prime,
                Catch::Matchers::WithinAbs(yuv_auto.u_prime, 1e-14));
@@ -390,9 +390,9 @@ TEST_CASE("spd_to_Yuv - K parameter passes through", "[xyz][Yuv][K]") {
                Catch::Matchers::WithinAbs(yuv_auto.v_prime, 1e-14));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // lambda_min/lambda_max - restrict to existing grid points, never resample
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_xyz - lambda_min/lambda_max restrict to existing grid "
           "points, never resample/interpolate at the boundary",
@@ -488,9 +488,9 @@ TEST_CASE("spd_to_xyz - lambda range producing fewer than 2 points throws",
                     std::invalid_argument);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // cct_to_xyz - reference illuminant XYZ at a given CCT
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("cct_to_xyz - matches manual generate_reference_spd + spd_to_xyz "
           "chain across Planckian, blend, and daylight branches",
@@ -525,7 +525,8 @@ TEST_CASE("cct_to_xyz - Y=100 by default (auto-normalisation)", "[xyz][cct]") {
   }
 }
 
-TEST_CASE("cct_to_xyz - K parameter behaves like spd_to_xyz's K", "[xyz][cct][K]") {
+TEST_CASE("cct_to_xyz - K parameter behaves like spd_to_xyz's K",
+          "[xyz][cct][K]") {
   auto wl = full_1nm_grid();
   auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
   CmfData cmf = load_cmf(data_path("cmf_1964_10.csv"));
@@ -551,9 +552,12 @@ TEST_CASE("cct_to_xyz_batch - matches scalar calls one-for-one",
 
   for (std::size_t i = 0; i < ccts.size(); ++i) {
     XyzTriple single = cct_to_xyz(ccts[i], wl, basis, cmf);
-    REQUIRE_THAT(batch_results[i].X, Catch::Matchers::WithinAbs(single.X, 1e-12));
-    REQUIRE_THAT(batch_results[i].Y, Catch::Matchers::WithinAbs(single.Y, 1e-12));
-    REQUIRE_THAT(batch_results[i].Z, Catch::Matchers::WithinAbs(single.Z, 1e-12));
+    REQUIRE_THAT(batch_results[i].X,
+                 Catch::Matchers::WithinAbs(single.X, 1e-12));
+    REQUIRE_THAT(batch_results[i].Y,
+                 Catch::Matchers::WithinAbs(single.Y, 1e-12));
+    REQUIRE_THAT(batch_results[i].Z,
+                 Catch::Matchers::WithinAbs(single.Z, 1e-12));
   }
 }
 
@@ -573,14 +577,15 @@ TEST_CASE("cct_to_xyz - chromaticity moves bluer as CCT increases, matching "
   REQUIRE(cool_uv.u_prime < warm_uv.u_prime);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // spd_to_power - radiometric (W) or photometric (lm) total power
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("spd_to_power - radiometric: flat SPD integrates to exact width",
           "[power][radiometric]") {
-  CmfData cmf = load_cmf(data_path("cmf_1964_10.csv")); // unused when photometric=false
-  auto wl = full_1nm_grid(); // 380..780nm, 400nm wide
+  CmfData cmf =
+      load_cmf(data_path("cmf_1964_10.csv")); // unused when photometric=false
+  auto wl = full_1nm_grid();                  // 380..780nm, 400nm wide
   std::vector<double> vals(wl.size(), 1.0);
 
   double power = spd_to_power(wl, vals, cmf, /*photometric=*/false);
@@ -658,18 +663,18 @@ TEST_CASE("spd_to_power_batch - matches scalar calls one-for-one, both modes",
   auto radiometric_batch = spd_to_power_batch(wl, spds, cmf, false);
   auto photometric_batch = spd_to_power_batch(wl, spds, cmf, true);
 
-  REQUIRE_THAT(radiometric_batch[0],
-               Catch::Matchers::WithinAbs(spd_to_power(wl, vals1, cmf, false),
-                                          1e-10));
-  REQUIRE_THAT(radiometric_batch[1],
-               Catch::Matchers::WithinAbs(spd_to_power(wl, vals2, cmf, false),
-                                          1e-10));
-  REQUIRE_THAT(photometric_batch[0],
-               Catch::Matchers::WithinAbs(spd_to_power(wl, vals1, cmf, true),
-                                          1e-9));
-  REQUIRE_THAT(photometric_batch[1],
-               Catch::Matchers::WithinAbs(spd_to_power(wl, vals2, cmf, true),
-                                          1e-9));
+  REQUIRE_THAT(
+      radiometric_batch[0],
+      Catch::Matchers::WithinAbs(spd_to_power(wl, vals1, cmf, false), 1e-10));
+  REQUIRE_THAT(
+      radiometric_batch[1],
+      Catch::Matchers::WithinAbs(spd_to_power(wl, vals2, cmf, false), 1e-10));
+  REQUIRE_THAT(
+      photometric_batch[0],
+      Catch::Matchers::WithinAbs(spd_to_power(wl, vals1, cmf, true), 1e-9));
+  REQUIRE_THAT(
+      photometric_batch[1],
+      Catch::Matchers::WithinAbs(spd_to_power(wl, vals2, cmf, true), 1e-9));
 }
 
 TEST_CASE("spd_to_power_batch - returns one scalar per SPD, not a triple",

@@ -35,7 +35,7 @@ struct LocalBinMetrics {
   std::array<double, 16> Rf_hj;  // Local fidelity per bin   // TM-30-20 §4.8
   std::array<double, 16> Rcs_hj; // Local chroma shift per bin  // TM-30-20 §4.6
   std::array<double, 16> Rhs_hj; // Local hue shift per bin   // TM-30-20 §4.7
-  std::array<double, 16> DE_hj;  // Mean ΔE′ per bin        // TM-30-20 §4.8
+  std::array<double, 16> DE_hj;  // Mean dE' per bin        // TM-30-20 §4.8
 };
 
 /// CVG-normalized bin-average coordinates.
@@ -88,7 +88,7 @@ BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
 /// Compute the polygon area in the (a', b') plane using the shoelace formula.
 ///
 /// Vertices are the 16 bin-averaged (a', b') points in counterclockwise
-/// bin order (0→15). Empty bins are skipped.
+/// bin order (0->15). Empty bins are skipped.
 ///
 /// @param avg  Bin-averaged a', b' coordinates.
 /// @return     Polygon area (positive).
@@ -98,7 +98,7 @@ double polygon_area(const BinAverages &avg);
 
 /// Compute the Gamut Area Index Rg.
 ///
-/// Rg = 100 × Area_test / Area_ref
+/// Rg = 100 x Area_test / Area_ref
 ///
 /// @param test_avg  Bin-averaged test coordinates.
 /// @param ref_avg   Bin-averaged reference coordinates.
@@ -110,11 +110,11 @@ double compute_rg(const BinAverages &test_avg, const BinAverages &ref_avg);
 /// Compute per-bin local metrics: Rf,hj, Rcs,hj, Rhs,hj, DE_hj.
 ///
 /// Requires the bin-averaged coordinates (test and reference), the per-CES
-/// ΔE' array, and the hue bin assignments.
+/// dE' array, and the hue bin assignments.
 ///
 /// @param test_avg     Bin-averaged test coordinates.
 /// @param ref_avg      Bin-averaged reference coordinates.
-/// @param delta_e      Per-CES ΔE' values (99).
+/// @param delta_e      Per-CES dE' values (99).
 /// @param bins         Hue bin assignments.
 /// @return             LocalBinMetrics for all 16 bins.
 ///
@@ -127,7 +127,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 /// Compute CVG-normalized bin-average coordinates.
 ///
 /// Reference polygon is normalized to a unit circle centered at origin.
-/// The reference circle position uses h̄_ref,j = mean of individual CES
+/// The reference circle position uses hbar_ref,j = mean of individual CES
 /// hue angles per bin (§4.5). Test coordinates are offset from reference
 /// circle points using the bin-averaged (a',b') displacement scaled by
 /// the reference radial distance.
@@ -150,7 +150,7 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
 ///
 /// @param jab_test    CAM02-UCS J'a'b' for test source (99 CES).
 /// @param jab_ref     CAM02-UCS J'a'b' for reference illuminant (99 CES).
-/// @param delta_e     Per-CES ΔE' values (99).
+/// @param delta_e     Per-CES dE' values (99).
 /// @param bins        Hue-angle bin assignments (16 bins).
 /// @return            Complete GamutResult.
 ///

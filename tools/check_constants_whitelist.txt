@@ -8,4 +8,23 @@
 # constant, not a TM-30-20 spec citation. TM-30-20 works entirely in
 # relative (Y=100-normalized) colorimetry and never defines this constant,
 # so there is no honest "TM-30-20 §x.y" citation to attach here.
-src/tm30/xyz.cpp:139
+src/tm30/xyz.cpp:142
+
+# Validity thresholds (kCctMin/kCctMax/kDuvMaxAbs in src/tm30/tm30.cpp).
+# TM-30-20 §2.0 Scope states the applicability domain qualitatively
+# ("nominally white light sources... on or near the Planckian locus";
+# reference to ANSI C78.377-2017 chromaticity bins) but prints NO
+# numerical CCT bounds or Duv threshold anywhere in the standard.
+# The values 1000, 25000, 0.05 have zero occurrences in the TM-30-20
+# text -- they are pytm30 sanity bounds, not spec-derived. See banner
+# comment in src/tm30/tm30.cpp for the full attribution.
+src/tm30/tm30.cpp:30
+src/tm30/tm30.cpp:31
+src/tm30/tm30.cpp:34
+
+# CVG display scale factor kCvgScale = 100.0 (src/tm30/gamut.cpp).
+# TM-30-20 §4.5 normalizes CVG coordinates to a unit circle (radius 1)
+# and prescribes plot axis limits of +/-1.5 -- no x100 anywhere in §4.5
+# or Eqs. (58)-(61). The x100 is an implementation display convention
+# retained for luxpy fixture parity, not a spec-derived quantity.
+src/tm30/gamut.cpp:42

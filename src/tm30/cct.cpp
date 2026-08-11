@@ -7,18 +7,18 @@
 #include "tm30/chromaticity.hpp"
 #include "tm30/csv_loader.hpp"
 
-#include <cmath>
 #include <algorithm>
-#include <stdexcept>
+#include <cmath>
 #include <limits>
+#include <stdexcept>
 
 namespace tm30 {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // LUT loading
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
-PlanckianLut load_planckian_lut(const std::string& filepath) {
+PlanckianLut load_planckian_lut(const std::string &filepath) {
   CsvTable table = load_csv(filepath);
 
   // CSV columns: cct, u, v
@@ -33,26 +33,26 @@ PlanckianLut load_planckian_lut(const std::string& filepath) {
   lut.u.reserve(table.rows.size());
   lut.v.reserve(table.rows.size());
 
-  for (const auto& row : table.rows) {
+  for (const auto &row : table.rows) {
     lut.T.push_back(row[0]);
     lut.u.push_back(row[1]);
     lut.v.push_back(row[2]);
   }
 
   if (lut.T.size() < 3) {
-    throw std::runtime_error(
-        "Planckian LUT must contain at least 3 points: " + filepath);
+    throw std::runtime_error("Planckian LUT must contain at least 3 points: " +
+                             filepath);
   }
 
   return lut;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Ohno 2014 triangular + parabolic CCT solver
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 CctDuvResult compute_cct_duv(double u_test, double v_test,
-                             const PlanckianLut& lut) {
+                             const PlanckianLut &lut) {
   const std::size_t n = lut.T.size();
 
   // --- Step 1: Find closest point in LUT by Euclidean distance in (u,v) ---
@@ -69,7 +69,8 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
     }
   }
 
-  // --- Step 2: Select three adjacent LUT points for triangular/parabolic fit ---
+  // --- Step 2: Select three adjacent LUT points for triangular/parabolic fit
+  // ---
 
   // The three points are (m1, 0, p1) where 0 is the closest.
   // If best_i is at endpoint, shift inward.
@@ -90,15 +91,15 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   }
 
   const double Tm1 = lut.T[im1];
-  const double T0  = lut.T[i0];
+  const double T0 = lut.T[i0];
   const double Tp1 = lut.T[ip1];
 
   const double um1 = lut.u[im1];
-  const double u0  = lut.u[i0];
+  const double u0 = lut.u[i0];
   const double up1 = lut.u[ip1];
 
   const double vm1 = lut.v[im1];
-  const double v0  = lut.v[i0];
+  const double v0 = lut.v[i0];
   const double vp1 = lut.v[ip1];
 
   // --- Step 3: Compute distances from test point to the three LUT points ---
@@ -110,21 +111,23 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   };
 
   const double dm1 = dist(um1, vm1);
-  const double d0  = dist(u0, v0);
+  const double d0 = dist(u0, v0);
   const double dp1 = dist(up1, vp1);
 
   // --- Step 4: Triangular solution ---
 
   // Length of segment from m1 to p1
-  const double l = std::sqrt(
-      (up1 - um1) * (up1 - um1) + (vp1 - vm1) * (vp1 - vm1));
+  const double l =
+      std::sqrt((up1 - um1) * (up1 - um1) + (vp1 - vm1) * (vp1 - vm1));
 
   // Projected distance along segment: x = (dm1^2 - dp1^2 + l^2) / (2*l)
   // Clamp x to [0, l] for robustness
   // TM-30-20 §3.3 (Ohno 2014 triangular geometry, algorithmic constants)
   double x = (dm1 * dm1 - dp1 * dp1 + l * l) / (2.0 * l);
-  if (x < 0.0) x = 0.0;
-  if (x > l) x = l;
+  if (x < 0.0)
+    x = 0.0;
+  if (x > l)
+    x = l;
 
   // Triangular CCT estimate: linear interpolation along the segment
   const double T_tri = Tm1 + (Tp1 - Tm1) * (x / l);
@@ -140,7 +143,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   const double duv_mag = std::sqrt(du_ch * du_ch + dv_ch * dv_ch);
 
   // Sign: positive if test is "above" the chord (toward green/yellow)
-  // We determine sign by comparing v coordinates: v_test > v_ch → positive
+  // We determine sign by comparing v coordinates: v_test > v_ch -> positive
   // (In CIE 1960 UCS, the Planckian locus generally has negative slope,
   //  so being "above" means higher v at the same approximate u.)
   // TM-30-20 §3.3 (sign convention for Duv)
@@ -149,27 +152,31 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 
   // --- Step 5: Parabolic solution ---
 
-  // Fit a parabola T → distance for the three points
+  // Fit a parabola T -> distance for the three points
   // a*T^2 + b*T + c = distance
   // Using the formula from Ohno 2014 (equivalent to Lagrange interpolation)
 
   // Denominator for the quadratic coefficients
   // TM-30-20 §3.3 (Ohno 2014 parabolic fit, guard against zero)
   double denom = (Tp1 - T0) * (Tm1 - Tp1) * (T0 - Tm1);
-  if (std::abs(denom) < 1e-30) denom = 1e-30;
+  if (std::abs(denom) < 1e-30)
+    denom = 1e-30;
 
   // a = (Tm1*(dp1-d0) + T0*(dm1-dp1) + Tp1*(d0-dm1)) / denom
-  const double a = (Tm1 * (dp1 - d0) + T0 * (dm1 - dp1) + Tp1 * (d0 - dm1)) / denom;
+  const double a =
+      (Tm1 * (dp1 - d0) + T0 * (dm1 - dp1) + Tp1 * (d0 - dm1)) / denom;
 
   // b = -(Tm1^2*(dp1-d0) + T0^2*(dm1-dp1) + Tp1^2*(d0-dm1)) / denom
-  const double b = -(Tm1 * Tm1 * (dp1 - d0) +
-                     T0 * T0 * (dm1 - dp1) +
-                     Tp1 * Tp1 * (d0 - dm1)) / denom;
+  const double b = -(Tm1 * Tm1 * (dp1 - d0) + T0 * T0 * (dm1 - dp1) +
+                     Tp1 * Tp1 * (d0 - dm1)) /
+                   denom;
 
-  // c = -(dm1*(Tp1-T0)*Tp1*T0 + d0*(Tm1-Tp1)*Tm1*Tp1 + dp1*(T0-Tm1)*T0*Tm1) / denom
-  const double c = -(dm1 * (Tp1 - T0) * Tp1 * T0 +
-                     d0 * (Tm1 - Tp1) * Tm1 * Tp1 +
-                     dp1 * (T0 - Tm1) * T0 * Tm1) / denom;
+  // c = -(dm1*(Tp1-T0)*Tp1*T0 + d0*(Tm1-Tp1)*Tm1*Tp1 + dp1*(T0-Tm1)*T0*Tm1) /
+  // denom
+  const double c =
+      -(dm1 * (Tp1 - T0) * Tp1 * T0 + d0 * (Tm1 - Tp1) * Tm1 * Tp1 +
+        dp1 * (T0 - Tm1) * T0 * Tm1) /
+      denom;
 
   // Vertex of parabola: T_par = -b / (2a)
   // TM-30-20 §3.3 (Ohno 2014 parabolic vertex formula)
@@ -177,10 +184,12 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   if (std::abs(a) > 1e-30) {
     T_par = -b / (2.0 * a);
     // Clamp to the local range [Tm1, Tp1]
-    if (T_par < Tm1) T_par = Tm1;
-    if (T_par > Tp1) T_par = Tp1;
+    if (T_par < Tm1)
+      T_par = Tm1;
+    if (T_par > Tp1)
+      T_par = Tp1;
   } else {
-    T_par = T_tri;  // fall back to triangular
+    T_par = T_tri; // fall back to triangular
   }
 
   // Parabolic Duv
@@ -194,14 +203,14 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // TM-30-20 §3.3 threshold for triangular vs parabolic
   // When |Duv| < 0.002, use triangular; otherwise parabolic.
   // This matches the luxpy implementation for TM-30.
-  constexpr double duv_threshold = 0.002;  // TM-30-20 §3.3
+  constexpr double duv_threshold = 0.002; // TM-30-20 §3.3
 
   // Apply linear shift to triangular solution (as in luxpy/TM-30)
   // T_tri_shift = T_tri + (T_par - T_tri) * |duv_tri| / threshold
   // TM-30-20 §3.3 (blend region clamp)
   const double duv_abs = std::abs(duv_tri);
-  const double T_tri_shift = T_tri + (T_par - T_tri) *
-      std::min(duv_abs / duv_threshold, 1.0);
+  const double T_tri_shift =
+      T_tri + (T_par - T_tri) * std::min(duv_abs / duv_threshold, 1.0);
 
   CctDuvResult result;
   if (duv_abs < duv_threshold) {
@@ -215,14 +224,14 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Convenience: from XYZ
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 CctDuvResult compute_cct_duv_from_xyz(double X, double Y, double Z,
-                                      const PlanckianLut& lut) {
+                                      const PlanckianLut &lut) {
   const UvCoord uv = xyz_to_uv(X, Y, Z);
   return compute_cct_duv(uv.u, uv.v, lut);
 }
 
-}  // namespace tm30
+} // namespace tm30

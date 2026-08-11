@@ -20,9 +20,9 @@
 namespace tm30::test {
 namespace {
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Test helpers
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /// Construct a data directory path from the compile-time TM30_DATA_DIR.
 std::string data_path(const std::string &filename) {
@@ -51,7 +51,7 @@ CesData load_ces(const std::string &path) {
   return data;
 }
 
-/// Load CIE 1964 10° CMF data from a CSV file.
+/// Load CIE 1964 10-deg CMF data from a CSV file.
 CmfData load_cmf(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
@@ -70,7 +70,8 @@ CmfData load_cmf(const std::string &path) {
 /// grid. Used for grid-invariance testing - the SPD itself is trivial, we test
 /// resampling.
 Spd make_test_spd(const std::vector<double> &wavelengths) {
-  std::vector<double> values(wavelengths.size(), 1.0); // TM-30-20 §3.2: St(λ)
+  std::vector<double> values(wavelengths.size(),
+                             1.0); // TM-30-20 §3.2: St(lambda)
   return Spd(wavelengths, values);
 }
 
@@ -83,9 +84,9 @@ std::vector<double> decimate(const std::vector<double> &v, int step) {
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // SPD construction & validation
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("SPD construction - valid 1nm grid", "[spd][slice01]") {
   std::vector<double> wl(401);
@@ -132,7 +133,7 @@ TEST_CASE("SPD construction - non-uniform grid returns step 0",
   REQUIRE(spd.step() == 0.0);
 }
 
-// ── Validation: empty SPD ───────────────────────────────────────────────
+// -- Validation: empty SPD -----------------------------------------------
 
 TEST_CASE("SPD validation - empty throws", "[spd][slice01]") {
   REQUIRE_THROWS_AS(Spd({}, {}), InvalidSpd);
@@ -142,7 +143,7 @@ TEST_CASE("SPD validation - mismatched sizes throw", "[spd][slice01]") {
   REQUIRE_THROWS_AS(Spd({380.0, 780.0}, {1.0}), InvalidSpd);
 }
 
-// ── Validation: non-monotonic wavelengths ───────────────────────────────
+// -- Validation: non-monotonic wavelengths -------------------------------
 
 TEST_CASE("SPD validation - non-monotonic wavelengths throw",
           "[spd][slice01]") {
@@ -158,7 +159,7 @@ TEST_CASE("SPD validation - duplicate wavelengths throw", "[spd][slice01]") {
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
 }
 
-// ── Validation: negative values ─────────────────────────────────────────
+// -- Validation: negative values -----------------------------------------
 
 TEST_CASE("SPD validation - negative values throw", "[spd][slice01]") {
   // TM-30-20 §3.2: spectral power is non-negative
@@ -167,7 +168,7 @@ TEST_CASE("SPD validation - negative values throw", "[spd][slice01]") {
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
 }
 
-// ── Validation: insufficient wavelength range ───────────────────────────
+// -- Validation: insufficient wavelength range ---------------------------
 
 TEST_CASE("SPD validation - range < 400-700 throws", "[spd][slice01]") {
   // TM-30-20 §3.5: "Minimum required range: 400 to 700 nm"
@@ -196,9 +197,9 @@ TEST_CASE("SPD validation - range wider than 400-700 passes",
   REQUIRE_NOTHROW(Spd(wl, vals));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // No-interpolation-of-test-SPD property
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("SPD - test SPD values pass through unchanged", "[spd][slice01]") {
   // TM-30-20 §3.5: "The SPD of the test source shall never be interpolated."
@@ -216,9 +217,9 @@ TEST_CASE("SPD - test SPD values pass through unchanged", "[spd][slice01]") {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Linear interpolation accuracy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Resample - linear interpolation accuracy", "[resample][slice01]") {
   // TM-30-20 §3.5: "Linear interpolation shall be used."
@@ -269,15 +270,15 @@ TEST_CASE("Resample - linear interpolation at grid points returns exact values",
   REQUIRE(result.samples[0][2] == 3.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Flat extrapolation
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Resample - flat extrapolation below source range",
           "[resample][slice01]") {
   // TM-30-20 §1.3 (Errata): flat extrapolation for CES outside 400-700 nm.
   //
-  // CES data starts at 400 nm. Request at 380 nm → return 400 nm value.
+  // CES data starts at 400 nm. Request at 380 nm -> return 400 nm value.
 
   CesData source;
   source.wavelengths = {400.0, 450.0, 700.0};
@@ -290,11 +291,11 @@ TEST_CASE("Resample - flat extrapolation below source range",
 
   CesData result = resample_ces(target, source);
 
-  // At 380 nm (below 400): flat extrapolation → use 400 nm value (0.5)
+  // At 380 nm (below 400): flat extrapolation -> use 400 nm value (0.5)
   REQUIRE(result.samples[0][0] == 0.5);
   // At 400 nm: exact match
   REQUIRE(result.samples[0][1] == 0.5);
-  // At 780 nm (above 700): flat extrapolation → use 700 nm value (0.7)
+  // At 780 nm (above 700): flat extrapolation -> use 700 nm value (0.7)
   REQUIRE(result.samples[0][2] == 0.7);
 }
 
@@ -312,14 +313,14 @@ TEST_CASE("Resample - flat extrapolation above source range",
 
   CesData result = resample_ces(target, source);
 
-  // Above 500: both 700 and 780 → use 500 nm value (0.8)
+  // Above 500: both 700 and 780 -> use 500 nm value (0.8)
   REQUIRE(result.samples[0][0] == 0.8);
   REQUIRE(result.samples[0][1] == 0.8);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CMF resampling - basic accuracy
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Resample - CMF linear interpolation", "[resample][slice01]") {
   CmfData source;
@@ -337,9 +338,9 @@ TEST_CASE("Resample - CMF linear interpolation", "[resample][slice01]") {
   REQUIRE(result.z_bar[0] == 0.1);  // midpoint of 0 and 0.2
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Grid invariance: 1nm vs 5nm resampling
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Grid invariance - CES resampled at 1nm and 5nm agree at shared "
           "wavelengths",
@@ -386,7 +387,7 @@ TEST_CASE("Grid invariance - CES resampled at 1nm and 5nm agree at shared "
     }
   }
 
-  // All 99 CES × 81 shared wavelengths should match exactly.
+  // All 99 CES x 81 shared wavelengths should match exactly.
   REQUIRE(mismatches == 0);
 }
 
@@ -423,9 +424,9 @@ TEST_CASE("Grid invariance - CMF resampled at 1nm and 5nm agree at shared "
   REQUIRE(mismatches == 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // 5nm source data - resampling to 1nm
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Resample - 5nm CES source to 1nm target via linear interpolation",
           "[resample][slice01]") {
@@ -458,9 +459,9 @@ TEST_CASE("Resample - 5nm CES source to 1nm target via linear interpolation",
   REQUIRE(mismatches == 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // CES data count validation
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 TEST_CASE("Resample - rejects wrong CES count", "[resample][slice01]") {
   CesData bad;

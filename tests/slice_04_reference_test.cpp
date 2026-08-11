@@ -22,7 +22,7 @@ std::string data_path(const std::string &filename) {
   return std::string(TM30_DATA_DIR) + "/" + filename;
 }
 
-// Load CIE 1964 10° CMF data
+// Load CIE 1964 10-deg CMF data
 CmfData load_cmf_10deg(const std::string &path) {
   CmfData data;
   CsvTable table = load_csv(path);
@@ -43,7 +43,7 @@ std::vector<double> wl_1nm() {
   return wl;
 }
 
-// ── Planckian ──────────────────────────────────────────────────────
+// -- Planckian ------------------------------------------------------
 
 TEST_CASE("Reference - Planckian 2700K self-consistency",
           "[reference][slice04]") {
@@ -65,13 +65,13 @@ TEST_CASE("Reference - Planckian values monotonic with T at fixed wavelength",
   auto spd_2700 = generate_planckian(2700.0, wl);
   auto spd_6500 = generate_planckian(6500.0, wl);
 
-  // At short wavelengths (380nm), higher T → higher relative radiance
+  // At short wavelengths (380nm), higher T -> higher relative radiance
   REQUIRE(spd_6500[0] > spd_2700[0]);
-  // At long wavelengths (780nm), higher T → lower relative radiance
+  // At long wavelengths (780nm), higher T -> lower relative radiance
   REQUIRE(spd_6500[400] < spd_2700[400]);
 }
 
-// ── D-series ───────────────────────────────────────────────────────
+// -- D-series -------------------------------------------------------
 
 TEST_CASE("Reference - CIE D65 generation", "[reference][slice04]") {
   auto wl = wl_1nm();
@@ -97,14 +97,14 @@ TEST_CASE("Reference - CIE D 7000K boundary", "[reference][slice04]") {
   }
 }
 
-// ── Blend region ───────────────────────────────────────────────────
+// -- Blend region ---------------------------------------------------
 
 TEST_CASE("Reference - 4000K boundary", "[reference][slice04]") {
   auto wl = wl_1nm();
   auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
   auto cmf = load_cmf_10deg(data_path("cmf_1964_10.csv"));
 
-  // At exactly 4000K → pure Planckian
+  // At exactly 4000K -> pure Planckian
   auto spd_4000 = generate_reference_spd(4000.0, wl, basis, cmf.y_bar);
   auto planck_4000 = generate_planckian(4000.0, wl);
 
@@ -118,7 +118,7 @@ TEST_CASE("Reference - 5000K boundary", "[reference][slice04]") {
   auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
   auto cmf = load_cmf_10deg(data_path("cmf_1964_10.csv"));
 
-  // At exactly 5000K → pure D-series
+  // At exactly 5000K -> pure D-series
   auto spd_5000 = generate_reference_spd(5000.0, wl, basis, cmf.y_bar);
   auto d_5000 = generate_cie_d(5000.0, wl, basis);
 
@@ -146,7 +146,7 @@ TEST_CASE("Reference - blend at 4500K produces intermediate values",
   REQUIRE_THAT(xyz_blended.Y, WithinTolerance(1e-4, 100.0));
 }
 
-// ── Continuity at boundaries ───────────────────────────────────────
+// -- Continuity at boundaries ---------------------------------------
 
 TEST_CASE("Reference - continuity at 4000K", "[reference][slice04]") {
   auto wl = wl_1nm();
@@ -179,7 +179,7 @@ TEST_CASE("Reference - continuity at 5000K", "[reference][slice04]") {
   REQUIRE(max_diff < 0.01);
 }
 
-// ── Daylight basis loading ─────────────────────────────────────────
+// -- Daylight basis loading -----------------------------------------
 
 TEST_CASE("Reference - daylight basis loads correctly",
           "[reference][slice04]") {
@@ -189,7 +189,7 @@ TEST_CASE("Reference - daylight basis loads correctly",
   REQUIRE(basis.S1.size() == 81);
   REQUIRE(basis.S2.size() == 81);
 
-  // S0(560) ≈ 100, S1(560) ≈ 0, S2(560) ≈ 0
+  // S0(560) ~= 100, S1(560) ~= 0, S2(560) ~= 0
   // index of 560nm in 5nm grid: (560-380)/5 = 36
   REQUIRE_THAT(basis.S0[36], WithinTolerance(0.1, 100.0));
   REQUIRE_THAT(basis.S1[36], WithinTolerance(0.01, 0.0));

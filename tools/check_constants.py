@@ -117,7 +117,7 @@ def check_file(filepath, whitelist, verbose=False):
 
             if has_citation:
                 if verbose:
-                    print(f"  [OK] {relpath}:{lineno}  {value!r}  ← cited")
+                    print(f"  [OK] {relpath}:{lineno}  {value!r}  <- cited")
             else:
                 violations.append((relpath, lineno, value, line.rstrip()))
 
@@ -180,7 +180,7 @@ def main():
     print(f"Violations:    {len(all_violations)}")
 
     if all_violations:
-        print(f"\n❌ FAIL: {len(all_violations)} uncited float literal(s) found.\n")
+        print(f"\n[x] FAIL: {len(all_violations)} uncited float literal(s) found.\n")
 
         # Group by file
         by_file = defaultdict(list)
@@ -201,7 +201,7 @@ def main():
         print(f"the maintainer can whitelist it in {WHITELIST_FILE}")
         return 1
     else:
-        print("\n✅ PASS: All float constants cite a TM-30-20 section.")
+        print("\n[+] PASS: All float constants cite a TM-30-20 section.")
         return 0
 
 

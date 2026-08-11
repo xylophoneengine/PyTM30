@@ -1,14 +1,14 @@
 // Simple CSV loader for spectral data tables.
 #include "tm30/csv_loader.hpp"
 
+#include <cctype>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-#include <cctype>
 
 namespace tm30 {
 
-CsvTable load_csv(const std::string& filepath) {
+CsvTable load_csv(const std::string &filepath) {
   std::ifstream file(filepath);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open CSV file: " + filepath);
@@ -41,12 +41,14 @@ CsvTable load_csv(const std::string& filepath) {
 
   // Read data rows
   while (std::getline(file, line)) {
-    if (line.empty()) continue;
+    if (line.empty())
+      continue;
 
     if (line.back() == '\r') {
       line.pop_back();
     }
-    if (line.empty()) continue;
+    if (line.empty())
+      continue;
 
     std::istringstream ss(line);
     std::string cell;
@@ -57,8 +59,12 @@ CsvTable load_csv(const std::string& filepath) {
       // Trim whitespace
       size_t start = 0;
       size_t end = cell.size();
-      while (start < end && std::isspace(static_cast<unsigned char>(cell[start]))) ++start;
-      while (end > start && std::isspace(static_cast<unsigned char>(cell[end - 1]))) --end;
+      while (start < end &&
+             std::isspace(static_cast<unsigned char>(cell[start])))
+        ++start;
+      while (end > start &&
+             std::isspace(static_cast<unsigned char>(cell[end - 1])))
+        --end;
 
       if (start == end) {
         throw std::runtime_error("Empty cell in CSV data row: " + filepath);
@@ -69,10 +75,10 @@ CsvTable load_csv(const std::string& filepath) {
     }
 
     if (row.size() != table.headers.size()) {
-      throw std::runtime_error(
-          "Column count mismatch in " + filepath
-          + ": expected " + std::to_string(table.headers.size())
-          + ", got " + std::to_string(row.size()));
+      throw std::runtime_error("Column count mismatch in " + filepath +
+                               ": expected " +
+                               std::to_string(table.headers.size()) + ", got " +
+                               std::to_string(row.size()));
     }
 
     table.rows.push_back(std::move(row));
@@ -81,4 +87,4 @@ CsvTable load_csv(const std::string& filepath) {
   return table;
 }
 
-}  // namespace tm30
+} // namespace tm30

@@ -1,0 +1,16 @@
+# Hand-authored text is pure LF. Without this, a Windows clone with
+# core.autocrlf=true rewrites working-tree files to CRLF, which fights
+# tools/fix_unicode.py and clang-format and produces noisy diffs.
+* text=auto eol=lf
+
+# Machine-written files: left byte-exact, never renormalized. data/*.csv is
+# currently CRLF in the index (the generator writes \r\n via Python's csv
+# module); src/tm30/csv_loader.cpp strips \r on read, so this is harmless, and
+# normalizing it would rewrite 30 generated files nobody should hand-edit.
+data/** -text
+tests/fixtures/** -text
+
+*.png binary
+*.pdf binary
+*.feather binary
+*.ipynb binary

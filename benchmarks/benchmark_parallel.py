@@ -94,7 +94,7 @@ def main():
     print(f"Config: n_workers={args.n_workers} persistent_workers={args.persistent}")
     print(f"Corpus: {len(corpus)} SPDs, batch matrix {batch_matrix.shape}")
 
-    # ── A. Single-SPD eval ────────────────────────────────────────────
+    # -- A. Single-SPD eval --------------------------------------------
     calc.eval(batch_matrix)  # warm tables
     single_s = []
     for _ in range(args.reps_single):
@@ -104,7 +104,7 @@ def main():
             single_s.append(time.perf_counter() - t0)
     single = stats_ms(single_s)
 
-    # ── B. True batch ─────────────────────────────────────────────────
+    # -- B. True batch -------------------------------------------------
     calc.eval(batch_matrix, COMMON_WL)  # warm-up
     batch_s = []
     for _ in range(args.reps_batch):
@@ -113,7 +113,7 @@ def main():
         batch_s.append(time.perf_counter() - t0)
     batch = stats_ms(batch_s)
 
-    # ── C. Repeated-call throughput (Phase 2 scenario) ────────────────
+    # -- C. Repeated-call throughput (Phase 2 scenario) ----------------
     calc.eval(batch_matrix, COMMON_WL)  # warm-up
     repeated_s = []
     for _ in range(args.reps_repeated):
