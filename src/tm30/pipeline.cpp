@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 namespace tm30 {
 
@@ -23,8 +24,6 @@ CesColorimetryResult compute_ces_colorimetry(
     const std::vector<double> &spd_values, const CmfData &cmf_2deg,
     const CmfData &cmf_10deg, const CesData &ces_data,
     const DaylightBasis &daylight_basis, const PlanckianLut &planckian_lut) {
-
-  const std::size_t n = spd_wavelengths.size();
 
   // -- Step 1: Resample CES reflectance data to SPD wavelength grid ------
   // TM-30-20 §3.5: "Linear interpolation shall be used."

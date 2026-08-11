@@ -2,6 +2,10 @@
 #include "tm30/task_pool.hpp"
 
 #include <algorithm> // std::min
+#include <cstddef>
+#include <functional>
+#include <mutex>
+#include <thread>
 
 #if defined(__linux__)
 #include <pthread.h>

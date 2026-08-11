@@ -2,8 +2,10 @@
 // TM-30-20 §3.6: Calculation of Tristimulus Values
 #include "tm30/integrate.hpp"
 
+#include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace tm30 {
 

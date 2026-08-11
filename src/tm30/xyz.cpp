@@ -6,8 +6,13 @@
 #include "tm30/integrate.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility> // std::move
+#include <vector>
 
 namespace tm30 {
 

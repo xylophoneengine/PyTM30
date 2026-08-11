@@ -9,7 +9,9 @@
 #include "tm30/ciecam02.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <numbers> // std::numbers::pi
 
 namespace tm30 {

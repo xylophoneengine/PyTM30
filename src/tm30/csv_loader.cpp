@@ -5,6 +5,9 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility> // std::move
+#include <vector>
 
 namespace tm30 {
 

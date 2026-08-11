@@ -4,7 +4,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
+#include <string> // std::to_string
+#include <vector>
 
 namespace tm30 {
 

@@ -8,13 +8,19 @@
 #include "tm30/spd.hpp"
 #include "tm30/tm30.hpp"
 #include "tm30/xyz.hpp"
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility> // std::move
 #include <vector>
 
 namespace nb = nanobind;

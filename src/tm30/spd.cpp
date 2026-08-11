@@ -1,6 +1,12 @@
 // SPD container - construction-time validation per TM-30-20 §3.5.
 #include "tm30/spd.hpp"
 
+#include <cstddef>
+#include <limits>
+#include <sstream>
+#include <utility> // std::move
+#include <vector>
+
 namespace tm30 {
 
 // TM-30-20 §3.5: "Calculations shall be performed over the range 380 to 780 nm"

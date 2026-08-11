@@ -4,7 +4,9 @@
 // TM-30-20 §4.1: Fidelity Index (Rf)
 #include "tm30/metrics.hpp"
 
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <numeric>
 
 namespace tm30 {

@@ -7,7 +7,9 @@
 // TM-30-20 §4.8: Local Color Fidelity (Rf,hj)
 #include "tm30/gamut.hpp"
 
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <numbers> // std::numbers::pi
 

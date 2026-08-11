@@ -5,10 +5,14 @@
 #include "tm30/pipeline.hpp"
 
 #include <algorithm> // std::min
+#include <array>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <stdexcept>
 #include <thread>
+#include <utility> // std::move
+#include <vector>
 
 namespace tm30 {
 

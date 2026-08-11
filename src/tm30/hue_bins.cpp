@@ -6,6 +6,7 @@
 // for bar charts / CVG vectors -- and contains no bin-assignment content).
 #include "tm30/hue_bins.hpp"
 
+#include <array>
 #include <cmath> // atan2
 #include <cstdint>
 #include <numbers> // std::numbers::pi

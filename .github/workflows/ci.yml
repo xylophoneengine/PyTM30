@@ -77,5 +77,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pre-commit
+      # fix_unicode.py is in its own scope, so a literal glyph in its mapping
+      # tables makes the hook rewrite (and break) itself. This asserts the
+      # tables are intact and the file is a fixed point before the hook runs,
+      # so the failure reads as a test name rather than a mangled diff.
+      - run: python3 tools/test_fix_unicode.py -v
       # Runs fix-unicode (ASCII-only gate) and clang-format over the tree.
       - run: pre-commit run --all-files --show-diff-on-failure

@@ -13,6 +13,7 @@
 /// cache and are NOT thread-safe. Callers parallelize across SPDs, not
 /// within one SPD. No mutex, no atomics.
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <span>

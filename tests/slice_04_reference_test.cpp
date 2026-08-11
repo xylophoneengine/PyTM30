@@ -11,6 +11,7 @@
 #include "tm30/xyz.hpp"
 #include "tolerances.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
