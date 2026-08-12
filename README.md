@@ -134,6 +134,8 @@ batches when you only need the scalar fields (`rf`, `rg`, `cct`, `duv`,
 xyz = calc.spd_to_xyz(spd)      # -> np.array([X, Y, Z]),    Y=100 (auto)
 yuv = calc.spd_to_Yuv(spd)      # -> np.array([Y, u', v']),  Y=100 (auto)
 xyz_raw = calc.spd_to_xyz(spd, K=1.0)   # raw integrals
+
+cct, duv = calc.spd_to_cct(spd)         # -> np.array([cct, duv]), unpacks too
 ```
 
 ### Configure CMF Observer

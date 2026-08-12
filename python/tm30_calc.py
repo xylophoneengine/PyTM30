@@ -1371,3 +1371,59 @@ class TM30Calc:
             matrix, wl_arg, cmf_path, photometric, lambda_min, lambda_max
         )
         return float(result[0]) if single else result
+
+    def spd_to_cct(
+        self,
+        spd: np.ndarray,
+        wavelengths: np.ndarray | None = None,
+        *,
+        cmf: Cmf | str | os.PathLike | None = None,
+    ) -> np.ndarray:
+        """Compute CCT and Duv for one or many SPDs.
+
+        Uses the CIE 1931 2-deg CMFs and the Ohno 2014 method (TM-30-20
+        §3.1 exception, §3.3) -- this is the one calculation in TM-30-20
+        that uses the 2-deg, not 10-deg, observer.
+
+        Parameters
+        ----------
+        spd : np.ndarray, shape (N_wl,) or (N_spds, N_wl)
+            1-D -> single SPD -> returns shape (2,) array [cct, duv]
+            2-D -> batch of N_spds -> returns shape (2, N_spds) array,
+            row 0 = cct, row 1 = duv
+        wavelengths : np.ndarray or None
+            Wavelength grid (nm). None (common case): use this
+            calculator's fixed wavelength grid. Explicit array: a
+            one-off different grid for this call only.
+        cmf : Cmf, str, Path, or None
+            2-deg CIE observer for this call. None (default): use this
+            calculator's bound cmf_2deg. Explicit value: load+resample a
+            different 2-deg CMF for this call only.
+
+        Returns
+        -------
+        np.ndarray, shape (2,) or (2, N_spds)
+            Row/index 0 is cct (K), row/index 1 is duv. Unpacks
+            naturally: ``cct, duv = calc.spd_to_cct(spd_matrix)``. Index
+            [0] to keep only cct and discard duv.
+        """
+        single = spd.ndim == 1
+        matrix = spd[np.newaxis, :] if single else spd
+        if matrix.dtype != np.float64:
+            matrix = matrix.astype(np.float64)
+        matrix = np.ascontiguousarray(matrix)
+
+        if wavelengths is None:
+            wavelengths = self._wavelengths
+        else:
+            if wavelengths.dtype != np.float64:
+                wavelengths = wavelengths.astype(np.float64)
+            # A column slice (e.g. `csv[:, 0]`), transpose, or reversed view
+            # is not contiguous - the C++ layer requires it to be.
+            wavelengths = np.ascontiguousarray(wavelengths)
+
+        cmf_path = (
+            None if cmf is None else _resolve_cmf(cmf, self._data_dir, suffix="2deg")
+        )
+        result = self._ctx.spd_to_cct(matrix, wavelengths, cmf_path)
+        return result[:, 0] if single else result

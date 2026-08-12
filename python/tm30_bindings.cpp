@@ -1145,6 +1145,68 @@ struct BatchContext {
     std::copy(results.begin(), results.end(), buf);
     return result;
   }
+
+  /// Compute CCT and Duv for all SPDs in the batch (N_spds x N_wl).
+  /// Returns a numpy array of shape (2, N_spds): row 0 = cct (K), row 1 =
+  /// duv. Uses the pre-loaded CIE 1931 2-deg CMFs by default (TM-30-20
+  /// §3.1 exception - CCT determination is the one calculation that uses
+  /// the 2-deg, not 10-deg, observer). cmf_path=None: use this context's
+  /// bound cmf_2deg. cmf_path=str: load+resample a different 2-deg CMF for
+  /// this call only.
+  nb::object spd_to_cct(nb::ndarray<> spd_matrix, nb::object wl_arg,
+                        nb::object cmf_path_arg) {
+    if (spd_matrix.ndim() != 2)
+      throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
+    require_c_contiguous(spd_matrix, "spd_matrix");
+    size_t N = spd_matrix.shape(0);
+    size_t nwl = spd_matrix.shape(1);
+    const double *data = static_cast<const double *>(spd_matrix.data());
+
+    std::vector<double> wl;
+    if (wl_arg.is_none()) {
+      if (nwl != 401)
+        throw std::invalid_argument(
+            "Expected 401 wavelengths (380-780 nm), got " +
+            std::to_string(nwl));
+      wl.resize(401);
+      for (size_t i = 0; i < 401; ++i)
+        wl[i] = 380.0 + i;
+    } else {
+      auto wl_arr = nb::cast<nb::ndarray<>>(wl_arg);
+      if (wl_arr.ndim() != 1 || wl_arr.shape(0) != nwl)
+        throw std::invalid_argument(
+            "wavelengths must match spd_matrix columns");
+      require_c_contiguous(wl_arr, "wavelengths");
+      const double *wl_data = static_cast<const double *>(wl_arr.data());
+      wl.assign(wl_data, wl_data + nwl);
+    }
+
+    std::vector<std::vector<double>> spd_vecs(N);
+    for (size_t i = 0; i < N; ++i) {
+      spd_vecs[i].assign(data + i * nwl, data + (i + 1) * nwl);
+    }
+
+    tm30::CmfData fresh_cmf;
+    const tm30::CmfData *cmf_to_use = &cmf_2deg;
+    if (!cmf_path_arg.is_none()) {
+      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      cmf_to_use = &fresh_cmf;
+    }
+
+    auto results =
+        tm30::spd_to_cct_batch(wl, spd_vecs, *cmf_to_use, planckian_lut);
+
+    auto np = nb::module_::import_("numpy");
+    auto result =
+        np.attr("empty")(nb::make_tuple(2, N), nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    double *buf = static_cast<double *>(nd.data());
+    for (size_t i = 0; i < N; ++i) {
+      buf[i] = results[i].cct;     // row 0, contiguous
+      buf[N + i] = results[i].duv; // row 1, contiguous
+    }
+    return result;
+  }
 };
 
 // ==========================================================================
@@ -1383,7 +1445,13 @@ NB_MODULE(tm30_core, m) {
            "Integrate each SPD to a single power value. Returns shape (N,), "
            "NOT (N,3) - power is one scalar per SPD. photometric=False "
            "(default): radiometric (W), unweighted. photometric=True: "
-           "Km=683.0 x ybar-weighted (lm).");
+           "Km=683.0 x ybar-weighted (lm).")
+      .def("spd_to_cct", &BatchContext::spd_to_cct, nb::arg("spd_matrix"),
+           nb::arg("wavelengths") = nb::none(), nb::arg("cmf") = nb::none(),
+           "Compute CCT and Duv for all SPDs (N_spds x N_wl). Returns "
+           "numpy array shape (2, N_spds): row 0 = cct (K), row 1 = duv. "
+           "Uses CIE 1931 2-deg CMFs by default (TM-30-20 §3.1 exception), "
+           "or the CMF at cmf= (a CSV path) for this call only.");
 
   // -- Exception translation ----------------------------------------
 

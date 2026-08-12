@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "tm30/cct.hpp"          // PlanckianLut, CctDuvResult
 #include "tm30/chromaticity.hpp" // YuvTriple
 #include "tm30/reference.hpp"    // DaylightBasis, generate_reference_spd
 #include "tm30/resample.hpp"     // CesData, CmfData
@@ -232,6 +233,42 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
                                         const DaylightBasis &basis,
                                         const CmfData &cmf_data,
                                         std::optional<double> K = std::nullopt);
+
+/// Compute CCT and Duv from an SPD, with automatic CMF resampling.
+///
+/// TM-30-20 §3.1 exception: CCT determination uses the CIE 1931 2-deg
+/// observer, not the 1964 10-deg observer used everywhere else in this
+/// library - `cmf_data` here must be 2-deg. Chains compute_source_xyz
+/// (2-deg XYZ) -> compute_cct_duv_from_xyz (Ohno 2014, TM-30-20 §3.3).
+///
+/// No K/lambda_min/lambda_max: CCT/Duv come from (u,v) chromaticity, which
+/// is scale-invariant, so K has no effect; lambda_min/max have no
+/// motivating truncation use case (same reasoning as cct_to_xyz above).
+///
+/// @param spd_wavelengths SPD wavelength grid (nm).
+/// @param spd_values      SPD spectral power values.
+/// @param cmf_data        CIE 1931 2-deg CMF data (resampled internally).
+/// @param planckian_lut   Pre-computed Planckian locus LUT.
+/// @return                CctDuvResult with cct (K) and duv.
+CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
+                        const std::vector<double> &spd_values,
+                        const CmfData &cmf_data,
+                        const PlanckianLut &planckian_lut);
+
+/// Compute spd_to_cct() for multiple SPDs sharing one wavelength grid.
+///
+/// Resamples the 2-deg CMF once, reused for every SPD in the batch - same
+/// resample-once-loop-many pattern as spd_to_xyz_batch.
+///
+/// @param spd_wavelengths SPD wavelength grid (nm), shared by all SPDs.
+/// @param spd_matrix      Vector of SPD value vectors (one per SPD).
+/// @param cmf_data        CIE 1931 2-deg CMF data.
+/// @param planckian_lut   Pre-computed Planckian locus LUT.
+/// @return                Vector of CctDuvResult (one per SPD).
+std::vector<CctDuvResult>
+spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
+                 const std::vector<std::vector<double>> &spd_matrix,
+                 const CmfData &cmf_data, const PlanckianLut &planckian_lut);
 
 /// Compute the total power of an SPD - radiometric (unweighted) or
 /// photometric (CIE luminous-efficiency-weighted).

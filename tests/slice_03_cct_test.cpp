@@ -493,5 +493,79 @@ TEST_CASE("CCT - Duv is signed distance", "[cct][slice03]") {
   }
 }
 
+// -------------------------------------------------------------------------
+// spd_to_cct / spd_to_cct_batch - SPD -> CCT/Duv convenience wrappers
+// -------------------------------------------------------------------------
+
+TEST_CASE("CCT - spd_to_cct matches the manual resample+compute chain (D65)",
+          "[cct][slice03]") {
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
+
+  // Same oracle as the "CCT - D65 (2-deg observer)" test above (luxpy):
+  // CCT=6501.8979, Duv=0.00321446
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6501.8979));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00321446));
+}
+
+TEST_CASE("CCT - spd_to_cct matches the manual chain (FL1)", "[cct][slice03]") {
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl1_1nm.csv"));
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
+
+  // Oracle: CCT=6425.4015, Duv=0.00719197
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6425.4015));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00719197));
+}
+
+TEST_CASE("CCT - spd_to_cct matches the manual chain (HP1, narrowband)",
+          "[cct][slice03]") {
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
+
+  // Oracle: CCT=1959.2357, Duv=0.00078236
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 1959.2357));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00078236));
+}
+
+TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
+          "[cct][slice03]") {
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  auto [wl_d65, vals_d65] = load_spd_csv(data_path("d65_1nm.csv"));
+  auto [wl_a, vals_a] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
+  auto [wl_fl1, vals_fl1] = load_spd_csv(data_path("fl1_1nm.csv"));
+
+  // All three SPDs share the same 1 nm, 380-780 nm grid.
+  REQUIRE(wl_d65 == wl_a);
+  REQUIRE(wl_d65 == wl_fl1);
+
+  std::vector<std::vector<double>> batch = {vals_d65, vals_a, vals_fl1};
+  std::vector<CctDuvResult> batch_results =
+      spd_to_cct_batch(wl_d65, batch, cmf, lut);
+
+  REQUIRE(batch_results.size() == 3);
+
+  CctDuvResult single_d65 = spd_to_cct(wl_d65, vals_d65, cmf, lut);
+  CctDuvResult single_a = spd_to_cct(wl_a, vals_a, cmf, lut);
+  CctDuvResult single_fl1 = spd_to_cct(wl_fl1, vals_fl1, cmf, lut);
+
+  REQUIRE(batch_results[0].cct == single_d65.cct);
+  REQUIRE(batch_results[0].duv == single_d65.duv);
+  REQUIRE(batch_results[1].cct == single_a.cct);
+  REQUIRE(batch_results[1].duv == single_a.duv);
+  REQUIRE(batch_results[2].cct == single_fl1.cct);
+  REQUIRE(batch_results[2].duv == single_fl1.duv);
+}
+
 } // namespace
 } // namespace tm30::test

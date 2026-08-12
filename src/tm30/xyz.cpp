@@ -355,6 +355,34 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
   return results;
 }
 
+CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
+                        const std::vector<double> &spd_values,
+                        const CmfData &cmf_data,
+                        const PlanckianLut &planckian_lut) {
+  CmfData cmf_resampled = resample_cmf(spd_wavelengths, cmf_data);
+  SourceXyz src =
+      compute_source_xyz(spd_wavelengths, spd_values, cmf_resampled.x_bar,
+                         cmf_resampled.y_bar, cmf_resampled.z_bar);
+  return compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut);
+}
+
+std::vector<CctDuvResult>
+spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
+                 const std::vector<std::vector<double>> &spd_matrix,
+                 const CmfData &cmf_data, const PlanckianLut &planckian_lut) {
+  CmfData cmf_resampled = resample_cmf(spd_wavelengths, cmf_data);
+  std::vector<CctDuvResult> results;
+  results.reserve(spd_matrix.size());
+  for (const auto &vals : spd_matrix) {
+    SourceXyz src =
+        compute_source_xyz(spd_wavelengths, vals, cmf_resampled.x_bar,
+                           cmf_resampled.y_bar, cmf_resampled.z_bar);
+    results.push_back(
+        compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut));
+  }
+  return results;
+}
+
 double spd_to_power(const std::vector<double> &wavelengths,
                     const std::vector<double> &values, const CmfData &cmf_data,
                     bool photometric, std::optional<double> lambda_min,
