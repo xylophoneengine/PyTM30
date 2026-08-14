@@ -409,7 +409,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
 
   double max_rcshj_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
-    double d = std::abs(gamut.local.Rcs_hj[j] - golden_rcshj[j]);
+    double d = std::abs(gamut.local.Rcs_hj_percent[j] - golden_rcshj[j]);
     if (d > max_rcshj_delta)
       max_rcshj_delta = d;
   }
@@ -534,7 +534,7 @@ TEST_CASE(
   // TM-30-20 §4.6: Self-consistency -> shifts near zero
   double max_rcs = 0.0;
   for (int j = 0; j < 16; ++j) {
-    double v = std::abs(gamut.local.Rcs_hj[j]);
+    double v = std::abs(gamut.local.Rcs_hj_percent[j]);
     if (v > max_rcs)
       max_rcs = v;
   }

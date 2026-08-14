@@ -634,7 +634,11 @@ class Tm30BatchResult:
 
     @property
     def rcs_hj(self) -> np.ndarray:
-        """Per-bin chroma shift Rcs,hj - shape (N, 16).  TM-30-20 §4.6."""
+        """Per-bin chroma shift Rcs,hj, in percent - shape (N, 16).
+
+        TM-30-20 §4.6: Eq. (62) computes a ratio; §4.6 requires percentage
+        representation, applied once in the core library.
+        """
         if "rcs_hj" not in self._d:
             raise AttributeError(
                 "rcs_hj is not available on this result -- call "
@@ -645,7 +649,11 @@ class Tm30BatchResult:
 
     @property
     def rhs_hj(self) -> np.ndarray:
-        """Per-bin hue shift Rhs,hj - shape (N, 16).  TM-30-20 §4.7."""
+        """Per-bin hue shift Rhs,hj, dimensionless ratio - shape (N, 16).
+
+        TM-30-20 §4.7: Eq. (63) is ratio-valued and §4.7 states no
+        percentage requirement; reported unscaled.
+        """
         if "rhs_hj" not in self._d:
             raise AttributeError(
                 "rhs_hj is not available on this result -- call "

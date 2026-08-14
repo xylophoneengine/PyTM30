@@ -215,7 +215,7 @@ bool results_equal(const std::optional<Tm30Result> &a,
         ga.ref_avg.b_prime[j] != gb.ref_avg.b_prime[j])
       return false;
     if (ga.local.Rf_hj[j] != gb.local.Rf_hj[j] ||
-        ga.local.Rcs_hj[j] != gb.local.Rcs_hj[j] ||
+        ga.local.Rcs_hj_percent[j] != gb.local.Rcs_hj_percent[j] ||
         ga.local.Rhs_hj[j] != gb.local.Rhs_hj[j] ||
         ga.local.DE_hj[j] != gb.local.DE_hj[j])
       return false;

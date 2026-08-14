@@ -650,7 +650,7 @@ void check_results_match(const CesColorimetryResult &a,
     INFO(label << " hue bin " << j);
     CHECK(nan_aware_close(a.gamut.local.Rf_hj[j], b.gamut.local.Rf_hj[j],
                           Tol_Rf));
-    CHECK(nan_aware_close(a.gamut.local.Rcs_hj[j], b.gamut.local.Rcs_hj[j],
+    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j], b.gamut.local.Rcs_hj_percent[j],
                           Tol_LocalShift));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
                           Tol_LocalShift));
@@ -683,7 +683,7 @@ void check_results_identical(const CesColorimetryResult &a,
   }
   for (std::size_t j = 0; j < 16; ++j) {
     INFO(label << " hue bin " << j);
-    CHECK(nan_aware_close(a.gamut.local.Rcs_hj[j], b.gamut.local.Rcs_hj[j],
+    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j], b.gamut.local.Rcs_hj_percent[j],
                           kDeterminismTol));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
                           kDeterminismTol));

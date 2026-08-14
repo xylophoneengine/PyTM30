@@ -187,7 +187,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-bin chroma shift Rcs,hj (16 values) - returns numpy array.
+  /// Per-bin chroma shift Rcs,hj, in percent (16 values) - numpy array.
   nb::object rcs_hj() const {
     const auto &lcm = tm30_->local_chroma_shift();
     auto np = nb::module_::import_("numpy");
@@ -195,11 +195,11 @@ struct PyTm30 {
     auto nd = nb::cast<nb::ndarray<>>(result);
     double *buf = static_cast<double *>(nd.data());
     for (int j = 0; j < 16; ++j)
-      buf[j] = lcm.Rcs_hj[j];
+      buf[j] = lcm.Rcs_hj_percent[j];
     return result;
   }
 
-  /// Per-bin hue shift Rhs,hj (16 values) - returns numpy array.
+  /// Per-bin hue shift Rhs,hj, dimensionless ratio (16 values) - numpy array.
   nb::object rhs_hj() const {
     const auto &lcm = tm30_->local_chroma_shift();
     auto np = nb::module_::import_("numpy");
@@ -601,7 +601,7 @@ struct BatchContext {
         double *buf_rcs = static_cast<double *>(nd_rcs.data());
         double *buf_rhs = static_cast<double *>(nd_rhs.data());
         for (int j = 0; j < 16; ++j) {
-          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
+          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj_percent[j];
           buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
         }
         d["rcs_hj"] = arr_rcs;
@@ -760,7 +760,7 @@ struct BatchContext {
         double *buf_rcs = static_cast<double *>(nd_rcs.data());
         double *buf_rhs = static_cast<double *>(nd_rhs.data());
         for (int j = 0; j < 16; ++j) {
-          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
+          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj_percent[j];
           buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
         }
         d["rcs_hj"] = arr_rcs;
@@ -1292,11 +1292,11 @@ NB_MODULE(tm30_core, m) {
                    "Per-sample fidelity Rf,CESi - numpy array of 99 values.  "
                    "TM-30-20 §4.2.")
       .def_prop_ro("rcs_hj", &PyTm30::rcs_hj,
-                   "Per-bin chroma shift Rcs,hj - numpy array of 16 values.  "
-                   "TM-30-20 §4.6.")
+                   "Per-bin chroma shift Rcs,hj, in percent - numpy array of "
+                   "16 values.  TM-30-20 §4.6 (percentage representation).")
       .def_prop_ro("rhs_hj", &PyTm30::rhs_hj,
-                   "Per-bin hue shift Rhs,hj - numpy array of 16 values.  "
-                   "TM-30-20 §4.7.")
+                   "Per-bin hue shift Rhs,hj, dimensionless ratio - numpy "
+                   "array of 16 values.  TM-30-20 §4.7.")
       .def_prop_ro("rf_hj", &PyTm30::rf_hj,
                    "Per-bin local fidelity Rf,hj - numpy array of 16 values.  "
                    "TM-30-20 §4.8.")

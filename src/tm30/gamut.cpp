@@ -29,12 +29,18 @@ static constexpr double kRfScale = 6.73; // TM-30-20 §4.1 Eq. (53)
 // TM-30-20 §4.1: Log rescale divisor.
 static constexpr double kLogRescale = 10.0; // TM-30-20 §4.1 Eq. (54)
 
-// TM-30-20 §4.6, §4.7: Local shift scaling.
-// Note: Eqs. (62)/(63) as printed are ratio-valued and carry NO x100
-// factor. §4.6/§4.7 only require Rcs,hj/Rhs,hj to be "represented as a
-// percentage" -- a reporting instruction, not equation content. luxpy
-// stores raw ratios; we match luxpy (compute raw, scale at report time).
-static constexpr double kLocalShiftScale = 1.0; // TM-30-20 §4.6, §4.7
+// TM-30-20 §4.6, Eq. (62): Rcs,hj is computed as a ratio, and §4.6
+// requires it to be represented as a percentage (Table E-1 gives a range
+// of roughly -100% to 100%; the Annex D report templates print
+// percentages). The conversion is applied exactly once, at struct fill in
+// compute_local_bin_metrics.
+static constexpr double kRcsRatioToPercent = 100.0; // TM-30-20 §4.6
+
+// TM-30-20 §4.7, Eq. (63): Rhs,hj is likewise ratio-valued, but §4.7
+// states no percentage requirement. Table E-1 gives its range as roughly
+// -1 to 1 and the Annex D report templates print bare decimals, so it is
+// reported as the raw ratio.
+static constexpr double kRhsScale = 1.0; // TM-30-20 §4.7
 
 // TM-30-20 §4.5: reference coordinates are normalised to a unit circle
 // (radius 1); the prescribed plot axis limits are +/-1.5 and the optional
@@ -149,7 +155,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
       // Empty bin: set metrics to NaN
       // TM-30-20 §4.6-§4.8 edge case
       metrics.Rf_hj[j] = std::numeric_limits<double>::quiet_NaN();
-      metrics.Rcs_hj[j] = std::numeric_limits<double>::quiet_NaN();
+      metrics.Rcs_hj_percent[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.Rhs_hj[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.DE_hj[j] = std::numeric_limits<double>::quiet_NaN();
       continue;
@@ -185,7 +191,7 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     if (r_ref < 1e-12) {
       // Degenerate: reference at origin - shifts undefined.
       // TM-30-20 §4.6 edge case
-      metrics.Rcs_hj[j] = 0.0;
+      metrics.Rcs_hj_percent[j] = 0.0;
       metrics.Rhs_hj[j] = 0.0;
       continue;
     }
@@ -198,13 +204,14 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     const double cos_t = std::cos(theta);
     const double sin_t = std::sin(theta);
 
-    // Local chroma shift: Eq. (62)
+    // Local chroma shift: Eq. (62) ratio, represented as a percentage
     // TM-30-20 §4.6 Eq. (62)
-    metrics.Rcs_hj[j] = kLocalShiftScale * (da * cos_t + db * sin_t) / r_ref;
+    metrics.Rcs_hj_percent[j] =
+        kRcsRatioToPercent * (da * cos_t + db * sin_t) / r_ref;
 
     // Local hue shift: Eq. (63) - note leading negative on first term
     // TM-30-20 §4.7 Eq. (63)
-    metrics.Rhs_hj[j] = kLocalShiftScale * (-da * sin_t + db * cos_t) / r_ref;
+    metrics.Rhs_hj[j] = kRhsScale * (-da * sin_t + db * cos_t) / r_ref;
   }
 
   return metrics;
