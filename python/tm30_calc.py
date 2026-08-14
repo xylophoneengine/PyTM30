@@ -1159,7 +1159,9 @@ class TM30Calc:
             Normalisation constant.  None (default): auto-compute
             k = 100/integral St*ybar dlambda -> Y = 100 (TM-30-20 §3.2 Eq. 4).
             K = 1.0: raw tristimulus integrals.
-            K = 683.0: photometric absolute (matches luxpy's relative=False).
+            K = 683.0: photometric absolute -- Km, the maximum luminous
+            efficacy of radiation at 555 nm (CIE/SI definition of the
+            candela); not a TM-30-20 quantity.
         cmf : Cmf, str, Path, or None
             CIE observer for this call. None (default): use this
             calculator's bound CMF. Explicit value: load+resample a
