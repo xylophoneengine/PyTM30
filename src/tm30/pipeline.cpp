@@ -26,7 +26,7 @@ CesColorimetryResult compute_ces_colorimetry(
     const DaylightBasis &daylight_basis, const PlanckianLut &planckian_lut) {
 
   // -- Step 1: Resample CES reflectance data to SPD wavelength grid ------
-  // TM-30-20 §3.5: "Linear interpolation shall be used."
+  // TM-30-20 §3.5 requires linear interpolation.
   const CesData ces_resampled = resample_ces(spd_wavelengths, ces_data);
   // TM-30-20 §3.5
 

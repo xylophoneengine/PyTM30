@@ -47,7 +47,7 @@ namespace {
 /// wavelengths.  Source and target wavelengths must be monotonically
 /// increasing.
 ///
-/// TM-30-20 §3.5: "Linear interpolation shall be used."
+/// TM-30-20 §3.5 requires linear interpolation.
 /// TM-30-20 §1.3 (Errata): flat extrapolation.
 std::vector<double> interpolate_linear(const std::vector<double> &target_wl,
                                        const std::vector<double> &source_wl,

@@ -16,7 +16,7 @@ namespace {
 /// Linearly interpolate (or flat-extrapolate) a single spectral vector
 /// from source wavelengths/values to target_wavelengths.
 ///
-/// TM-30-20 §3.5: "Linear interpolation shall be used."
+/// TM-30-20 §3.5 requires linear interpolation.
 /// TM-30-20 §1.3 (Errata): flat extrapolation replaces logarithm-based.
 std::vector<double> lerp_vector(const std::vector<double> &target_wl,
                                 const std::vector<double> &source_wl,

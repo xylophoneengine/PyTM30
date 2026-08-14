@@ -34,7 +34,7 @@ struct CmfData {
 ///   lambda < first CES lambda  -> first CES value
 ///   lambda > last CES lambda   -> last CES value
 ///
-/// TM-30-20 §3.5: "Linear interpolation shall be used."
+/// TM-30-20 §3.5 requires linear interpolation.
 CesData resample_ces(const std::vector<double> &target_wavelengths,
                      const CesData &source);
 
