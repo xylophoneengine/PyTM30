@@ -128,9 +128,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
       std::sqrt((up1 - um1) * (up1 - um1) + (vp1 - vm1) * (vp1 - vm1));
 
   // Projected distance along segment: x = (dm1^2 - dp1^2 + l^2) / (2*l)
-  // Ohno (2014) triangular geometry -- the method TM-30-20 §3.3
-  // incorporates by normative reference. The [0, l] clamp below is an
-  // implementation robustness extension, not part of the published method.
+  // TM-30-20 §3.3 incorporation: Ohno (2014) triangular geometry. The
+  // [0, l] clamp below is an implementation robustness extension, not
+  // part of the published method.
   double x = (dm1 * dm1 - dp1 * dp1 + l * l) / (2.0 * l);
   if (x < 0.0)
     x = 0.0;
@@ -166,9 +166,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // Using the formula from Ohno 2014 (equivalent to Lagrange interpolation)
 
   // Denominator for the quadratic coefficients
-  // Ohno (2014) parabolic fit; method incorporated by TM-30-20 §3.3 by
-  // normative reference. The zero guard below is an implementation
-  // robustness extension, not part of the published method.
+  // TM-30-20 §3.3 incorporation: Ohno (2014) parabolic fit. The zero
+  // guard below is an implementation robustness extension, not part of
+  // the published method.
   double denom = (Tp1 - T0) * (Tm1 - Tp1) * (T0 - Tm1);
   if (std::abs(denom) < 1e-30)
     denom = 1e-30;
@@ -213,10 +213,11 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // --- Step 6: Select between triangular and parabolic ---
 
   // The triangular/parabolic selection threshold is from Ohno (2014),
-  // the method TM-30-20 §3.3 incorporates by normative reference; the
-  // TM-30-20 text itself prints no threshold. When |Duv| < 0.002 the
-  // triangular solution is used; otherwise the parabolic one.
-  constexpr double duv_threshold = 0.002; // Ohno (2014)
+  // the method incorporated by normative reference; the TM-30-20 text
+  // itself prints no threshold. When |Duv| < 0.002 the triangular
+  // solution is used; otherwise the parabolic one.
+  // TM-30-20 §3.3 incorporation; threshold value from Ohno (2014).
+  constexpr double duv_threshold = 0.002;
 
   // Apply linear shift to triangular solution (as in luxpy/TM-30)
   // T_tri_shift = T_tri + (T_par - T_tri) * |duv_tri| / threshold
