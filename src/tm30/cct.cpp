@@ -217,6 +217,17 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // the method incorporated by normative reference; the TM-30-20 text
   // itself prints no threshold. When |Duv| < 0.002 the triangular
   // solution is used; otherwise the parabolic one.
+  //
+  // Known bias, deliberately uncorrected: the triangular solution
+  // approximates the curved Planckian locus with a straight chord
+  // between LUT points, giving a small systematic CCT bias that shrinks
+  // with the square of the LUT spacing. Ohno (2014) publishes a
+  // constant correction factor for it, but that constant is fitted to
+  // the paper's 1%-step LUT; applied to this implementation's 0.25%
+  // grid it would overcorrect by roughly the ratio of the squared
+  // spacings (~16x) and worsen accuracy, so it is omitted. Smet et al.
+  // 2023 (doi:10.1080/15502724.2023.2248397) bound the uncorrected
+  // method's maximum CCT error at ~0.4 K for a 0.25% LUT.
   // TM-30-20 §3.3 incorporation; threshold value from Ohno (2014).
   constexpr double duv_threshold = 0.002;
 
