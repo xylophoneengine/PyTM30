@@ -553,12 +553,10 @@ struct BatchContext {
 
   // NOTE: `bins`/`samples` gate which arrays get allocated and copied into
   // the per-SPD Python dict at *this* layer - `samples` controls `rf_cesi`,
-  // `bins` controls `rcs_hj`/`rhs_hj`. That's the actual memory-bandwidth
-  // win the docs describe (not a FLOP win): the underlying C++ pipeline in
-  // src/tm30/tm30.cpp still computes every field unconditionally regardless
-  // of these flags - see Tm30Request's doc comment in include/tm30/tm30.hpp
-  // ("~85-90% of compute is upstream of the binning fork"). That part is
-  // unchanged and intentionally out of scope here. `extras` below is the
+  // `bins` controls `rcs_hj`/`rhs_hj`. The underlying C++ pipeline in
+  // src/tm30/tm30.cpp computes every field unconditionally regardless of
+  // these flags (see Tm30Request's doc comment in include/tm30/tm30.hpp),
+  // so the gate is a marshaling/memory win only. `extras` below is the
   // same kind of gate: it only controls whether its additional fields get
   // array-copied into the per-SPD dict (the C++ pipeline computes them
   // unconditionally either way, same as bins/samples).
@@ -1396,7 +1394,7 @@ NB_MODULE(tm30_core, m) {
            "Load SPDs from a 2-D numpy array (N_spds x N_wl). "
            "wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
-           nb::arg("samples") = true, nb::arg("extras") = false,
+           nb::arg("samples") = false, nb::arg("extras") = false,
            nb::arg("n_workers") = 1,
            "Run TM-30 on all prepared SPDs. Returns list of dicts "
            "(or None for failed SPDs). extras=True additionally includes "
@@ -1410,7 +1408,7 @@ NB_MODULE(tm30_core, m) {
            "`wavelengths`. Call once at construction; evaluate_cached() then "
            "reuses this cache for every SPD sharing this grid.")
       .def("evaluate_cached", &BatchContext::evaluate_cached,
-           nb::arg("bins") = true, nb::arg("samples") = true,
+           nb::arg("bins") = true, nb::arg("samples") = false,
            nb::arg("extras") = false, nb::arg("n_workers") = 1,
            "Like evaluate(), but uses the grid-fixed tables cached by "
            "set_fixed_grid() and skips CES/CMF/daylight-basis resampling "

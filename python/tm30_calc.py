@@ -324,7 +324,7 @@ class Tm30Result:
             raise AttributeError(
                 "rf_cesi is not available on this result -- call "
                 "eval(..., samples=True) to include it (samples defaults "
-                "to True; this result came from an explicit samples=False)."
+                "to False)."
             )
         return np.asarray(self._d["rf_cesi"])
 
@@ -633,7 +633,7 @@ class Tm30BatchResult:
             raise AttributeError(
                 "rf_cesi is not available on this result -- call "
                 "eval(..., samples=True) to include it (samples defaults "
-                "to True; this result came from an explicit samples=False)."
+                "to False)."
             )
         return self._d["rf_cesi"]
 
@@ -1020,7 +1020,7 @@ class TM30Calc:
         wavelengths: np.ndarray | None = None,
         *,
         bins: bool = True,
-        samples: bool = True,
+        samples: bool = False,
         extras: bool = False,
     ) -> Tm30Result | Tm30BatchResult:
         """Evaluate TM-30 for one or many SPDs.
@@ -1050,9 +1050,11 @@ class TM30Calc:
             False to skip allocating/copying these arrays as a batch-size
             memory/bandwidth optimization.
         samples : bool
-            Include per-sample fidelity Rf,CESi.  Default True - pass
-            False to skip allocating/copying this array as a batch-size
-            memory/bandwidth optimization.
+            Include per-sample fidelity Rf,CESi.  Default False (matching
+            the C++ Tm30Request default) - pass True to include the
+            99-element per-sample array; leaving it off skips allocating/
+            copying that array as a batch-size memory/bandwidth
+            optimization.
         extras : bool
             Include additional fields: rf_hj, de_hj (16 each), CVG
             coordinates (cvg_j_test/x_test/y_test/j_ref/x_ref/y_ref, 16
