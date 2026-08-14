@@ -1,7 +1,12 @@
-// CCT and Duv via Ohno 2014 triangular search.
-// TM-30-20 §3.3: CCT determination using Ohno 2013 method
-// Reference: Ohno, Y. "Practical Use and Calculation of CCT and Duv."
-//            LEUKOS 10, no. 1 (2014): 47-55.
+// CCT and Duv via the Ohno triangular + parabolic search.
+//
+// TM-30-20 §3.3 prints no CCT algorithm; it incorporates one by normative
+// reference: Ohno, Y. "Practical Use and Calculation of CCT and Duv."
+// Leukos 10(1):47-55, doi:10.1080/15502724.2014.839020. (TM-30-20's
+// reference list dates the article 2013, online-first; Smet et al. 2023
+// cite it as 2014 -- same article, so the DOI is the stable citation.)
+// Per TM-30-20 §3.1, CCT determination uses the CIE 1931 2-deg observer,
+// unlike the 1964 10-deg observer used everywhere else.
 
 #include "tm30/cct.hpp"
 #include "tm30/chromaticity.hpp"
@@ -123,8 +128,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
       std::sqrt((up1 - um1) * (up1 - um1) + (vp1 - vm1) * (vp1 - vm1));
 
   // Projected distance along segment: x = (dm1^2 - dp1^2 + l^2) / (2*l)
-  // Clamp x to [0, l] for robustness
-  // TM-30-20 §3.3 (Ohno 2014 triangular geometry, algorithmic constants)
+  // Ohno (2014) triangular geometry -- the method TM-30-20 §3.3
+  // incorporates by normative reference. The [0, l] clamp below is an
+  // implementation robustness extension, not part of the published method.
   double x = (dm1 * dm1 - dp1 * dp1 + l * l) / (2.0 * l);
   if (x < 0.0)
     x = 0.0;
@@ -148,7 +154,8 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // We determine sign by comparing v coordinates: v_test > v_ch -> positive
   // (In CIE 1960 UCS, the Planckian locus generally has negative slope,
   //  so being "above" means higher v at the same approximate u.)
-  // TM-30-20 §3.3 (sign convention for Duv)
+  // Duv sign convention per Ohno (2014); method incorporated by
+  // TM-30-20 §3.3 by normative reference.
   const double sign = (v_test >= vch) ? 1.0 : -1.0;
   const double duv_tri = duv_mag * sign;
 
@@ -159,7 +166,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // Using the formula from Ohno 2014 (equivalent to Lagrange interpolation)
 
   // Denominator for the quadratic coefficients
-  // TM-30-20 §3.3 (Ohno 2014 parabolic fit, guard against zero)
+  // Ohno (2014) parabolic fit; method incorporated by TM-30-20 §3.3 by
+  // normative reference. The zero guard below is an implementation
+  // robustness extension, not part of the published method.
   double denom = (Tp1 - T0) * (Tm1 - Tp1) * (T0 - Tm1);
   if (std::abs(denom) < 1e-30)
     denom = 1e-30;
@@ -181,7 +190,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
       denom;
 
   // Vertex of parabola: T_par = -b / (2a)
-  // TM-30-20 §3.3 (Ohno 2014 parabolic vertex formula)
+  // Ohno (2014) parabolic vertex formula; method incorporated by
+  // TM-30-20 §3.3 by normative reference. The [Tm1, Tp1] clamp and the
+  // triangular fallback below are implementation robustness extensions.
   double T_par;
   if (std::abs(a) > 1e-30) {
     T_par = -b / (2.0 * a);
@@ -201,11 +212,11 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 
   // --- Step 6: Select between triangular and parabolic ---
 
-  // TM-30-20 uses a threshold of 0.002 (from Ohno 2014)
-  // TM-30-20 §3.3 threshold for triangular vs parabolic
-  // When |Duv| < 0.002, use triangular; otherwise parabolic.
-  // This matches the luxpy implementation for TM-30.
-  constexpr double duv_threshold = 0.002; // TM-30-20 §3.3
+  // The triangular/parabolic selection threshold is from Ohno (2014),
+  // the method TM-30-20 §3.3 incorporates by normative reference; the
+  // TM-30-20 text itself prints no threshold. When |Duv| < 0.002 the
+  // triangular solution is used; otherwise the parabolic one.
+  constexpr double duv_threshold = 0.002; // Ohno (2014)
 
   // Apply linear shift to triangular solution (as in luxpy/TM-30)
   // T_tri_shift = T_tri + (T_par - T_tri) * |duv_tri| / threshold
