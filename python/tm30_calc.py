@@ -149,20 +149,21 @@ def _resolve_cmf(
 __all__ = ["TM30Calc", "Tm30Result", "Tm30BatchResult", "to_dataframe", "Cmf"]
 
 
-# -- Multi-level column support (luxpy lx_util.py backwards compatibility) --
+# -- Multi-level column support ------------------------------------------
 #
-# Mirrors the column-naming convention of lx_util.py's tm30_dict_to_dataframe():
+# Backwards-compatible with the author's internal lx_util.py wrapper.
+# Mirrors the column-naming convention of its tm30_dict_to_dataframe():
 # per-CES arrays (99 values/row) -> 'CES_01'..'CES_99', per-bin arrays (16
-# values/row) -> 'bin_01'..'bin_16', per-CES/bin [X,Y,Z]/[J,a,b] triples get a
-# third column level, and scalar fields are single-level (padded with '' to
-# match the deepest column's tuple length, same as lx_util.py's padded_cols).
+# values/row) -> 'bin_01'..'bin_16', per-CES/bin [X,Y,Z]/[J,a,b] triples get
+# a third column level, and scalar fields are single-level (padded with ''
+# to match the deepest column's tuple length, same as its padded_cols).
 #
-# Top-level column names are also aliased to luxpy's own dict key names
-# (verified against `luxpy.color.cri.iestm30.metrics_fast.spd_to_tm30()`'s
-# actual output) so that, e.g., `df['Rcshj']` works exactly like it did
-# against a luxpy-dict-derived DataFrame. Fields with no direct top-level
-# luxpy equivalent keep pytm30's own name -- see the comment below.
-_LUXPY_KEY_ALIASES: dict[str, str] = {
+# Top-level column names follow luxpy's spd_to_tm30() dict vocabulary so
+# existing downstream code keeps working -- e.g. `df['Rcshj']` works
+# exactly like it did against a luxpy-dict-derived DataFrame. Fields with
+# no direct top-level equivalent in that vocabulary keep pytm30's own
+# name -- see the comment below.
+_COMPAT_KEY_ALIASES: dict[str, str] = {
     "rf": "Rf",
     "rg": "Rg",
     # cct, duv: luxpy uses the same lowercase names already -- no alias needed.
@@ -193,7 +194,7 @@ def _field_column_tuples(
     wavelengths: np.ndarray | None,
 ) -> list[tuple[str, ...]]:
     """Build luxpy-style column-name tuples for one field."""
-    label = _LUXPY_KEY_ALIASES.get(key, key)
+    label = _COMPAT_KEY_ALIASES.get(key, key)
 
     if per_row_shape == ():
         return [(label,)]
