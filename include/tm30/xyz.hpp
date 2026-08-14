@@ -115,8 +115,10 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
 ///                         If a value is provided, it is used directly as the
 ///                           multiplier for the raw tristimulus integrals.
 ///                           K = 1.0 returns raw integrals.
-///                           K = 683.0 matches luxpy's photometric absolute
-///                           mode.
+///                           K = 683.0 gives absolute photometric quantities:
+///                           683 lm/W is Km, the maximum luminous efficacy of
+///                           radiation at 555 nm (CIE/SI definition of the
+///                           candela), not a TM-30-20 quantity.
 /// @param lambda_min       Lower integration bound (nm).  If std::nullopt,
 ///                         integrates from the first wavelength in the SPD.
 /// @param lambda_max       Upper integration bound (nm).  If std::nullopt,

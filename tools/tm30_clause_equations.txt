@@ -9,27 +9,25 @@
 # copy of ANSI/IES TM-30-20. Unverified entries produce warnings, not
 # failures.
 #
-# MAINTAINER TASK: confirm every entry against the standard and remove
-# the 'unverified' markers. Entries without the marker were cross-checked
-# against the clause derivations in the remediation master plan;
-# 'unverified' entries were seeded from the equation numbers the code
-# itself cites, which is circumstantial, not authoritative.
+# All entries verified against ANSI/IES TM-30-20 (+Errata 1) directly,
+# 2026-08-14: every equation number below matches the printed clause.
+# Clauses listed 'none' print no numbered equations.
 1.2: none
-1.3: none unverified
-2.0: none unverified
-3.1: none unverified
-3.2: 1-4 unverified
+1.3: none
+2.0: none
+3.1: none
+3.2: 1-4
 3.3: 5-20
-3.4: none unverified
-3.5: none unverified
+3.4: none
+3.5: none
 3.6: 21-28
-3.7: none unverified
+3.7: none
 3.7.1: 29-51
-3.8: 52 unverified
-4.0: none unverified
-4.1: 53-54 unverified
-4.2: 55-56 unverified
-4.3: none unverified
+3.8: 52
+4.0: none
+4.1: 53-54
+4.2: 55-56
+4.3: none
 4.4: 57
 4.5: 58-61
 4.6: 62
