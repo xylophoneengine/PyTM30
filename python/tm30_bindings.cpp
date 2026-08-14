@@ -1246,9 +1246,10 @@ NB_MODULE(tm30_core, m) {
               "(pytm30 advisory; TM-30-20 §2.0 prints no numerical CCT "
               "bounds).")
       .def_rw("extrapolated", &tm30::Validity::extrapolated,
-              "Test SPD does not cover 380-780 nm; zero-fill was applied "
-              "per TM-30-20 §3.5. CES/CMF tables are flat-extrapolated "
-              "per §1.3 / Annex A -- unrelated to this flag.");
+              "Test SPD did not cover 380-780 nm; missing edge values "
+              "were zero-filled at construction per TM-30-20 §3.5. "
+              "CES/CMF tables are flat-extrapolated per §1.3 / Annex A "
+              "-- unrelated to this flag.");
 
   // -- Tm30 class --------------------------------------------------
 

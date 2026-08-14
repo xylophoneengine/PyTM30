@@ -39,8 +39,6 @@ constexpr double kDuvMaxAbs = 0.05;
 
 // TM-30-20 §3.5: Full CES wavelength range is 380-780 nm.
 // If the test SPD does not cover this range, extrapolation is needed.
-constexpr double kFullRangeMin = 380.0; // TM-30-20 §3.5
-constexpr double kFullRangeMax = 780.0; // TM-30-20 §3.5
 } // namespace
 
 // ==========================================================================
@@ -60,13 +58,13 @@ static Validity compute_validity(const CesColorimetryResult &cr,
   // C78.377-2017 white bins), no numerical Duv threshold.
   v.duv_out_of_range = (std::abs(cr.duv) > kDuvMaxAbs);
 
-  // Test SPD does not cover the full 380-780 nm grid -> zero-fill applied
-  // per TM-30-20 §3.5 ("missing values shall be replaced by zeros"; the test
-  // SPD "shall never be interpolated or extrapolated"). Flat-extrapolation
-  // of CES/CMF reference tables from 400-700 to 380-780 is a separate
-  // provision (TM-30-20 §1.3 / Annex A) and is unrelated to this flag.
-  v.extrapolated = (spd.min_wavelength() > kFullRangeMin ||
-                    spd.max_wavelength() < kFullRangeMax);
+  // Test SPD did not cover the full 380-780 nm grid; the missing edge
+  // values were zero-filled at Spd construction per TM-30-20 §3.5, which
+  // requires zeros for missing values and forbids interpolating or
+  // extrapolating the test SPD. Flat-extrapolation of CES/CMF reference
+  // tables from 400-700 to 380-780 is a separate provision (TM-30-20
+  // §1.3 / Annex A) and is unrelated to this flag.
+  v.extrapolated = spd.zero_filled();
 
   return v;
 }

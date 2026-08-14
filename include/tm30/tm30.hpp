@@ -79,10 +79,10 @@ struct Validity {
   /// bounds).
   bool cct_out_of_range = false;
 
-  /// The test SPD does not cover the full 380-780 nm grid. Missing values
-  /// were zero-filled per TM-30-20 §3.5 (which forbids interpolating or
-  /// extrapolating the test SPD). Not the same as CES/CMF flat
-  /// extrapolation (TM-30-20 §1.3 / Annex A).
+  /// The test SPD did not cover the full 380-780 nm grid; the missing
+  /// edge values were zero-filled at Spd construction per TM-30-20 §3.5
+  /// (which forbids interpolating or extrapolating the test SPD). Not
+  /// the same as CES/CMF flat extrapolation (TM-30-20 §1.3 / Annex A).
   bool extrapolated = false;
 };
 

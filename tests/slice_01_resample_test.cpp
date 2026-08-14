@@ -121,14 +121,19 @@ TEST_CASE("SPD construction - valid 5nm grid", "[spd][slice01]") {
 TEST_CASE("SPD construction - non-uniform grid returns step 0",
           "[spd][slice01]") {
   // TM-30-20 §3.5: Minimum required range is 400-700 nm.
-  // Grid covers the range but with non-uniform spacing.
-  std::vector<double> wl = {400.0, 500.0, 600.0, 625.0, 700.0, 780.0};
+  // Grid covers the range but with non-uniform spacing (5 nm then 2 nm,
+  // both within the 5 nm maximum increment).
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 600.0; w += 5.0)
+    wl.push_back(w);
+  for (double w = 602.0; w <= 780.0; w += 2.0)
+    wl.push_back(w);
   std::vector<double> vals(wl.size(), 1.0);
 
   Spd spd(wl, vals);
 
-  REQUIRE(spd.size() == 6);
-  REQUIRE(spd.min_wavelength() == 400.0);
+  REQUIRE(spd.size() == wl.size());
+  REQUIRE(spd.min_wavelength() == 380.0);
   REQUIRE(spd.max_wavelength() == 780.0);
   REQUIRE(spd.step() == 0.0);
 }
@@ -185,14 +190,19 @@ TEST_CASE("SPD validation - range starts at 400 but ends before 700 throws",
 }
 
 TEST_CASE("SPD validation - range exactly 400-700 passes", "[spd][slice01]") {
-  std::vector<double> wl = {400.0, 500.0, 700.0};
+  // 400-700 nm at 5 nm (the largest permitted increment, TM-30-20 §3.5)
+  std::vector<double> wl;
+  for (double w = 400.0; w <= 700.0; w += 5.0)
+    wl.push_back(w);
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_NOTHROW(Spd(wl, vals));
 }
 
 TEST_CASE("SPD validation - range wider than 400-700 passes",
           "[spd][slice01]") {
-  std::vector<double> wl = {380.0, 500.0, 780.0};
+  std::vector<double> wl;
+  for (double w = 380.0; w <= 780.0; w += 5.0)
+    wl.push_back(w);
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_NOTHROW(Spd(wl, vals));
 }
@@ -202,19 +212,93 @@ TEST_CASE("SPD validation - range wider than 400-700 passes",
 // -------------------------------------------------------------------------
 
 TEST_CASE("SPD - test SPD values pass through unchanged", "[spd][slice01]") {
-  // TM-30-20 §3.5: "The SPD of the test source shall never be interpolated."
-  std::vector<double> wl = {380.0, 500.0, 780.0};
-  std::vector<double> vals = {0.5, 1.0, 0.3};
+  // TM-30-20 §3.5 forbids interpolating or extrapolating the test SPD.
+  // Full-range input at 5 nm: no drop, no zero-fill, stored exactly.
+  std::vector<double> wl;
+  std::vector<double> vals;
+  for (double w = 380.0; w <= 780.0; w += 5.0) {
+    wl.push_back(w);
+    vals.push_back(0.5 + 0.001 * (w - 380.0));
+  }
 
   Spd spd(wl, vals);
 
   // Verify the values are stored exactly as provided
-  REQUIRE(spd.wavelengths().size() == 3);
-  REQUIRE(spd.values().size() == 3);
-  for (std::size_t i = 0; i < 3; ++i) {
+  REQUIRE(spd.wavelengths().size() == wl.size());
+  REQUIRE(spd.values().size() == vals.size());
+  for (std::size_t i = 0; i < wl.size(); ++i) {
     REQUIRE(spd.wavelengths()[i] == wl[i]);
     REQUIRE(spd.values()[i] == vals[i]);
   }
+  REQUIRE_FALSE(spd.zero_filled());
+}
+
+// -------------------------------------------------------------------------
+// TM-30-20 §3.5 range handling: step limit, drop, zero-fill
+// -------------------------------------------------------------------------
+
+TEST_CASE("SPD validation - wavelength step above 5 nm throws",
+          "[spd][slice01]") {
+  // TM-30-20 §3.5: increments above 5 nm are not permitted.
+  std::vector<double> wl = {400.0, 500.0, 700.0};
+  std::vector<double> vals(wl.size(), 1.0);
+  REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
+  // The message names the offending gap.
+  try {
+    Spd spd(wl, vals);
+  } catch (const InvalidSpd &e) {
+    const std::string msg = e.what();
+    REQUIRE(msg.find("100") != std::string::npos);
+    REQUIRE(msg.find("400") != std::string::npos);
+    REQUIRE(msg.find("500") != std::string::npos);
+  }
+}
+
+TEST_CASE("SPD - samples outside 380-780 nm are dropped", "[spd][slice01]") {
+  // TM-30-20 §3.5: values outside the calculation range are dropped.
+  std::vector<double> wl;
+  std::vector<double> vals;
+  for (double w = 360.0; w <= 800.0; w += 5.0) {
+    wl.push_back(w);
+    vals.push_back(1.0);
+  }
+  Spd spd(wl, vals);
+  REQUIRE(spd.min_wavelength() == 380.0);
+  REQUIRE(spd.max_wavelength() == 780.0);
+  REQUIRE(spd.size() == 81); // 380..780 at 5 nm
+  REQUIRE(spd.input_min_wavelength() == 360.0);
+  REQUIRE(spd.input_max_wavelength() == 800.0);
+  REQUIRE_FALSE(spd.zero_filled());
+}
+
+TEST_CASE("SPD - missing edge values are zero-filled to 380-780 nm",
+          "[spd][slice01]") {
+  // TM-30-20 §3.5: missing values within 380-780 nm are replaced by
+  // zeros (input must still cover at least 400-700 nm).
+  std::vector<double> wl;
+  std::vector<double> vals;
+  for (double w = 400.0; w <= 700.0; w += 5.0) {
+    wl.push_back(w);
+    vals.push_back(1.0);
+  }
+  Spd spd(wl, vals);
+  REQUIRE(spd.zero_filled());
+  REQUIRE(spd.min_wavelength() == 380.0);
+  REQUIRE(spd.max_wavelength() == 780.0);
+  REQUIRE(spd.input_min_wavelength() == 400.0);
+  REQUIRE(spd.input_max_wavelength() == 700.0);
+  // Filled edges carry zeros; original samples are untouched.
+  for (std::size_t i = 0; i < spd.size(); ++i) {
+    const double w = spd.wavelengths()[i];
+    if (w < 400.0 || w > 700.0) {
+      REQUIRE(spd.values()[i] == 0.0);
+    } else {
+      REQUIRE(spd.values()[i] == 1.0);
+    }
+  }
+  // Native 5 nm step extends outward and lands exactly on 380/780 here.
+  REQUIRE(spd.wavelengths().front() == 380.0);
+  REQUIRE(spd.wavelengths()[1] == 385.0);
 }
 
 // -------------------------------------------------------------------------
