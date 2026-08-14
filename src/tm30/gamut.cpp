@@ -214,8 +214,8 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 
 CvgCoordinates
 compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
-                        const std::array<Cam02Ucs, 99> & /*jab_ref*/,
-                        const HueBins & /*bins*/) {
+                        const std::array<Cam02Ucs, 99> &jab_ref,
+                        const HueBins &bins) {
 
   // TM-30-20 §4.5
   CvgCoordinates cvg{};
@@ -238,11 +238,29 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
       continue;
     }
 
-    // Reference hue angle from bin-averaged a', b'
-    // TM-30-20 §4.5: hbar_ref,j = atan2(bbar'r,j, abar'r,j)
-    // The spec calls for mean of individual hue angles, but the
-    // oracle (luxpy) uses the bin-averaged coordinates directly.
-    const double h_bar = std::atan2(ref_avg.b_prime[j], ref_avg.a_prime[j]);
+    // TM-30-20 §4.5 Eqs. (58)-(59): the reference circle position for bin j
+    // derives from the arithmetic mean of the individual CES hue angles in
+    // the bin, each taken from that sample's own reference-illuminant
+    // (a', b'). This is distinct from the hue angle of the bin-averaged
+    // coordinates, which would weight samples by chroma; Eqs. (58)-(59)
+    // weight every sample in the bin equally.
+    //
+    // std::atan2 returns [-pi, pi], so samples with negative b' (bins 9-16)
+    // come back negative and a raw mean would be meaningless; normalise
+    // each angle to [0, 2*pi) before averaging. After normalisation a plain arithmetic
+    // mean suffices: §4.3 places 0 deg on the positive a' axis with 16 bins
+    // of 22.5 deg increasing counterclockwise, and §4.6 confirms 0 deg is
+    // the boundary between bins 1 and 16, so no bin straddles the wrap
+    // point and circular-mean machinery is unnecessary.
+    double sum_h = 0.0; // TM-30-20 §4.5 Eqs. (58)-(59) accumulator
+    for (int idx : bins[j]) {
+      double h = std::atan2(jab_ref[idx].b_prime, jab_ref[idx].a_prime);
+      if (h < 0.0) {                 // TM-30-20 §4.3: hue angles in [0, 360)
+        h += 2.0 * std::numbers::pi; // TM-30-20 §4.3: full turn, [0, 2*pi)
+      }
+      sum_h += h;
+    }
+    const double h_bar = sum_h / static_cast<double>(bins[j].size());
 
     // Reference radial distance (for test coordinate offset)
     const double r_ref =
