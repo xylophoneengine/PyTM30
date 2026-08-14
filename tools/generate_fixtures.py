@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 generate_fixtures.py -- Golden fixture generator for ANSI/IES TM-30-20,
-using colour-science (BSD-3-Clause) as the oracle instead of luxpy (GPLv3).
+using colour-science (BSD-3-Clause) primitives plus the standard's own
+equations for the steps colour-science does not expose in spec-conform
+form.
 
-Produces tests/fixtures/{spd_name}/{stage}.json in the exact envelope/layout
-the existing (unmodified) C++ Catch2 test suite expects -- this schema was
-reverse-engineered from the original repo's *actual* shipped fixtures
-(produced by tools/regenerate_fixtures.py, not the more elaborate but
-never-actually-run tools/generate_fixtures.py) and from grep'ing every
-fixture_path(...)/JSON-key read site in tests/slice_*.cpp.
+Produces tests/fixtures/{spd_name}/{stage}.json in the envelope/layout the
+C++ Catch2 test suite expects. Key names use this project's vocabulary
+(see the per-stage mapping below); every JSON-key read site lives in
+tests/slice_*.cpp.
 
 WHY THIS DOESN'T JUST CALL colour.colour_fidelity_index() AND STOP
 ------------------------------------------------------------------
@@ -31,8 +31,7 @@ interpolator for those datasets -- confirmed via
 SDS_BASIS_FUNCTIONS_CIE_ILLUMINANT_D_SERIES["S0"].interpolator). TM-30-20
 Sec 3.5 mandates LINEAR interpolation for this step, and pytm30's C++
 implementation (src/tm30/reference.cpp::interpolate_linear) does exactly
-that -- as does luxpy, which is why the original (luxpy-oracle) fixtures
-did not show this problem. Sprague vs linear resampling of the *same*,
+that. Sprague vs linear resampling of the *same*,
 verified-bit-identical 5nm basis functions gives visibly different values
 between 5nm grid points (see PyTM30/tools/generate_data_colour_science.py's
 own D65 cross-check, which found up to ~3% relative divergence between
@@ -46,8 +45,7 @@ interpolation of the confirmed-clean daylight basis functions -- i.e. the
 same formula pytm30's own reference.cpp implements, and the same one this
 project already uses in generate_data_colour_science.py's D65/D50/D75
 reconstruction. colour-science is still very much the oracle for
-everything else: CCT/Duv (Ohno 2013, via colour.quality.cfi2017.
-CCT_reference_illuminant), tristimulus integration (colour.sd_to_XYZ /
+everything else: tristimulus integration (colour.sd_to_XYZ /
 colour.msds_to_XYZ, method="Integration"), CIECAM02 (colour.
 XYZ_to_CIECAM02, Y_b=20/L_A=100/Average surround/discount_illuminant=True,
 matching colour-science's own TM-30-18 viewing conditions), CAM02-UCS
@@ -60,9 +58,9 @@ library default.
 
 Mapping onto the 18 pipeline stages:
   01_resampled_spd   <- sd_test itself, on its native 380-780nm grid
-  02_cct_duv         <- colour.quality.cfi2017.CCT_reference_illuminant(sd_test)
-                        (Ohno 2013, CIE 1931 2-degree observer -- matches
-                        both colour-science's and pytm30's CCT convention)
+  02_cct_duv         <- Ohno (2014) LUT search (CIE 1931 2-degree
+                        observer), published triangular/parabolic
+                        selection rule -- see the CCT/Duv block below
   03_reference_spd   <- hand-built reference SPD (see above)
   04_xyz_test_white  <- Y=100-normalised XYZ of sd_test (CIE 1964 10-degree)
   05_xyz_ref_white   <- Y=100-normalised XYZ of the reference SPD
@@ -76,13 +74,17 @@ Mapping onto the 18 pipeline stages:
                         22.5-degree boundaries (no oracle needed)
   12_rf              <- delta_E_to_R_f(mean(delta_E))
   13_rg              <- 100 * area(avg_test_ab) / area(avg_ref_ab)
-  14_per_bin_metrics <- Rfhj = delta_E_to_R_f(nanmean(delta_E per bin));
-                        Rcshj/Rhshj via the bin-bisector-angle projection
-                        formula (TM-30-20 Sec 4.6/4.7 == gamut.cpp exactly)
-  15_cvg_coordinates <- jabt_hj/jabr_hj: [J'_bin_avg, a'_bin_avg, b'_bin_avg];
-                        jabtn_hj/jabrn_hj: the CVG-normalised (unit
-                        reference-circle) display coordinates, via the
-                        same Eq.(58)-(61) formula gamut.cpp implements
+  14_per_bin_metrics <- Rf_hj = delta_E_to_R_f(nanmean(delta_E per bin));
+                        Rcs_hj_percent/Rhs_hj via the bin-bisector-angle
+                        projection formulas, TM-30-20 Sec 4.6 Eq. (62)
+                        (x100, percentage per the clause) and Sec 4.7
+                        Eq. (63) (ratio, no percentage in the clause)
+  15_cvg_coordinates <- jab_test_bin_avg/jab_ref_bin_avg:
+                        [J'_bin_avg, a'_bin_avg, b'_bin_avg];
+                        cvg_test/cvg_ref: the CVG unit-circle display
+                        coordinates per TM-30-20 Sec 4.5 Eq. (58)-(61),
+                        with h_bar the arithmetic mean of the individual
+                        CES reference hue angles in the bin
   16_rfi_per_sample  <- delta_E_to_R_f(delta_E) (99,)
   17_rf_skin         <- (R_s[14] + R_s[17]) / 2  (CES15, CES18, 0-indexed)
   18_annex_e         <- static P1/P2/P3 priority-level taxonomy (TM-30-20
@@ -91,13 +93,12 @@ Mapping onto the 18 pipeline stages:
                         constants are asserted, in
                         slice_10_sample_test.cpp); no per-SPD data needed.
 
-NOTE on Rcs,hj scaling: colour-science's own R_cs (from the high-level
-colour_fidelity_index call) is expressed as a percentage (x100). pytm30's
-C++ implementation (src/tm30/gamut.cpp) explicitly keeps this UNSCALED to
-match luxpy's convention (kLocalShiftScale=1.0). Since this script computes
-R_cs itself (not via colour_fidelity_index), it follows the UNSCALED
-(pytm30/luxpy) convention directly -- confirmed against the original
-on-disk fixtures (e.g. D65/14_per_bin_metrics.json: Rcshj ~ 1e-5, not ~1e-3).
+Conventions: Rcs,hj is a percentage (TM-30-20 Sec 4.6 requires percentage
+representation of the Eq. (62) ratio); Rhs,hj stays a ratio (Sec 4.7
+states no percentage requirement). colour-science's own tm3018.py applies
+exactly this asymmetry (R_cs x100, R_hs raw). CVG coordinates sit on the
+unit reference circle -- Sec 4.5 Eq. (58)-(61) prescribe no display
+scaling.
 """
 import os
 import json
@@ -118,7 +119,7 @@ OUTPUT_DIR = os.path.join(REPO, "tests", "fixtures")
 DATA_DIR = os.path.join(REPO, "data")
 COLOUR_VERSION = colour.__version__
 GENERATED_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-CRI_TYPE = "ies-tm30-20"  # matches the original fixtures' "cri_type" field
+STANDARD_ID = "ANSI/IES TM-30-20"
 METHOD_NOTE = "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant"
 
 CMFS_10 = colour.MSDS_CMFS["CIE 1964 10 Degree Standard Observer"].copy()
@@ -220,12 +221,13 @@ def compute_cct_duv(u_test, v_test):
     duv_par_mag = a * T_par * T_par + b * T_par + c
     duv_par = duv_par_mag * sign
 
+    # Ohno (2014), as published: below the |Duv| threshold the triangular
+    # solution is used as-is; above it the parabolic one. (The C++ engine's
+    # opt-in shifted-triangular blend, CctOptions::shifted_triangular_blend,
+    # is default-off and is not applied here.)
     duv_threshold = 0.002
-    duv_abs = abs(duv_tri)
-    T_tri_shift = T_tri + (T_par - T_tri) * min(duv_abs / duv_threshold, 1.0)
-
-    if duv_abs < duv_threshold:
-        return T_tri_shift, duv_tri
+    if abs(duv_tri) < duv_threshold:
+        return T_tri, duv_tri
     return T_par, duv_par
 
 
@@ -461,9 +463,11 @@ def compute_stages(sd_test):
     Rf_hj = np.asarray(delta_E_to_R_f(np.nan_to_num(DE_hj, nan=0.0)))
     Rf_hj = np.where(np.isnan(DE_hj), np.nan, Rf_hj)
 
-    # Per-bin Rcs,hj / Rhs,hj (TM-30-20 Sec 4.6/4.7 == gamut.cpp exactly).
-    # UNSCALED convention (matches pytm30/luxpy, not colour-science's own
-    # x100 percentage convention -- see module docstring NOTE).
+    # Per-bin Rcs,hj / Rhs,hj via the bin-bisector-angle projection.
+    # TM-30-20 Sec 4.6 Eq. (62) computes the chroma-shift ratio and the
+    # clause requires percentage representation (x100); Sec 4.7 Eq. (63)
+    # defines the hue-shift ratio with no percentage requirement. Same
+    # asymmetry as colour-science's tm3018.py (R_cs x100, R_hs raw).
     j_idx = np.arange(16)
     theta = (j_idx + 0.5) * 22.5 * np.pi / 180.0
     cos_t, sin_t = np.cos(theta), np.sin(theta)
@@ -471,34 +475,42 @@ def compute_stages(sd_test):
     db = avg_test_ab[:, 1] - avg_ref_ab[:, 1]
     r_ref = np.hypot(avg_ref_ab[:, 0], avg_ref_ab[:, 1])
     with np.errstate(invalid="ignore", divide="ignore"):
-        Rcs_hj = (da * cos_t + db * sin_t) / r_ref
+        Rcs_hj_percent = 100.0 * (da * cos_t + db * sin_t) / r_ref
         Rhs_hj = (-da * sin_t + db * cos_t) / r_ref
-    Rcs_hj = np.where(r_ref < 1e-12, 0.0, Rcs_hj)
+    Rcs_hj_percent = np.where(r_ref < 1e-12, 0.0, Rcs_hj_percent)
     Rhs_hj = np.where(r_ref < 1e-12, 0.0, Rhs_hj)
 
-    # CVG-normalised coordinates (TM-30-20 Sec 4.5 Eq. 58-61 == gamut.cpp)
-    jabt_hj = np.column_stack([J_test_bin, avg_test_ab[:, 0], avg_test_ab[:, 1]])
-    jabr_hj = np.column_stack([J_ref_bin, avg_ref_ab[:, 0], avg_ref_ab[:, 1]])
-    jabtn_hj = np.full((16, 3), np.nan)
-    jabrn_hj = np.full((16, 3), np.nan)
+    # CVG display coordinates (TM-30-20 Sec 4.5 Eq. 58-61). The reference
+    # circle position for bin j uses h_bar = the arithmetic mean of the
+    # individual CES reference hue angles in the bin (Sec 4.3 Eq. 57,
+    # normalised to [0, 2*pi) -- every sample weighted equally), NOT the
+    # hue angle of the bin-averaged (a', b'), which would weight samples
+    # by chroma. Eq. (58)-(61) place the coordinates on the unit reference
+    # circle; the clause prescribes no display scaling.
+    h_ref_rad = np.arctan2(Jpapbp_ref[:, 2], Jpapbp_ref[:, 1])
+    h_ref_rad = np.where(h_ref_rad < 0.0, h_ref_rad + 2.0 * np.pi, h_ref_rad)
+    jab_test_bin_avg = np.column_stack([J_test_bin, avg_test_ab[:, 0], avg_test_ab[:, 1]])
+    jab_ref_bin_avg = np.column_stack([J_ref_bin, avg_ref_ab[:, 0], avg_ref_ab[:, 1]])
+    cvg_test = np.full((16, 3), np.nan)
+    cvg_ref = np.full((16, 3), np.nan)
     for j in range(16):
-        jabtn_hj[j, 0] = J_test_bin[j]
-        jabrn_hj[j, 0] = J_ref_bin[j]
+        cvg_test[j, 0] = J_test_bin[j]
+        cvg_ref[j, 0] = J_ref_bin[j]
         ar, br = avg_ref_ab[j]
         if np.isnan(ar) or np.isnan(br):
             continue
         rr = np.hypot(ar, br)
-        h_bar = np.arctan2(br, ar)
+        h_bar = float(np.mean(h_ref_rad[bins == j]))
         x_ref_raw, y_ref_raw = np.cos(h_bar), np.sin(h_bar)
-        jabrn_hj[j, 1] = 100.0 * x_ref_raw
-        jabrn_hj[j, 2] = 100.0 * y_ref_raw
+        cvg_ref[j, 1] = x_ref_raw
+        cvg_ref[j, 2] = y_ref_raw
         at_, bt_ = avg_test_ab[j]
         if rr < 1e-12:
-            jabtn_hj[j, 1] = 100.0 * x_ref_raw
-            jabtn_hj[j, 2] = 100.0 * y_ref_raw
+            cvg_test[j, 1] = x_ref_raw
+            cvg_test[j, 2] = y_ref_raw
         else:
-            jabtn_hj[j, 1] = 100.0 * (x_ref_raw + (at_ - ar) / rr)
-            jabtn_hj[j, 2] = 100.0 * (y_ref_raw + (bt_ - br) / rr)
+            cvg_test[j, 1] = x_ref_raw + (at_ - ar) / rr
+            cvg_test[j, 2] = y_ref_raw + (bt_ - br) / rr
 
     rf_skin = (float(R_s[SKIN_CES_15]) + float(R_s[SKIN_CES_18])) / 2.0
 
@@ -527,24 +539,24 @@ def compute_stages(sd_test):
     stages["11_hue_bins"] = {
         "n_bins": 16,
         "hue_bin_edges_rad": HUE_BIN_EDGES_RAD,
-        "bin_assignments_0_indexed": bins.tolist(),
-        "hbinnrs": [float(b) for b in bins.tolist()],
-        "ht": htest.tolist(),
-        "hr": href.tolist(),
-        "nhbins": 16,
+        "hue_bin_index": bins.tolist(),
+        "hue_angle_test_deg": htest.tolist(),
+        "hue_angle_ref_deg": href.tolist(),
     }
     stages["12_rf"] = {"Rf": R_f}
     stages["13_rg"] = {"Rg": float(R_g)}
     stages["14_per_bin_metrics"] = {
         "n_bins": 16,
-        "Rf_hj": Rf_hj.tolist(), "Rcs_hj": Rcs_hj.tolist(), "Rhs_hj": Rhs_hj.tolist(),
-        "Rfhj": Rf_hj.tolist(), "Rcshj": Rcs_hj.tolist(), "Rhshj": Rhs_hj.tolist(),
-        "DE_hj": DE_hj.tolist(), "DEhj": DE_hj.tolist(),
+        "Rf_hj": Rf_hj.tolist(),
+        "Rcs_hj_percent": Rcs_hj_percent.tolist(),
+        "Rhs_hj": Rhs_hj.tolist(),
+        "DE_hj": DE_hj.tolist(),
     }
     stages["15_cvg_coordinates"] = {
         "n_bins": 16,
-        "jabt_hj": jabt_hj.tolist(), "jabr_hj": jabr_hj.tolist(),
-        "jabtn_hj": jabtn_hj.tolist(), "jabrn_hj": jabrn_hj.tolist(),
+        "jab_test_bin_avg": jab_test_bin_avg.tolist(),
+        "jab_ref_bin_avg": jab_ref_bin_avg.tolist(),
+        "cvg_test": cvg_test.tolist(), "cvg_ref": cvg_ref.tolist(),
         "test_coordinates": {"a_prime": avg_test_ab[:, 0].tolist(), "b_prime": avg_test_ab[:, 1].tolist()},
         "reference_coordinates": {"a_prime": avg_ref_ab[:, 0].tolist(), "b_prime": avg_ref_ab[:, 1].tolist()},
         "reference_circle_radius": r_ref.tolist(),
@@ -563,7 +575,7 @@ def compute_stages(sd_test):
 def _wrap(stage_name, stage_data, spd_name):
     envelope = OrderedDict()
     envelope["spd_name"] = spd_name
-    envelope["cri_type"] = CRI_TYPE
+    envelope["standard"] = STANDARD_ID
     envelope["colour_science_version"] = COLOUR_VERSION
     envelope["method"] = METHOD_NOTE
     envelope["generated"] = GENERATED_DATE

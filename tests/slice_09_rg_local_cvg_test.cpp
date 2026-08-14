@@ -392,7 +392,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
 
   // -- Per-bin Rf,hj ----------------------------------------------
   auto golden_rfhj = load_json_array_16(
-      fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rfhj");
+      fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rf_hj");
 
   double max_rfhj_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -405,7 +405,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
 
   // -- Per-bin Rcs,hj ---------------------------------------------
   auto golden_rcshj = load_json_array_16(
-      fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rcshj");
+      fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rcs_hj_percent");
 
   double max_rcshj_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -418,7 +418,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
 
   // -- Per-bin Rhs,hj ---------------------------------------------
   auto golden_rhshj = load_json_array_16(
-      fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rhshj");
+      fixture_path(fixture_subdir, "14_per_bin_metrics"), "Rhs_hj");
 
   double max_rhshj_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -427,11 +427,11 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
       max_rhshj_delta = d;
   }
   INFO(fixture_subdir << ": max Rhs,hj delta = " << max_rhshj_delta);
-  CHECK(max_rhshj_delta <= Tol_LocalShift);
+  CHECK(max_rhshj_delta <= Tol_HueShiftRatio);
 
-  // -- CVG: test average J'a'b' (jabt_hj) -------------------------
+  // -- CVG: test average J'a'b' (jab_test_bin_avg) ----------------
   auto golden_jabt = load_json_jab_triples(
-      fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabt_hj");
+      fixture_path(fixture_subdir, "15_cvg_coordinates"), "jab_test_bin_avg");
 
   double max_jabt_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -445,12 +445,12 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
     if (db > max_jabt_delta)
       max_jabt_delta = db;
   }
-  INFO(fixture_subdir << ": max jabt_hj delta = " << max_jabt_delta);
+  INFO(fixture_subdir << ": max jab_test_bin_avg delta = " << max_jabt_delta);
   CHECK(max_jabt_delta <= Tol_Jab);
 
-  // -- CVG: reference average J'a'b' (jabr_hj) --------------------
+  // -- CVG: reference average J'a'b' (jab_ref_bin_avg) ------------
   auto golden_jabr = load_json_jab_triples(
-      fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabr_hj");
+      fixture_path(fixture_subdir, "15_cvg_coordinates"), "jab_ref_bin_avg");
 
   double max_jabr_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -464,15 +464,15 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
     if (db > max_jabr_delta)
       max_jabr_delta = db;
   }
-  INFO(fixture_subdir << ": max jabr_hj delta = " << max_jabr_delta);
+  INFO(fixture_subdir << ": max jab_ref_bin_avg delta = " << max_jabr_delta);
   // Bin-averaged J'a'b' values accumulate more pipeline noise than
   // per-CES values. Use a slightly relaxed tolerance (documented in PARITY.md).
   // Tol_Jab (0.001) remains the standard; bin-average comparisons use 0.002.
   CHECK(max_jabr_delta <= 0.002);
 
-  // -- CVG normalized test coordinates (jabtn_hj) -----------------
+  // -- CVG unit-circle test coordinates (cvg_test) ----------------
   auto golden_jabtn = load_json_jab_triples(
-      fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabtn_hj");
+      fixture_path(fixture_subdir, "15_cvg_coordinates"), "cvg_test");
 
   double max_jabtn_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -486,13 +486,16 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
     if (dy > max_jabtn_delta)
       max_jabtn_delta = dy;
   }
-  INFO(fixture_subdir << ": max jabtn_hj delta = " << max_jabtn_delta);
-  // CVG scale is 100x, so Tol_Jab x 100 for the scaled coordinates
-  CHECK(max_jabtn_delta <= Tol_Jab * 100.0);
+  INFO(fixture_subdir << ": max cvg_test delta = " << max_jabtn_delta);
+  // CVG x/y sit on the unit circle (TM-30-20 §4.5 Eq. 58-61, no display
+  // scaling); the J' column is a bin-averaged pass-through and dominates
+  // the delta, so the bin-average tolerance (0.002, see jab_ref_bin_avg
+  // above) applies.
+  CHECK(max_jabtn_delta <= 0.002);
 
-  // -- CVG normalized reference coordinates (jabrn_hj) ------------
+  // -- CVG unit-circle reference coordinates (cvg_ref) ------------
   auto golden_jabrn = load_json_jab_triples(
-      fixture_path(fixture_subdir, "15_cvg_coordinates"), "jabrn_hj");
+      fixture_path(fixture_subdir, "15_cvg_coordinates"), "cvg_ref");
 
   double max_jabrn_delta = 0.0;
   for (int j = 0; j < 16; ++j) {
@@ -506,8 +509,8 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
     if (dy > max_jabrn_delta)
       max_jabrn_delta = dy;
   }
-  INFO(fixture_subdir << ": max jabrn_hj delta = " << max_jabrn_delta);
-  CHECK(max_jabrn_delta <= Tol_Jab * 100.0);
+  INFO(fixture_subdir << ": max cvg_ref delta = " << max_jabrn_delta);
+  CHECK(max_jabrn_delta <= 0.002);
 }
 
 // -------------------------------------------------------------------------

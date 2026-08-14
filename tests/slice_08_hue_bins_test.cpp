@@ -104,8 +104,8 @@ std::vector<double> wl_1nm() {
   return wl;
 }
 
-/// Simple JSON parser: extract the "hbinnrs" array from a fixture file.
-std::vector<int> load_hbinnrs_fixture(const std::string &filepath) {
+/// Simple JSON parser: extract the "hue_bin_index" array from a fixture file.
+std::vector<int> load_hue_bin_index_fixture(const std::string &filepath) {
   std::ifstream in(filepath);
   if (!in) {
     throw std::runtime_error("Cannot open fixture: " + filepath);
@@ -119,9 +119,9 @@ std::vector<int> load_hbinnrs_fixture(const std::string &filepath) {
     }
   }
 
-  auto pos = content.find("\"hbinnrs\"");
+  auto pos = content.find("\"hue_bin_index\"");
   if (pos == std::string::npos) {
-    throw std::runtime_error("No 'hbinnrs' key in: " + filepath);
+    throw std::runtime_error("No 'hue_bin_index' key in: " + filepath);
   }
 
   pos = content.find('[', pos);
@@ -212,19 +212,19 @@ void verify_hue_bins_for_spd(const std::string &spd_name,
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // Load golden hbinnrs (0-indexed bins 0-15)
-  auto golden_hbinnrs =
-      load_hbinnrs_fixture(fixture_path(fixture_subdir, "11_hue_bins"));
-  REQUIRE(golden_hbinnrs.size() == 99);
+  // Load golden hue_bin_index (0-indexed bins 0-15)
+  auto golden_hue_bin_index =
+      load_hue_bin_index_fixture(fixture_path(fixture_subdir, "11_hue_bins"));
+  REQUIRE(golden_hue_bin_index.size() == 99);
 
   // Convert our HueBins to per-CES array
   auto computed = flatten_bins(result.hue_bins);
 
   int mismatches = 0;
   for (int i = 0; i < 99; ++i) {
-    if (computed[i] != golden_hbinnrs[i]) {
+    if (computed[i] != golden_hue_bin_index[i]) {
       INFO("CES[" << i << "]: computed bin = " << computed[i]
-                  << ", golden bin = " << golden_hbinnrs[i]);
+                  << ", golden bin = " << golden_hue_bin_index[i]);
       ++mismatches;
       if (mismatches >= 5) {
         INFO("... (too many mismatches, stopping)");
@@ -272,17 +272,17 @@ TEST_CASE("Hue binning - planckian 3000K bin assignments match fixture",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  auto golden_hbinnrs =
-      load_hbinnrs_fixture(fixture_path("planckian_3000K", "11_hue_bins"));
-  REQUIRE(golden_hbinnrs.size() == 99);
+  auto golden_hue_bin_index =
+      load_hue_bin_index_fixture(fixture_path("planckian_3000K", "11_hue_bins"));
+  REQUIRE(golden_hue_bin_index.size() == 99);
 
   auto computed = flatten_bins(result.hue_bins);
 
   int mismatches = 0;
   for (int i = 0; i < 99; ++i) {
-    if (computed[i] != golden_hbinnrs[i]) {
+    if (computed[i] != golden_hue_bin_index[i]) {
       INFO("CES[" << i << "]: computed bin = " << computed[i]
-                  << ", golden bin = " << golden_hbinnrs[i]);
+                  << ", golden bin = " << golden_hue_bin_index[i]);
       ++mismatches;
       if (mismatches >= 5)
         break;

@@ -1,9 +1,9 @@
 {
   "spd_name": "planckian_4500K",
-  "cri_type": "ies-tm30-20",
+  "standard": "ANSI/IES TM-30-20",
   "colour_science_version": "0.4.7",
   "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
-  "generated": "2026-07-29",
+  "generated": "2026-08-14",
   "stage": "04_xyz_test_white",
   "X": 99.83769650665847,
   "Y": 100.0,

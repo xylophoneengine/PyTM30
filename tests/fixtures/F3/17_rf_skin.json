@@ -1,17 +1,17 @@
 {
   "spd_name": "F3",
-  "cri_type": "ies-tm30-20",
+  "standard": "ANSI/IES TM-30-20",
   "colour_science_version": "0.4.7",
   "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
-  "generated": "2026-07-29",
+  "generated": "2026-08-14",
   "stage": "17_rf_skin",
-  "Rf_skin": 64.74813330703466,
-  "Rf_CES15": 66.66417072889539,
-  "Rf_CES18": 62.832095885173956,
+  "Rf_skin": 64.74793690078505,
+  "Rf_CES15": 66.66394813694477,
+  "Rf_CES18": 62.831925664625345,
   "ces_indices_0_indexed": [
     14,
     17
   ],
-  "ces15": 66.66417072889539,
-  "ces18": 62.832095885173956
+  "ces15": 66.66394813694477,
+  "ces18": 62.831925664625345
 }

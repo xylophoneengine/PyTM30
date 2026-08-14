@@ -1,17 +1,17 @@
 {
   "spd_name": "planckian_4999.9K",
-  "cri_type": "ies-tm30-20",
+  "standard": "ANSI/IES TM-30-20",
   "colour_science_version": "0.4.7",
   "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
-  "generated": "2026-07-29",
+  "generated": "2026-08-14",
   "stage": "17_rf_skin",
-  "Rf_skin": 96.5743823767789,
-  "Rf_CES15": 96.40041394557143,
-  "Rf_CES18": 96.74835080798637,
+  "Rf_skin": 96.57438156396972,
+  "Rf_CES15": 96.40041284598743,
+  "Rf_CES18": 96.74835028195203,
   "ces_indices_0_indexed": [
     14,
     17
   ],
-  "ces15": 96.40041394557143,
-  "ces18": 96.74835080798637
+  "ces15": 96.40041284598743,
+  "ces18": 96.74835028195203
 }
