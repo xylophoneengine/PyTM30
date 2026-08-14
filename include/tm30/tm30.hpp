@@ -157,7 +157,9 @@ public:
   /// Per-sample fidelity Rf,CESi (99 values).             TM-30-20 §4.2
   const std::array<double, 99> &rf_cesi() const;
 
-  /// Skin fidelity Rf,skin (average of CES15 + CES18).    TM-30-20 §4.2
+  /// Skin fidelity Rf,skin (average of CES15 + CES18). PyTM30 research
+  /// extension informed by TM-30-20 §4.2; not a standardised measure
+  /// (§1.2, §4.0).
   double rf_skin() const;
 
   /// Full gamut result: Rg, per-bin metrics, CVG.         TM-30-20 §4.4-§4.8

@@ -618,7 +618,12 @@ class Tm30BatchResult:
 
     @property
     def rf_skin(self) -> np.ndarray:
-        """Skin fidelity Rf,skin - shape (N,).  TM-30-20 §4.2."""
+        """Skin fidelity Rf,skin - shape (N,).
+
+        PyTM30 research extension informed by TM-30-20 §4.2 (mean of the
+        CES15 and CES18 fidelity values); not a standardised TM-30
+        measure (§1.2, §4.0).
+        """
         return self._d["rf_skin"]
 
     @property

@@ -64,7 +64,10 @@ compute_rf_cesi(const std::array<double, 99> &delta_e_array);
 ///
 /// Rf,skin = (Rf,CES15 + Rf,CES18) / 2   (0-indexed: indices 14 and 17)
 ///
-/// TM-30-20 §4.2
+/// PyTM30 research extension informed by TM-30-20 §4.2 (the CES15/CES18
+/// mean correlates with the broader skin-sample set). Not one of the
+/// standard's 50 measures (§1.2); per §4.0 not identified as part of
+/// the TM-30 method.
 double compute_rf_skin(const std::array<double, 99> &rf_cesi);
 
 /// Annex E priority levels for specifying light source color rendition.

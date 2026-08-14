@@ -1287,7 +1287,9 @@ NB_MODULE(tm30_core, m) {
                    "Average dE' across 99 CES.  TM-30-20 §4.1.")
       .def_prop_ro(
           "rf_skin", &PyTm30::rf_skin,
-          "Skin fidelity Rf,skin (average of CES15 + CES18).  TM-30-20 §4.2.")
+          "Skin fidelity Rf,skin (average of CES15 + CES18).  PyTM30 "
+          "research extension informed by TM-30-20 §4.2; not a "
+          "standardised TM-30 measure (§1.2, §4.0).")
       .def_prop_ro("rf_cesi", &PyTm30::rf_cesi,
                    "Per-sample fidelity Rf,CESi - numpy array of 99 values.  "
                    "TM-30-20 §4.2.")
