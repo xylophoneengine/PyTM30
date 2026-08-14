@@ -55,8 +55,8 @@ jobs:
       # still runs by default locally via ./build/tm30-tests.
       #
       # Do NOT "simplify" this to `ctest -LE timing`: catch_discover_tests does
-      # not export Catch2 tags as ctest LABELS, so -LE matches nothing and all
-      # 252 tests run, timing test included. Verified against the generated
+      # not export Catch2 tags as ctest LABELS, so -LE matches nothing and
+      # every test runs, timing test included. Verified against the generated
       # CTestTestfile.
       #
       # --no-tests=error makes a broken catch_discover_tests a red job instead
@@ -67,6 +67,23 @@ jobs:
           -E timing
           --output-on-failure
           --no-tests=error
+
+  data-reproducibility:
+    name: Data tables byte-reproducible
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # Pinned environment: every table in data/ is byte-reproducible from
+      # the two generator scripts against colour-science 0.4.7 with
+      # numpy 2.5.2.
+      - run: python -m pip install "colour-science==0.4.7" "numpy==2.5.2"
+      - run: python tools/generate_data_colour_science.py
+      - run: python tools/generate_planckian_lut.py
+      # Any byte difference in a regenerated table fails the job.
+      - run: git diff --exit-code -- data/
 
   lint:
     name: Lint (pre-commit)
