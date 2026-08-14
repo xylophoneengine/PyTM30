@@ -1,3 +1,9 @@
+# Merge commits fire pre-merge-commit, not pre-commit; without the second
+# hook type a `git merge` lands unchecked (how an unformatted remediation
+# branch reached main). `pre-commit install` reads this list, and the CMake
+# configure step runs that install automatically.
+default_install_hook_types: [pre-commit, pre-merge-commit]
+
 repos:
   # Runs before clang-format: transliterating a comment can push it past the
   # column limit, and clang-format should get the final say on the result.

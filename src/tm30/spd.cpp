@@ -76,7 +76,6 @@ void Spd::validate() {
         << ", " << kMinRequiredHi << "] nm";
     throw InvalidSpd(oss.str());
   }
-
 }
 
 void Spd::normalize() {
@@ -88,8 +87,7 @@ void Spd::normalize() {
   if (input_min_wavelength_ < kMinFullRange ||
       input_max_wavelength_ > kMaxFullRange) {
     std::size_t first = 0;
-    while (first < wavelengths_.size() &&
-           wavelengths_[first] < kMinFullRange) {
+    while (first < wavelengths_.size() && wavelengths_[first] < kMinFullRange) {
       ++first;
     }
     std::size_t last = wavelengths_.size();

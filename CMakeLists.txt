@@ -18,6 +18,43 @@ if(MSVC)
   add_compile_options(/utf-8)
 endif()
 
+# -- Git hooks (pre-commit) at configure time ------------------------------
+# `pre-commit install` is per-clone and nobody remembers it, so the one
+# command every contributor already runs -- configure -- does it for them.
+# Missing tool is a hard error by policy: hook-less clones are how
+# unformatted commits reached main. Skipped in CI (build runners have no
+# pre-commit; the lint job is the enforcement there) and in non-git builds.
+option(TM30_INSTALL_GIT_HOOKS
+       "Install the pre-commit git hooks at configure time" ON)
+if(TM30_INSTALL_GIT_HOOKS
+   AND CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git"
+   AND NOT DEFINED ENV{CI})
+  # Re-search every configure: a cached NOTFOUND from before the tool was
+  # installed would otherwise keep failing after the user fixed it.
+  unset(TM30_PRE_COMMIT CACHE)
+  find_program(TM30_PRE_COMMIT pre-commit)
+  if(NOT TM30_PRE_COMMIT)
+    message(FATAL_ERROR
+      "pre-commit was not found, so the formatting git hooks cannot be set "
+      "up.\nInstall it once:\n"
+      "    pipx install pre-commit\n"
+      "(or: pip install --user pre-commit)\n"
+      "then re-run cmake. To build without hooks (not for regular "
+      "development): -DTM30_INSTALL_GIT_HOOKS=OFF")
+  endif()
+  execute_process(
+    COMMAND "${TM30_PRE_COMMIT}" install
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    RESULT_VARIABLE _tm30_hook_result
+    OUTPUT_VARIABLE _tm30_hook_output
+    ERROR_VARIABLE _tm30_hook_output)
+  if(NOT _tm30_hook_result EQUAL 0)
+    message(FATAL_ERROR "pre-commit install failed:\n${_tm30_hook_output}")
+  endif()
+  message(STATUS "Git hooks installed (pre-commit, pre-merge-commit)")
+endif()
+
 # -- Catch2 v3 via FetchContent ------------------------------------------
 include(FetchContent)
 FetchContent_Declare(

@@ -152,10 +152,11 @@ spd_to_xyz_batch(const std::vector<double> &spd_wavelengths,
 /// and no integration-range clipping, for callers that cache the
 /// resample per grid (e.g. the Python bindings). A length mismatch
 /// between `cmf_resampled` and the grid throws std::invalid_argument.
-std::vector<XyzTriple> spd_to_xyz_batch_prepared(
-    const std::vector<double> &spd_wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, std::optional<double> K = std::nullopt);
+std::vector<XyzTriple>
+spd_to_xyz_batch_prepared(const std::vector<double> &spd_wavelengths,
+                          const std::vector<std::vector<double>> &spd_matrix,
+                          const CmfData &cmf_resampled,
+                          std::optional<double> K = std::nullopt);
 
 /// Compute CIE 1976 Y,u',v' from an SPD.
 ///
@@ -194,10 +195,11 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
 
 /// spd_to_Yuv_batch() with the CMF already resampled -- same contract as
 /// spd_to_xyz_batch_prepared().
-std::vector<YuvTriple> spd_to_Yuv_batch_prepared(
-    const std::vector<double> &spd_wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, std::optional<double> K = std::nullopt);
+std::vector<YuvTriple>
+spd_to_Yuv_batch_prepared(const std::vector<double> &spd_wavelengths,
+                          const std::vector<std::vector<double>> &spd_matrix,
+                          const CmfData &cmf_resampled,
+                          std::optional<double> K = std::nullopt);
 
 /// Convert multiple XYZ tristimulus triples to CIE 1976 Y,u',v'.
 ///
@@ -313,10 +315,11 @@ spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
 /// conformed grid and `cmf_resampled` throws std::invalid_argument.
 ///
 /// @throws InvalidSpd if the grid or any row fails §3.5 validation.
-std::vector<CctDuvResult> spd_to_cct_batch_prepared(
-    const std::vector<double> &raw_wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, const PlanckianLut &planckian_lut);
+std::vector<CctDuvResult>
+spd_to_cct_batch_prepared(const std::vector<double> &raw_wavelengths,
+                          const std::vector<std::vector<double>> &spd_matrix,
+                          const CmfData &cmf_resampled,
+                          const PlanckianLut &planckian_lut);
 
 /// Compute the total power of an SPD - radiometric (unweighted) or
 /// photometric (CIE luminous-efficiency-weighted).
@@ -364,9 +367,9 @@ spd_to_power_batch(const std::vector<double> &wavelengths,
 /// and no integration-range clipping -- same contract as
 /// spd_to_xyz_batch_prepared(). The CMF is only consulted (and only
 /// size-checked) when photometric is true.
-std::vector<double> spd_to_power_batch_prepared(
-    const std::vector<double> &wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, bool photometric);
+std::vector<double>
+spd_to_power_batch_prepared(const std::vector<double> &wavelengths,
+                            const std::vector<std::vector<double>> &spd_matrix,
+                            const CmfData &cmf_resampled, bool photometric);
 
 } // namespace tm30

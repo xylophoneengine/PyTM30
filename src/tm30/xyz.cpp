@@ -248,10 +248,11 @@ XyzTriple spd_to_xyz(const std::vector<double> &spd_wavelengths,
   }
 }
 
-std::vector<XyzTriple> spd_to_xyz_batch_prepared(
-    const std::vector<double> &spd_wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, std::optional<double> K) {
+std::vector<XyzTriple>
+spd_to_xyz_batch_prepared(const std::vector<double> &spd_wavelengths,
+                          const std::vector<std::vector<double>> &spd_matrix,
+                          const CmfData &cmf_resampled,
+                          std::optional<double> K) {
   if (cmf_resampled.x_bar.size() != spd_wavelengths.size()) {
     throw std::invalid_argument(
         "cmf_resampled does not match the wavelength grid: expected " +
@@ -333,10 +334,11 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
   return xyz_to_Yuv_batch(xyzs);
 }
 
-std::vector<YuvTriple> spd_to_Yuv_batch_prepared(
-    const std::vector<double> &spd_wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, std::optional<double> K) {
+std::vector<YuvTriple>
+spd_to_Yuv_batch_prepared(const std::vector<double> &spd_wavelengths,
+                          const std::vector<std::vector<double>> &spd_matrix,
+                          const CmfData &cmf_resampled,
+                          std::optional<double> K) {
   auto xyzs =
       spd_to_xyz_batch_prepared(spd_wavelengths, spd_matrix, cmf_resampled, K);
   return xyz_to_Yuv_batch(xyzs);
@@ -402,8 +404,8 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
                                         const DaylightBasis &basis,
                                         const CmfData &cmf_data,
                                         std::optional<double> K) {
-  return cct_to_xyz_batch_prepared(
-      ccts, wavelengths, basis, resample_cmf(wavelengths, cmf_data), K);
+  return cct_to_xyz_batch_prepared(ccts, wavelengths, basis,
+                                   resample_cmf(wavelengths, cmf_data), K);
 }
 
 CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
@@ -422,10 +424,11 @@ CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
   return compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut);
 }
 
-std::vector<CctDuvResult> spd_to_cct_batch_prepared(
-    const std::vector<double> &raw_wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, const PlanckianLut &planckian_lut) {
+std::vector<CctDuvResult>
+spd_to_cct_batch_prepared(const std::vector<double> &raw_wavelengths,
+                          const std::vector<std::vector<double>> &spd_matrix,
+                          const CmfData &cmf_resampled,
+                          const PlanckianLut &planckian_lut) {
   // Per-row §3.5 conformance. Spd is the single owner of the §3.5
   // recipe -- do not inline a copy of it here for speed (that is the
   // drift the remediation removed); the planned ValidatedGrid refactor
@@ -442,9 +445,8 @@ std::vector<CctDuvResult> spd_to_cct_batch_prepared(
           std::to_string(cmf_resampled.x_bar.size()));
     }
     SourceXyz src =
-        compute_source_xyz(spd.wavelengths(), spd.values(),
-                           cmf_resampled.x_bar, cmf_resampled.y_bar,
-                           cmf_resampled.z_bar);
+        compute_source_xyz(spd.wavelengths(), spd.values(), cmf_resampled.x_bar,
+                           cmf_resampled.y_bar, cmf_resampled.z_bar);
     results.push_back(
         compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut));
   }
@@ -461,8 +463,8 @@ spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
   const Spd grid_probe(spd_wavelengths,
                        std::vector<double>(spd_wavelengths.size(), 1.0));
   CmfData cmf_resampled = resample_cmf(grid_probe.wavelengths(), cmf_data);
-  return spd_to_cct_batch_prepared(spd_wavelengths, spd_matrix,
-                                   cmf_resampled, planckian_lut);
+  return spd_to_cct_batch_prepared(spd_wavelengths, spd_matrix, cmf_resampled,
+                                   planckian_lut);
 }
 
 double spd_to_power(const std::vector<double> &wavelengths,
@@ -484,10 +486,10 @@ double spd_to_power(const std::vector<double> &wavelengths,
   return kMaxLuminousEfficacy * trapezoidal_integrate(clip_wl, weighted);
 }
 
-std::vector<double> spd_to_power_batch_prepared(
-    const std::vector<double> &wavelengths,
-    const std::vector<std::vector<double>> &spd_matrix,
-    const CmfData &cmf_resampled, bool photometric) {
+std::vector<double>
+spd_to_power_batch_prepared(const std::vector<double> &wavelengths,
+                            const std::vector<std::vector<double>> &spd_matrix,
+                            const CmfData &cmf_resampled, bool photometric) {
   if (photometric && cmf_resampled.y_bar.size() != wavelengths.size()) {
     throw std::invalid_argument(
         "cmf_resampled does not match the wavelength grid: expected " +

@@ -229,10 +229,10 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 
 // --- CVG Coordinates ------------------------------------------------------
 
-CvgCoordinates
-compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
-                        const std::array<Cam02Ucs, 99> &jab_ref,
-                        const HueBins &bins) {
+CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
+                                       const BinAverages &ref_avg,
+                                       const std::array<Cam02Ucs, 99> &jab_ref,
+                                       const HueBins &bins) {
 
   // TM-30-20 §4.5
   CvgCoordinates cvg{};
@@ -264,11 +264,11 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
     //
     // std::atan2 returns [-pi, pi], so samples with negative b' (bins 9-16)
     // come back negative and a raw mean would be meaningless; normalise
-    // each angle to [0, 2*pi) before averaging. After normalisation a plain arithmetic
-    // mean suffices: §4.3 places 0 deg on the positive a' axis with 16 bins
-    // of 22.5 deg increasing counterclockwise, and §4.6 confirms 0 deg is
-    // the boundary between bins 1 and 16, so no bin straddles the wrap
-    // point and circular-mean machinery is unnecessary.
+    // each angle to [0, 2*pi) before averaging. After normalisation a plain
+    // arithmetic mean suffices: §4.3 places 0 deg on the positive a' axis with
+    // 16 bins of 22.5 deg increasing counterclockwise, and §4.6 confirms 0 deg
+    // is the boundary between bins 1 and 16, so no bin straddles the wrap point
+    // and circular-mean machinery is unnecessary.
     double sum_h = 0.0; // TM-30-20 §4.5 Eqs. (58)-(59) accumulator
     for (int idx : bins[j]) {
       double h = std::atan2(jab_ref[idx].b_prime, jab_ref[idx].a_prime);

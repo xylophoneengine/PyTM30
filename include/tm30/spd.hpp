@@ -59,12 +59,8 @@ public:
   double max_wavelength() const noexcept { return wavelengths_.back(); }
 
   /// Raw input range before §3.5 normalisation (drop/zero-fill).
-  double input_min_wavelength() const noexcept {
-    return input_min_wavelength_;
-  }
-  double input_max_wavelength() const noexcept {
-    return input_max_wavelength_;
-  }
+  double input_min_wavelength() const noexcept { return input_min_wavelength_; }
+  double input_max_wavelength() const noexcept { return input_max_wavelength_; }
 
   /// True if zero-fill extended the grid to cover 380-780 nm (§3.5).
   bool zero_filled() const noexcept { return zero_filled_; }

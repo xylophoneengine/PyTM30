@@ -579,12 +579,11 @@ struct BatchContext {
     // per-row values and cached tables always align. An invalid grid
     // (step > 5 nm, range short of 400-700 nm) surfaces here, at bind
     // time, as InvalidSpd -> ValueError.
-    const tm30::Spd grid_probe(wl_vec,
-                               std::vector<double>(wl_vec.size(), 1.0));
+    const tm30::Spd grid_probe(wl_vec, std::vector<double>(wl_vec.size(), 1.0));
 
-    fixed_tables_ = tm30::prepare_resampled_tables(
-        grid_probe.wavelengths(), cmf_2deg, cmf_10deg, ces_data,
-        daylight_basis);
+    fixed_tables_ =
+        tm30::prepare_resampled_tables(grid_probe.wavelengths(), cmf_2deg,
+                                       cmf_10deg, ces_data, daylight_basis);
   }
 
   // NOTE: `bins`/`samples` gate which arrays get allocated and copied into
@@ -1117,9 +1116,9 @@ struct BatchContext {
     if (cmf_path_arg.is_none()) {
       // fixed_tables_ already holds the 10-deg CMF resampled to exactly
       // this grid; reuse it instead of resampling per call.
-      xyzs = tm30::cct_to_xyz_batch_prepared(
-          ccts, fixed_tables_->wavelengths, fixed_tables_->daylight_basis,
-          fixed_tables_->cmf_10deg, K_opt);
+      xyzs = tm30::cct_to_xyz_batch_prepared(ccts, fixed_tables_->wavelengths,
+                                             fixed_tables_->daylight_basis,
+                                             fixed_tables_->cmf_10deg, K_opt);
     } else {
       tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
       xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
@@ -1367,11 +1366,10 @@ NB_MODULE(tm30_core, m) {
           "Distance from Planckian locus in CIE 1960 UCS.  TM-30-20 §3.3.")
       .def_prop_ro("delta_e_avg", &PyTm30::delta_e_avg,
                    "Average dE' across 99 CES.  TM-30-20 §4.1.")
-      .def_prop_ro(
-          "rf_skin", &PyTm30::rf_skin,
-          "Skin fidelity Rf,skin (average of CES15 + CES18).  PyTM30 "
-          "research extension informed by TM-30-20 §4.2; not a "
-          "standardised TM-30 measure (§1.2, §4.0).")
+      .def_prop_ro("rf_skin", &PyTm30::rf_skin,
+                   "Skin fidelity Rf,skin (average of CES15 + CES18).  PyTM30 "
+                   "research extension informed by TM-30-20 §4.2; not a "
+                   "standardised TM-30 measure (§1.2, §4.0).")
       .def_prop_ro("rf_cesi", &PyTm30::rf_cesi,
                    "Per-sample fidelity Rf,CESi - numpy array of 99 values.  "
                    "TM-30-20 §4.2.")

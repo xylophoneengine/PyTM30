@@ -653,7 +653,6 @@ TEST_CASE("Parallel - persistent workers: plain path bit-identical, and "
   }
 }
 
-
 // ======================================================================
 //  Cached path vs TM-30-20 §3.5 grid conformance
 // ======================================================================
@@ -689,7 +688,7 @@ TEST_CASE("Cached path - narrow bound grid conforms like Spd",
   REQUIRE(plain.size() == 1);
   REQUIRE(cached[0].has_value());
   REQUIRE(plain[0].has_value());
-  REQUIRE(vectors_equal(cached, plain)); // exact ==, not tolerance
+  REQUIRE(vectors_equal(cached, plain));   // exact ==, not tolerance
   CHECK(cached[0]->validity.extrapolated); // zero-fill happened
 }
 

@@ -571,7 +571,7 @@ TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
 // spd_to_cct §3.5 conformance (grid handling identical to the pipeline)
 // -------------------------------------------------------------------------
 
-TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per §3.5",
+TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per TM-30-20 3.5",
           "[cct][slice03]") {
   auto [wl_full, vals_full] = load_spd_csv(data_path("d65_1nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
@@ -604,7 +604,8 @@ TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per §3.5",
   REQUIRE(narrow.duv == padded.duv);
 }
 
-TEST_CASE("CCT - spd_to_cct rejects a wavelength step above 5 nm (§3.5)",
+TEST_CASE("CCT - spd_to_cct rejects a wavelength step above 5 nm "
+          "(TM-30-20 3.5)",
           "[cct][slice03]") {
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));

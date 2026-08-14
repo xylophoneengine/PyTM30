@@ -272,8 +272,8 @@ TEST_CASE("Hue binning - planckian 3000K bin assignments match fixture",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  auto golden_hue_bin_index =
-      load_hue_bin_index_fixture(fixture_path("planckian_3000K", "11_hue_bins"));
+  auto golden_hue_bin_index = load_hue_bin_index_fixture(
+      fixture_path("planckian_3000K", "11_hue_bins"));
   REQUIRE(golden_hue_bin_index.size() == 99);
 
   auto computed = flatten_bins(result.hue_bins);

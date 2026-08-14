@@ -35,7 +35,7 @@ struct BinAverages {
 ///
 /// TM-30-20 §4.6, §4.7, §4.8
 struct LocalBinMetrics {
-  std::array<double, 16> Rf_hj;  // Local fidelity per bin   // TM-30-20 §4.8
+  std::array<double, 16> Rf_hj; // Local fidelity per bin   // TM-30-20 §4.8
   // Local chroma shift per bin, as a PERCENTAGE. Eq. (62) computes a
   // ratio; §4.6 requires percentage representation (Table E-1 range is
   // roughly -100% to 100%). The x100 is applied exactly once, at struct
@@ -45,7 +45,7 @@ struct LocalBinMetrics {
   // percentage requirement; Table E-1 range is roughly -1 to 1 and the
   // Annex D templates print bare decimals. TM-30-20 §4.7
   std::array<double, 16> Rhs_hj;
-  std::array<double, 16> DE_hj;  // Mean dE' per bin        // TM-30-20 §4.8
+  std::array<double, 16> DE_hj; // Mean dE' per bin        // TM-30-20 §4.8
 };
 
 /// CVG-normalized bin-average coordinates.

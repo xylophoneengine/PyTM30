@@ -398,10 +398,10 @@ TEST_CASE("CES colorimetry - planckian 3000K matches golden fixtures",
 // deltas up to ~6e-4. This is inherent to the Ohno (2014) LUT method, not
 // implementation-specific (Smet et al. 2023,
 // doi:10.1080/15502724.2023.2248397, bound the max CCT error at ~0.4 K
-// for a 0.25% LUT). A tolerance of 1e-3 is appropriate for this self-consistency
-// check, reflecting the inherent CCT algorithm imprecision rather than
-// an implementation error.
-// TM-30-20 §3.3: CCT of a perfect Planckian is not identity.
+// for a 0.25% LUT). A tolerance of 1e-3 is appropriate for this
+// self-consistency check, reflecting the inherent CCT algorithm imprecision
+// rather than an implementation error. TM-30-20 §3.3: CCT of a perfect
+// Planckian is not identity.
 // -------------------------------------------------------------------------
 
 TEST_CASE("CES colorimetry - planckian self-consistency: test ~= reference",
@@ -652,8 +652,8 @@ void check_results_match(const CesColorimetryResult &a,
     INFO(label << " hue bin " << j);
     CHECK(nan_aware_close(a.gamut.local.Rf_hj[j], b.gamut.local.Rf_hj[j],
                           Tol_Rf));
-    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j], b.gamut.local.Rcs_hj_percent[j],
-                          Tol_LocalShift));
+    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j],
+                          b.gamut.local.Rcs_hj_percent[j], Tol_LocalShift));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
                           Tol_LocalShift));
     CHECK(nan_aware_close(a.gamut.local.DE_hj[j], b.gamut.local.DE_hj[j],
@@ -685,8 +685,8 @@ void check_results_identical(const CesColorimetryResult &a,
   }
   for (std::size_t j = 0; j < 16; ++j) {
     INFO(label << " hue bin " << j);
-    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j], b.gamut.local.Rcs_hj_percent[j],
-                          kDeterminismTol));
+    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j],
+                          b.gamut.local.Rcs_hj_percent[j], kDeterminismTol));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
                           kDeterminismTol));
   }
