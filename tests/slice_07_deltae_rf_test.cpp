@@ -442,7 +442,7 @@ TEST_CASE("dE' & Rf - HP1 Rf matches golden fixture",
           "[delta_e][rf][slice07][fixture]") {
   auto &G = GlobalFixtures::instance();
 
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
 
   CesColorimetryResult result =
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
@@ -469,8 +469,8 @@ TEST_CASE("dE' & Rf - Rf in [0, 100] for various SPDs",
   };
 
   std::vector<SpdCase> cases = {
-      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_1nm.csv"},
-      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_1nm.csv"},
+      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_5nm.csv"},
+      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_5nm.csv"},
   };
 
   for (const auto &c : cases) {

@@ -15,11 +15,11 @@ SPD corpus: 19 real standard-illuminant spectra from data/*.csv
   fl10_1nm              401 pts   380-780 nm   step=1 nm
   fl11_1nm              401 pts   380-780 nm   step=1 nm
   fl12_1nm              401 pts   380-780 nm   step=1 nm
-  hp1_1nm                81 pts   380-780 nm   step=5 nm
-  hp2_1nm                81 pts   380-780 nm   step=5 nm
-  hp3_1nm                81 pts   380-780 nm   step=5 nm
-  hp4_1nm                81 pts   380-780 nm   step=5 nm
-  hp5_1nm                81 pts   380-780 nm   step=5 nm
+  hp1_5nm                81 pts   380-780 nm   step=5 nm
+  hp2_5nm                81 pts   380-780 nm   step=5 nm
+  hp3_5nm                81 pts   380-780 nm   step=5 nm
+  hp4_5nm                81 pts   380-780 nm   step=5 nm
+  hp5_5nm                81 pts   380-780 nm   step=5 nm
   illuminant_a_1nm      401 pts   380-780 nm   step=1 nm
 
 Calculator: TM30Calc(tables loaded)  (spd_to_xyz/spd_to_Yuv use the CIE 1964 10-degree observer)
@@ -28,30 +28,30 @@ Calculator: TM30Calc(tables loaded)  (spd_to_xyz/spd_to_Yuv use the CIE 1964 10-
 2) SPEED
 ======================================================================
 pytm30 spd_to_xyz single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.0039 +/- 0.0013 ms/SPD (median 0.0043, max 0.0342)
+  0.0043 +/- 0.0023 ms/SPD (median 0.0043, max 0.0473)
 pytm30 spd_to_Yuv single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.0040 +/- 0.0009 ms/SPD (median 0.0043, max 0.0080)
+  0.0041 +/- 0.0011 ms/SPD (median 0.0043, max 0.0135)
 
 colour-science spd_to_xyz-equivalent single eval, 50 reps x 19 SPDs = 950 timed calls:
-  0.6317 +/- 0.0578 ms/SPD (median 0.6457, max 0.9797)
-  pytm30 is 160.9x faster
+  0.9046 +/- 0.1582 ms/SPD (median 0.9088, max 4.8797)
+  pytm30 is 212.0x faster
 colour-science spd_to_Yuv-equivalent single eval, 50 reps x 19 SPDs = 950 timed calls:
-  0.6529 +/- 0.0470 ms/SPD (median 0.6755, max 0.8394)
-  pytm30 is 162.6x faster
+  0.9260 +/- 0.0552 ms/SPD (median 0.9484, max 1.4453)
+  pytm30 is 225.4x faster
 
 pytm30 spd_to_xyz true batch, all 19 SPDs in one call, 100 repetitions:
-  0.0218 +/- 0.0002 ms total (0.0011 ms/SPD)
+  0.0326 +/- 0.0017 ms total (0.0017 ms/SPD)
 pytm30 spd_to_Yuv true batch, all 19 SPDs in one call, 100 repetitions:
-  0.0218 +/- 0.0001 ms total (0.0011 ms/SPD)
+  0.0324 +/- 0.0018 ms total (0.0017 ms/SPD)
 
 colour-science spd_to_xyz-equivalent pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  12.0533 +/- 0.3505 ms total (0.6344 ms/SPD)
-  pytm30 is 554.0x faster
+  16.6887 +/- 0.1636 ms total (0.8784 ms/SPD)
+  pytm30 is 511.5x faster
 colour-science spd_to_Yuv-equivalent pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  12.4585 +/- 0.2147 ms total (0.6557 ms/SPD)
-  pytm30 is 571.0x faster
+  17.5081 +/- 0.1553 ms total (0.9215 ms/SPD)
+  pytm30 is 540.0x faster
 
-Timing plot saved: /Users/zwenger/Downloads/pytm30/PyTM30/benchmarks/benchmark_spd_utils_timing.png
+Timing plot saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_spd_utils_timing.png
 
 ======================================================================
 3) ACCURACY
@@ -66,7 +66,7 @@ pytm30 vs colour-science 0.4.7 (CIE 1964 10-degree observer, Integration, Y=100)
   u'             1.37e-08     2.07e-08     8.41e-08
   v'             4.25e-08     4.34e-08     1.93e-07
 
-Plot saved: /Users/zwenger/Downloads/pytm30/PyTM30/benchmarks/benchmark_spd_utils_accuracy.png
+Plot saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_spd_utils_accuracy.png
 
 Done.
-Report saved: /Users/zwenger/Downloads/pytm30/PyTM30/benchmarks/benchmark_spd_utils_report.txt
+Report saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_spd_utils_report.txt

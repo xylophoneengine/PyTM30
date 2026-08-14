@@ -607,7 +607,7 @@ TEST_CASE("Gamut - HP1 gamut metrics match golden fixtures",
           "[gamut][rg][slice09][fixture]") {
   auto &G = GlobalFixtures::instance();
 
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
   auto gfs = run_gamut_for_spd(spd_wl, spd_vals);
 
   verify_gamut_for_spd("HP1", gfs);
@@ -638,8 +638,8 @@ TEST_CASE("Gamut - Rg is positive for various SPDs",
   };
 
   std::vector<SpdCase> cases = {
-      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_1nm.csv"},
-      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_1nm.csv"},
+      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_5nm.csv"},
+      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_5nm.csv"},
   };
 
   for (const auto &c : cases) {
@@ -662,8 +662,8 @@ TEST_CASE("Gamut - Rf,hj in [0, 100] for all SPDs",
   };
 
   std::vector<SpdCase> cases = {
-      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_1nm.csv"},
-      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_1nm.csv"},
+      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_5nm.csv"},
+      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_5nm.csv"},
   };
 
   for (const auto &c : cases) {

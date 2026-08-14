@@ -248,7 +248,7 @@ TEST_CASE("Hue binning - F1 bin assignments match fixture",
 
 TEST_CASE("Hue binning - HP1 bin assignments match fixture",
           "[hue_bins][slice08][fixture]") {
-  verify_hue_bins_for_spd("HP1", "hp1_1nm.csv", "HP1");
+  verify_hue_bins_for_spd("HP1", "hp1_5nm.csv", "HP1");
 }
 
 TEST_CASE("Hue binning - F12 bin assignments match fixture",
@@ -258,7 +258,7 @@ TEST_CASE("Hue binning - F12 bin assignments match fixture",
 
 TEST_CASE("Hue binning - HP5 bin assignments match fixture",
           "[hue_bins][slice08][fixture]") {
-  verify_hue_bins_for_spd("HP5", "hp5_1nm.csv", "HP5");
+  verify_hue_bins_for_spd("HP5", "hp5_5nm.csv", "HP5");
 }
 
 TEST_CASE("Hue binning - planckian 3000K bin assignments match fixture",
@@ -375,7 +375,7 @@ TEST_CASE("Hue binning - no empty bins for HP1",
           "[hue_bins][slice08][coverage]") {
   auto &G = GlobalFixtures::instance();
 
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
 
   CesColorimetryResult result =
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,

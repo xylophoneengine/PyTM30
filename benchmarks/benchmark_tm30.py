@@ -56,7 +56,7 @@ sys.stdout = _Tee(sys.__stdout__, log_file)
 SPD_NAMES = (
     ["d65_1nm"]
     + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_1nm" for i in range(1, 6)]
+    + [f"hp{i}_5nm" for i in range(1, 6)]
     + ["illuminant_a_1nm"]
 )
 
@@ -67,15 +67,40 @@ def load_spd(name):
     return arr[:, 0], arr[:, 1]
 
 
-def hist_panel(ax, data, color, xlabel, title):
+def hist_panel(ax, data, color, xlabel, title, groups=None):
     """Plain histogram (no scipy KDE dependency) showing the actual
     distribution shape -- a mean+/-std number alone hides skew, outliers,
-    and multi-modality."""
-    ax.hist(data, bins=min(30, max(10, len(data) // 10)), color=color,
-             edgecolor="white", alpha=0.85)
+    and multi-modality.
+
+    `groups` is an optional list of (subset, color, label) that splits the
+    histogram into labelled series over shared bins. Used for the single-eval
+    panels, whose bimodality is a corpus property (two wavelength-grid sizes,
+    per-eval cost scales with grid length) that an unlabelled histogram
+    presents as a mystery."""
+    bins = np.histogram_bin_edges(data, bins=min(30, max(10, len(data) // 10)))
+    if groups:
+        for g_data, g_color, g_label in groups:
+            ax.hist(g_data, bins=bins, color=g_color, edgecolor="white",
+                    alpha=0.85, label=f"{g_label} (n={len(g_data)})")
+        ax.legend(fontsize=7)
+    else:
+        ax.hist(data, bins=bins, color=color, edgecolor="white", alpha=0.85)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Count")
     ax.set_title(title, fontsize=9)
+
+
+def grid_split(times_ms, npts, shades):
+    """Split per-call timings into one histogram series per wavelength-grid
+    size (finest grid first), pairing each with a shade of the panel's
+    implementation colour. Returns None when the shades can't cover the
+    grids, so the caller falls back to a plain unsplit histogram."""
+    npts = np.asarray(npts)
+    uniq = sorted(set(npts.tolist()), reverse=True)
+    if len(uniq) < 2 or len(uniq) > len(shades):
+        return None
+    return [(times_ms[npts == n], shade, f"{n}-pt grid")
+            for n, shade in zip(uniq, shades)]
 
 
 # ===================================================================
@@ -147,6 +172,12 @@ print("=" * 70)
 
 PYTM30_COLOR = "#10b981"   # green -- pytm30, used consistently below
 COLOUR_COLOR = "#2563eb"   # blue  -- colour-science, used consistently below
+# Two-tone shades of each implementation colour, used to split the
+# single-eval histograms by wavelength-grid size (finest grid gets the
+# first shade). Pairs validated for CVD separation, lightness band and
+# chroma on a white surface.
+PYTM30_GRID_SHADES = ("#10b981", "#047857")
+COLOUR_GRID_SHADES = ("#60a5fa", "#1d4ed8")
 
 N_SINGLE_REPS = 50
 N_REPS = 100
@@ -166,11 +197,13 @@ def cs_fidelity_index(wl, spd):
 _ = calc.eval(spd0, wl0)  # warm-up (pays any one-time setup cost)
 
 single_times = []
+single_npts = []  # per-call grid length, to attribute timing modes to grids
 for _ in range(N_SINGLE_REPS):
     for wl, spd in corpus.values():
         t0 = time.perf_counter()
         calc.eval(spd, wl)
         single_times.append(time.perf_counter() - t0)
+        single_npts.append(len(wl))
 single_ms = np.array(single_times) * 1000.0
 
 print(f"pytm30 single eval, {N_SINGLE_REPS} repetitions x {len(corpus)} SPDs "
@@ -181,11 +214,13 @@ print(f"  {single_ms.mean():.4f} +/- {single_ms.std():.4f} ms/SPD "
 if HAVE_COLOUR:
     _ = cs_fidelity_index(wl0, spd0)  # warm-up
     cs_single_times = []
+    cs_single_npts = []
     for _ in range(N_SINGLE_REPS):
         for wl, spd in corpus.values():
             t0 = time.perf_counter()
             cs_fidelity_index(wl, spd)
             cs_single_times.append(time.perf_counter() - t0)
+            cs_single_npts.append(len(wl))
     cs_single_ms = np.array(cs_single_times) * 1000.0
     print(f"\ncolour-science single eval, {N_SINGLE_REPS} repetitions x {len(corpus)} SPDs "
           f"= {len(cs_single_ms)} timed calls:")
@@ -239,16 +274,28 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# The single-eval histograms are bimodal because the corpus mixes two
+# wavelength grids (401-pt 1 nm and 81-pt 5 nm) and per-eval cost scales
+# with grid length -- split them by grid so the modes are attributable,
+# and say so in a caption on the figure itself.
+GRID_CAPTION = (
+    "Single-eval panels are split by SPD wavelength grid: per-eval cost scales with grid length\n"
+    "(CES/CMF resampling and tristimulus integration run on the input grid), so the 401-pt (1 nm)\n"
+    "and 81-pt (5 nm) illuminants form two timing modes. The batch call first resamples all SPDs\n"
+    "onto one common 1 nm grid, hence its single mode.")
+
 if HAVE_COLOUR:
-    fig, axes = plt.subplots(2, 2, figsize=(11, 7))
+    fig, axes = plt.subplots(2, 2, figsize=(11, 7.8))
     hist_panel(
         axes[0, 0], single_ms, PYTM30_COLOR, "Time per SPD (ms)",
         f"pytm30 single eval -- mean={single_ms.mean():.4f} ms  "
-        f"std={single_ms.std():.4f} ms  n={len(single_ms)}")
+        f"std={single_ms.std():.4f} ms  n={len(single_ms)}",
+        groups=grid_split(single_ms, single_npts, PYTM30_GRID_SHADES))
     hist_panel(
         axes[0, 1], cs_single_ms, COLOUR_COLOR, "Time per SPD (ms)",
         f"colour-science single eval -- mean={cs_single_ms.mean():.4f} ms  "
-        f"std={cs_single_ms.std():.4f} ms  n={len(cs_single_ms)}")
+        f"std={cs_single_ms.std():.4f} ms  n={len(cs_single_ms)}",
+        groups=grid_split(cs_single_ms, cs_single_npts, COLOUR_GRID_SHADES))
     hist_panel(
         axes[1, 0], batch_ms_total, PYTM30_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
         f"pytm30 true batch ({N_REPS} reps) -- mean={batch_ms_total.mean():.4f} ms  "
@@ -260,18 +307,21 @@ if HAVE_COLOUR:
     fig.suptitle("TM30Calc.eval() vs colour-science -- Timing Distributions "
                  "(green=pytm30, blue=colour-science)", fontsize=12)
 else:
-    fig, axes = plt.subplots(1, 2, figsize=(11, 3.5))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.3))
     hist_panel(
         axes[0], single_ms, PYTM30_COLOR, "Time per SPD (ms)",
         f"pytm30 single eval -- mean={single_ms.mean():.4f} ms  "
-        f"std={single_ms.std():.4f} ms  n={len(single_ms)}")
+        f"std={single_ms.std():.4f} ms  n={len(single_ms)}",
+        groups=grid_split(single_ms, single_npts, PYTM30_GRID_SHADES))
     hist_panel(
         axes[1], batch_ms_total, PYTM30_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
         f"pytm30 true batch ({N_REPS} reps) -- mean={batch_ms_total.mean():.4f} ms  "
         f"std={batch_ms_total.std():.4f} ms")
     fig.suptitle("TM30Calc.eval() Timing Distributions "
                  "(colour-science unavailable -- pytm30 only)", fontsize=12)
-fig.tight_layout()
+fig.text(0.5, 0.005, GRID_CAPTION, ha="center", va="bottom", fontsize=8,
+         color="#555555")
+fig.tight_layout(rect=(0.0, 0.09 if HAVE_COLOUR else 0.16, 1.0, 1.0))
 timing_plot_path = BENCH_DIR / "benchmark_tm30_timing.png"
 fig.savefig(timing_plot_path, dpi=150)
 plt.close(fig)
@@ -368,6 +418,13 @@ numpy {np.__version__}, colour-science {colour.__version__} -- full
 environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
 
 ![Timing distributions, pytm30 vs colour-science](benchmarks/benchmark_tm30_timing.png)
+
+The two modes in the single-eval histograms are a corpus property, not
+timing noise: the bundled illuminants mix two wavelength grids (401-pt
+1 nm and 81-pt 5 nm), and per-eval cost scales with grid length because
+CES/CMF resampling and tristimulus integration run on the input grid.
+The batch call resamples everything onto one common 1 nm grid first,
+hence its single mode.
 {end}"""
     text = readme_path.read_text()
     if begin in text and end in text:

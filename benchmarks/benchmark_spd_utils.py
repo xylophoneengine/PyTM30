@@ -54,7 +54,7 @@ sys.stdout = _Tee(sys.__stdout__, log_file)
 SPD_NAMES = (
     ["d65_1nm"]
     + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_1nm" for i in range(1, 6)]
+    + [f"hp{i}_5nm" for i in range(1, 6)]
     + ["illuminant_a_1nm"]
 )
 
@@ -65,15 +65,40 @@ def load_spd(name):
     return arr[:, 0], arr[:, 1]
 
 
-def hist_panel(ax, data, color, xlabel, title):
+def hist_panel(ax, data, color, xlabel, title, groups=None):
     """Plain histogram (no scipy KDE dependency) showing the actual
     distribution shape -- a mean+/-std number alone hides skew, outliers,
-    and multi-modality."""
-    ax.hist(data, bins=min(30, max(10, len(data) // 10)), color=color,
-             edgecolor="white", alpha=0.85)
+    and multi-modality.
+
+    `groups` is an optional list of (subset, color, label) that splits the
+    histogram into labelled series over shared bins. Used for the single-eval
+    panels, whose bimodality is a corpus property (two wavelength-grid sizes,
+    per-call cost scales with grid length) that an unlabelled histogram
+    presents as a mystery."""
+    bins = np.histogram_bin_edges(data, bins=min(30, max(10, len(data) // 10)))
+    if groups:
+        for g_data, g_color, g_label in groups:
+            ax.hist(g_data, bins=bins, color=g_color, edgecolor="white",
+                    alpha=0.85, label=f"{g_label} (n={len(g_data)})")
+        ax.legend(fontsize=7)
+    else:
+        ax.hist(data, bins=bins, color=color, edgecolor="white", alpha=0.85)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Count")
     ax.set_title(title, fontsize=9)
+
+
+def grid_split(times_ms, npts, shades):
+    """Split per-call timings into one histogram series per wavelength-grid
+    size (finest grid first), pairing each with a shade of the panel's
+    implementation colour. Returns None when the shades can't cover the
+    grids, so the caller falls back to a plain unsplit histogram."""
+    npts = np.asarray(npts)
+    uniq = sorted(set(npts.tolist()), reverse=True)
+    if len(uniq) < 2 or len(uniq) > len(shades):
+        return None
+    return [(times_ms[npts == n], shade, f"{n}-pt grid")
+            for n, shade in zip(uniq, shades)]
 
 
 # ===================================================================
@@ -104,10 +129,22 @@ print("=" * 70)
 
 PYTM30_COLOR = "#10b981"   # green -- pytm30, used consistently below
 COLOUR_COLOR = "#2563eb"   # blue  -- colour-science, used consistently below
+# Two-tone shades of each implementation colour, used to split the
+# single-eval histograms by wavelength-grid size (finest grid gets the
+# first shade). Pairs validated for CVD separation, lightness band and
+# chroma on a white surface.
+PYTM30_GRID_SHADES = ("#10b981", "#047857")
+COLOUR_GRID_SHADES = ("#60a5fa", "#1d4ed8")
 
 N_SINGLE_REPS = 50
 N_REPS = 100
 wl0, spd0 = next(iter(corpus.values()))
+
+# Grid length of each timed single-eval call, in loop order (rep outer,
+# corpus inner) -- identical for every timed function below, so computed
+# once and reused to split the timing histograms by grid.
+SINGLE_NPTS = np.array(
+    [len(wl) for _ in range(N_SINGLE_REPS) for wl, _ in corpus.values()])
 
 if HAVE_COLOUR:
     _cmfs_10deg = colour.MSDS_CMFS["CIE 1964 10 Degree Standard Observer"].copy()
@@ -219,17 +256,29 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# The single-eval histograms are bimodal because the corpus mixes two
+# wavelength grids (401-pt 1 nm and 81-pt 5 nm) and per-call cost scales
+# with grid length -- split them by grid so the modes are attributable,
+# and say so in a caption on the figure itself.
+GRID_CAPTION = (
+    "Single-eval panels are split by SPD wavelength grid: per-call cost scales with grid length\n"
+    "(CMF resampling and the XYZ integration run on the input grid), so the 401-pt (1 nm) and\n"
+    "81-pt (5 nm) illuminants form two timing modes. The batch call first resamples all SPDs\n"
+    "onto one common 1 nm grid, hence its single mode.")
+
 if HAVE_COLOUR:
-    fig, axes = plt.subplots(2, 4, figsize=(19, 7))
+    fig, axes = plt.subplots(2, 4, figsize=(19, 7.8))
     for col, fn_name in enumerate(["spd_to_xyz", "spd_to_Yuv"]):
         hist_panel(
             axes[0, col * 2], single_ms[fn_name], PYTM30_COLOR, "Time per SPD (ms)",
             f"pytm30 {fn_name} single eval -- mean={single_ms[fn_name].mean():.4f} ms  "
-            f"n={len(single_ms[fn_name])}")
+            f"n={len(single_ms[fn_name])}",
+            groups=grid_split(single_ms[fn_name], SINGLE_NPTS, PYTM30_GRID_SHADES))
         hist_panel(
             axes[0, col * 2 + 1], cs_single_ms[fn_name], COLOUR_COLOR, "Time per SPD (ms)",
             f"colour-science {fn_name}-eq single eval -- "
-            f"mean={cs_single_ms[fn_name].mean():.4f} ms  n={len(cs_single_ms[fn_name])}")
+            f"mean={cs_single_ms[fn_name].mean():.4f} ms  n={len(cs_single_ms[fn_name])}",
+            groups=grid_split(cs_single_ms[fn_name], SINGLE_NPTS, COLOUR_GRID_SHADES))
         hist_panel(
             axes[1, col * 2], batch_ms_total[fn_name], PYTM30_COLOR,
             f"Total time for {len(corpus)} SPDs (ms)",
@@ -243,12 +292,13 @@ if HAVE_COLOUR:
     fig.suptitle("spd_to_xyz / spd_to_Yuv vs colour-science -- Timing Distributions "
                  "(green=pytm30, blue=colour-science)", fontsize=12)
 else:
-    fig, axes = plt.subplots(2, 2, figsize=(11, 7))
+    fig, axes = plt.subplots(2, 2, figsize=(11, 7.8))
     for col, fn_name in enumerate(["spd_to_xyz", "spd_to_Yuv"]):
         hist_panel(
             axes[0, col], single_ms[fn_name], PYTM30_COLOR, "Time per SPD (ms)",
             f"pytm30 {fn_name} single eval -- mean={single_ms[fn_name].mean():.4f} ms  "
-            f"n={len(single_ms[fn_name])}")
+            f"n={len(single_ms[fn_name])}",
+            groups=grid_split(single_ms[fn_name], SINGLE_NPTS, PYTM30_GRID_SHADES))
         hist_panel(
             axes[1, col], batch_ms_total[fn_name], PYTM30_COLOR,
             f"Total time for {len(corpus)} SPDs (ms)",
@@ -256,7 +306,9 @@ else:
             f"mean={batch_ms_total[fn_name].mean():.4f} ms")
     fig.suptitle("spd_to_xyz / spd_to_Yuv Timing Distributions "
                  "(colour-science unavailable -- pytm30 only)", fontsize=12)
-fig.tight_layout()
+fig.text(0.5, 0.005, GRID_CAPTION, ha="center", va="bottom", fontsize=8,
+         color="#555555")
+fig.tight_layout(rect=(0.0, 0.09, 1.0, 1.0))
 timing_plot_path = BENCH_DIR / "benchmark_spd_utils_timing.png"
 fig.savefig(timing_plot_path, dpi=150)
 plt.close(fig)

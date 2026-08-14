@@ -1,12 +1,12 @@
 ======================================================================
 0) ENVIRONMENT
 ======================================================================
-Date (UTC):     2026-08-14 15:59
-Python:         3.12.13 (CPython)
+Date (UTC):     2026-08-14 19:46
+Python:         3.11.15 (CPython)
 OS / machine:   macOS-26.6.1-arm64-arm-64bit (arm64)
 CPU:            Apple M4 Pro
-Power mode:     2 (macOS pmset powermode; 1 = low power)
-numpy:          2.5.2
+Power mode:     1 (macOS pmset powermode; 1 = low power)
+numpy:          2.4.6
 colour-science: 0.4.7
 pytm30:         0.1.0
 
@@ -27,11 +27,11 @@ SPD corpus: 19 real standard-illuminant spectra from data/*.csv
   fl10_1nm              401 pts   380-780 nm   step=1 nm
   fl11_1nm              401 pts   380-780 nm   step=1 nm
   fl12_1nm              401 pts   380-780 nm   step=1 nm
-  hp1_1nm                81 pts   380-780 nm   step=5 nm
-  hp2_1nm                81 pts   380-780 nm   step=5 nm
-  hp3_1nm                81 pts   380-780 nm   step=5 nm
-  hp4_1nm                81 pts   380-780 nm   step=5 nm
-  hp5_1nm                81 pts   380-780 nm   step=5 nm
+  hp1_5nm                81 pts   380-780 nm   step=5 nm
+  hp2_5nm                81 pts   380-780 nm   step=5 nm
+  hp3_5nm                81 pts   380-780 nm   step=5 nm
+  hp4_5nm                81 pts   380-780 nm   step=5 nm
+  hp5_5nm                81 pts   380-780 nm   step=5 nm
   illuminant_a_1nm      401 pts   380-780 nm   step=1 nm
 
 Calculator: TM30Calc(tables loaded)
@@ -40,22 +40,22 @@ Calculator: TM30Calc(tables loaded)
 2) SPEED
 ======================================================================
 pytm30 single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.1121 +/- 0.0379 ms/SPD (median 0.1306, max 0.1645)
+  0.1893 +/- 0.0609 ms/SPD (median 0.2217, max 0.3025)
 
 colour-science single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  1.0728 +/- 0.2510 ms/SPD (median 1.0510, max 7.6225)
+  1.6749 +/- 0.4137 ms/SPD (median 1.6182, max 13.1336)
 
-pytm30 is 9.6x faster, single eval
+pytm30 is 8.8x faster, single eval
 
 pytm30 true batch, all 19 SPDs in one call, 100 repetitions:
-  2.5428 +/- 0.0480 ms total (0.1338 ms/SPD)
+  4.2354 +/- 0.0500 ms total (0.2229 ms/SPD)
 
 colour-science pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  20.3035 +/- 0.6518 ms total (1.0686 ms/SPD)
+  31.7108 +/- 0.4753 ms total (1.6690 ms/SPD)
 
-pytm30 is 8.0x faster, batch
+pytm30 is 7.5x faster, batch
 
-Timing plot saved: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/benchmarks/benchmark_tm30_timing.png
+Timing plot saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_tm30_timing.png
 
 ======================================================================
 3) ACCURACY
@@ -68,9 +68,9 @@ pytm30 vs colour-science 0.4.7 ('ANSI/IES TM-30-18'), 19 SPDs:
   CCT             0.050        0.014        0.069
   Duv          8.08e-07     3.41e-07     1.76e-06
 
-Plot saved: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/benchmarks/benchmark_tm30_accuracy.png
+Plot saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_tm30_accuracy.png
 
-README measured-claims block refreshed: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/README.md
+README measured-claims block refreshed: /Users/zwenger/mini_projects/PyTM30/README.md
 
 Done.
-Report saved: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/benchmarks/benchmark_tm30_report.txt
+Report saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_tm30_report.txt

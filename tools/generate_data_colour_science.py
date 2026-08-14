@@ -264,19 +264,20 @@ report("illuminant_a_1nm.csv",
 
 
 # -------------------------------------------------------------------------
-# 8. High-pressure discharge lamps HP1-5 (already native 5nm, 380-780;
-#    despite the "1nm" filename these files hold 81 rows / 5nm data in
-#    the original repo too -- TM-30/CIE only tabulate these at 5nm).
+# 8. High-pressure discharge lamps HP1-5 (native 5nm, 380-780, 81 rows --
+#    TM-30/CIE only tabulate these at 5nm). The original repo names these
+#    files hp{1..5}_1nm.csv even though they too hold 5nm data; ours are
+#    named hp{1..5}_5nm.csv to match their actual grid.
 # -------------------------------------------------------------------------
 for i in range(1, 6):
     sd = colour.SDS_ILLUMINANTS[f"HP{i}"].copy().align(colour.SpectralShape(380, 780, 5))
-    write_csv(f"hp{i}_1nm.csv", ["wavelength", "value"], sd.wavelengths, [sd.values])
-report("hp1_1nm.csv .. hp5_1nm.csv",
+    write_csv(f"hp{i}_5nm.csv", ["wavelength", "value"], sd.wavelengths, [sd.values])
+report("hp1_5nm.csv .. hp5_5nm.csv",
        "colour.SDS_ILLUMINANTS['HP1'..'HP5'].align(SpectralShape(380,780,5)) (native 5nm; "
-       "no interpolation needed/performed -- these files hold 5nm data despite the "
-       "'_1nm' filename, matching the original repo's own convention)",
+       "no interpolation needed/performed)",
        "Confirmed bit-identical (max|delta|=0.0) for all 5 lamps, at every one of the "
-       "81 tabulated points, vs the original repo's hp{1..5}_1nm.csv.")
+       "81 tabulated points, vs the original repo's hp{1..5}_1nm.csv (the original repo "
+       "keeps the '_1nm' name for these 5nm tables; we name them by their actual grid).")
 
 
 # -------------------------------------------------------------------------

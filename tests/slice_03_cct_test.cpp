@@ -319,7 +319,7 @@ TEST_CASE("CCT - FL12", "[cct][slice03]") {
 // -------------------------------------------------------------------------
 
 TEST_CASE("CCT - HP1 (high-pressure sodium, narrowband)", "[cct][slice03]") {
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -330,7 +330,7 @@ TEST_CASE("CCT - HP1 (high-pressure sodium, narrowband)", "[cct][slice03]") {
 }
 
 TEST_CASE("CCT - HP2", "[cct][slice03]") {
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp2_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp2_5nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -341,7 +341,7 @@ TEST_CASE("CCT - HP2", "[cct][slice03]") {
 }
 
 TEST_CASE("CCT - HP3", "[cct][slice03]") {
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp3_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp3_5nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -352,7 +352,7 @@ TEST_CASE("CCT - HP3", "[cct][slice03]") {
 }
 
 TEST_CASE("CCT - HP4", "[cct][slice03]") {
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp4_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp4_5nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -363,7 +363,7 @@ TEST_CASE("CCT - HP4", "[cct][slice03]") {
 }
 
 TEST_CASE("CCT - HP5", "[cct][slice03]") {
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp5_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp5_5nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -525,7 +525,7 @@ TEST_CASE("CCT - spd_to_cct matches the manual chain (FL1)", "[cct][slice03]") {
 
 TEST_CASE("CCT - spd_to_cct matches the manual chain (HP1, narrowband)",
           "[cct][slice03]") {
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 

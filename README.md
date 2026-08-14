@@ -59,20 +59,27 @@ order of magnitude apart on throughput.
 The payoff, measured against colour-science on the bundled illuminant
 corpus (`benchmarks/benchmark_tm30.py`):
 
-| Path                     | colour-science | pytm30       | Speedup  |
-| ------------------------ | -------------- | ------------ | -------- |
-| Single eval              | 1.073 ms/SPD   | 0.112 ms/SPD | **9.6x** |
-| Batch (19 SPDs per call) | 1.069 ms/SPD   | 0.134 ms/SPD | **8.0x** |
+| Path | colour-science | pytm30 | Speedup |
+|---|---|---|---|
+| Single eval | 1.675 ms/SPD | 0.189 ms/SPD | **8.8x** |
+| Batch (19 SPDs per call) | 1.669 ms/SPD | 0.223 ms/SPD | **7.5x** |
 
 Accuracy on the same corpus: Rf within 0.004, Rg within
 0.001, and CCT within 0.07 K of colour-science's own
 values.
 
-Measured on: Apple M4 Pro, Python 3.12.13,
-numpy 2.5.2, colour-science 0.4.7 -- full
+Measured on: Apple M4 Pro, Python 3.11.15,
+numpy 2.4.6, colour-science 0.4.7 -- full
 environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
 
 ![Timing distributions, pytm30 vs colour-science](benchmarks/benchmark_tm30_timing.png)
+
+The two modes in the single-eval histograms are a corpus property, not
+timing noise: the bundled illuminants mix two wavelength grids (401-pt
+1 nm and 81-pt 5 nm), and per-eval cost scales with grid length because
+CES/CMF resampling and tristimulus integration run on the input grid.
+The batch call resamples everything onto one common 1 nm grid first,
+hence its single mode.
 <!-- benchmark-results:end -->
 
 ---
@@ -360,7 +367,7 @@ a multiplier.
 | `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                                 | CIE 2015 CMFs                                                  | 360-830 nm           |
 | `daylight_basis.csv`                                                                                 | CIE daylight vectors S0, S1, S2                                | 300-830 nm, 5 nm     |
 | `planckian_uv.csv`                                                                                   | Planckian locus LUT (u,v)                                      | 1000-25000 K         |
-| `d65_1nm.csv`, `fl1_1nm.csv`...`fl12_1nm.csv`, `hp1_1nm.csv`...`hp5_1nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |
+| `d65_1nm.csv`, `fl1_1nm.csv`...`fl12_1nm.csv`, `hp1_5nm.csv`...`hp5_5nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |
 
 All data tables are sourced from **[colour-science](https://github.com/colour-science/colour-science)**
 (BSD-3-Clause), not hand-derived - every one is a universal, published CIE

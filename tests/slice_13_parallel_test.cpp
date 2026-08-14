@@ -112,8 +112,8 @@ Tables &tables() {
 const std::vector<std::string> kCorpusNames = {
     "d65_1nm",  "fl1_1nm",  "fl2_1nm",  "fl3_1nm",         "fl4_1nm",
     "fl5_1nm",  "fl6_1nm",  "fl7_1nm",  "fl8_1nm",         "fl9_1nm",
-    "fl10_1nm", "fl11_1nm", "fl12_1nm", "hp1_1nm",         "hp2_1nm",
-    "hp3_1nm",  "hp4_1nm",  "hp5_1nm",  "illuminant_a_1nm"};
+    "fl10_1nm", "fl11_1nm", "fl12_1nm", "hp1_5nm",         "hp2_5nm",
+    "hp3_5nm",  "hp4_5nm",  "hp5_5nm",  "illuminant_a_1nm"};
 
 std::vector<double> resample_to_1nm(const std::vector<double> &wl,
                                     const std::vector<double> &vals) {

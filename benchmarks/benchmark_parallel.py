@@ -36,7 +36,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SPD_NAMES = (
     ["d65_1nm"]
     + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_1nm" for i in range(1, 6)]
+    + [f"hp{i}_5nm" for i in range(1, 6)]
     + ["illuminant_a_1nm"]
 )
 

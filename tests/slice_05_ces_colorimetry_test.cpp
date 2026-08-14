@@ -341,7 +341,7 @@ TEST_CASE("CES colorimetry - HP1 matches golden fixtures",
           "[pipeline][slice05]") {
   auto &G = GlobalFixtures::instance();
 
-  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
   // HP1 is at 5nm grid, 81 points
   REQUIRE(spd_wl.size() == 81);
 
@@ -765,8 +765,8 @@ TEST_CASE("Grid matrix row 1 - default 1nm 380-780nm: cached matches "
 TEST_CASE("Grid matrix row 2 - uniform 5nm 380-780nm: cached matches "
           "non-cached (HP1, HP2)",
           "[pipeline][slice05][gridmatrix]") {
-  auto [hp1_wl, hp1_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
-  auto [hp2_wl, hp2_vals] = load_spd_csv(data_path("hp2_1nm.csv"));
+  auto [hp1_wl, hp1_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
+  auto [hp2_wl, hp2_vals] = load_spd_csv(data_path("hp2_5nm.csv"));
   REQUIRE(hp1_wl.size() == 81);
   REQUIRE(hp2_wl.size() == 81);
   REQUIRE(hp1_wl == hp2_wl); // must share the exact same grid
@@ -996,7 +996,7 @@ TEST_CASE("Tables immutability - unrelated compute_ces_colorimetry call "
 
   // Unrelated call: different explicit grid (5 nm, HP1's grid), different
   // SPD, its own fresh cmf/ces/daylight-basis tables.
-  auto [hp1_wl, hp1_vals] = load_spd_csv(data_path("hp1_1nm.csv"));
+  auto [hp1_wl, hp1_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
   CesColorimetryResult interloper =
       compute_ces_colorimetry(hp1_wl, hp1_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);

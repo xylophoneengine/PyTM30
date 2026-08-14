@@ -171,7 +171,7 @@ def compute_d65_source_xyz():
 if __name__ == "__main__":
     sources = [("D65", "d65_1nm.csv"), ("IllA", "illuminant_a_1nm.csv")]
     sources += [(f"FL{i}", f"fl{i}_1nm.csv") for i in range(1, 13)]
-    sources += [(f"HP{i}", f"hp{i}_1nm.csv") for i in range(1, 6)]
+    sources += [(f"HP{i}", f"hp{i}_5nm.csv") for i in range(1, 6)]
 
     print("=== CCT/Duv recompute (slice_03 corpus), from data/*.csv ===")
     for name, fn in sources:
