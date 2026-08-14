@@ -4,6 +4,13 @@
 Fails on any float literal in the monitored directories that lacks a
 `// TM-30-20 §x.y` (or `/* TM-30-20 §x.y */`) citation on or above its line.
 
+Also validates the citation tags themselves against
+tools/tm30_clause_equations.txt: a `TM-30-20 §x.y` tag must name a known
+clause, and any `Eq. (nn)` on the same line must fall inside a clause
+cited on that line. Clause entries marked 'unverified' in the map file
+produce warnings rather than failures until the maintainer confirms them
+against the standard.
+
 Usage:
     python3 tools/check_constants.py              # check all float literals
     python3 tools/check_constants.py --verbose    # show passing citations too
@@ -47,6 +54,109 @@ CITATION_BLOCK = re.compile(r"/\*\s*TM-30-20\s+§\s*[\d.]+[a-z]?\s*\*/")
 
 # Lines to ignore (comments, preprocessor, string literals - though we skip those separately)
 IGNORE_LINE = re.compile(r"^\s*//|^\s*#|^\s*\*")
+
+# --- Clause-reference validation ---
+CLAUSE_MAP_FILE = Path(__file__).resolve().parent / "tm30_clause_equations.txt"
+# Clause list attached to a TM-30-20 token ("TM-30-20 §4.6, §4.7" or
+# "§4.6-§4.8"); a "§" belonging to another document (e.g. "CIE 15:2004
+# §8.2.1" on the same line) is not captured.
+TM30_CLAUSES = re.compile(r"TM-30-20\s*(§\s*[\d.]+\d(?:\s*[-,/]\s*§\s*[\d.]+\d)*)")
+CLAUSE_NUM = re.compile(r"§\s*([\d.]+\d)")
+EQ_REF = re.compile(r"Eqs?\.?\s*\(?(\d+)\)?(?:\s*[-,]\s*\(?(\d+)\)?)?")
+
+
+def load_clause_map():
+    """Load {clause: (eq_lo, eq_hi, verified)} with (None, None, v) for 'none'."""
+    clause_map = {}
+    if not CLAUSE_MAP_FILE.exists():
+        return None
+    with open(CLAUSE_MAP_FILE) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            clause, _, spec = line.partition(":")
+            # Strip the trailing '# ...' clause-title comment before
+            # tokenising, so titles never affect range or 'unverified'
+            # parsing.
+            spec = spec.partition("#")[0]
+            parts = spec.split()
+            if not parts:
+                continue
+            verified = "unverified" not in parts
+            rng = parts[0]
+            if rng == "none":
+                lo = hi = None
+            elif "-" in rng:
+                lo, hi = (int(x) for x in rng.split("-", 1))
+            else:
+                lo = hi = int(rng)
+            clause_map[clause.strip()] = (lo, hi, verified)
+    return clause_map
+
+
+def check_clause_refs(filepath, clause_map):
+    """Validate every 'TM-30-20 §x.y' tag (and Eq. numbers on its line).
+
+    Returns (violations, warnings): lists of (relpath, lineno, message).
+    A violation is an unknown clause, or an equation number outside the
+    range of every clause cited on that line when all those clauses are
+    verified. If any clause involved is unverified, the finding is
+    downgraded to a warning.
+    """
+    violations = []
+    warnings = []
+    relpath = str(filepath.relative_to(REPO_ROOT))
+    try:
+        with open(filepath) as f:
+            lines = f.readlines()
+    except Exception as e:
+        return [(relpath, 0, f"ERROR reading file: {e}")], []
+
+    for lineno, line in enumerate(lines, start=1):
+        if "TM-30-20" not in line:
+            continue
+        clauses = []
+        for group in TM30_CLAUSES.findall(line):
+            clauses.extend(CLAUSE_NUM.findall(group))
+        if not clauses:
+            continue
+
+        line_verified = True
+        known_clauses = []
+        for clause in clauses:
+            if clause not in clause_map:
+                violations.append(
+                    (relpath, lineno, f"unknown clause §{clause}")
+                )
+                continue
+            known_clauses.append(clause)
+            if not clause_map[clause][2]:
+                line_verified = False
+
+        if not known_clauses:
+            continue
+
+        for m in EQ_REF.finditer(line):
+            eq_nums = [int(m.group(1))]
+            if m.group(2):
+                eq_nums.append(int(m.group(2)))
+            for eq in eq_nums:
+                in_range = any(
+                    clause_map[c][0] is not None
+                    and clause_map[c][0] <= eq <= clause_map[c][1]
+                    for c in known_clauses
+                )
+                if not in_range:
+                    msg = (
+                        f"Eq. ({eq}) is outside every clause cited on this "
+                        f"line ({', '.join('§' + c for c in known_clauses)})"
+                    )
+                    if line_verified:
+                        violations.append((relpath, lineno, msg))
+                    else:
+                        warnings.append((relpath, lineno, msg + " [unverified clause]"))
+    return violations, warnings
 
 
 def load_whitelist():
@@ -162,10 +272,22 @@ def main():
     files_checked = 0
     constants_checked = 0
 
+    clause_map = load_clause_map()
+    clause_violations = []
+    clause_warnings = []
+    unverified_count = (
+        sum(1 for v in clause_map.values() if not v[2]) if clause_map else 0
+    )
+
     for filepath in source_files:
         violations = check_file(filepath, whitelist, verbose)
         all_violations.extend(violations)
         files_checked += 1
+
+        if clause_map is not None:
+            cv, cw = check_clause_refs(filepath, clause_map)
+            clause_violations.extend(cv)
+            clause_warnings.extend(cw)
 
         if verbose:
             print(f"\n{filepath.relative_to(REPO_ROOT)}:")
@@ -178,6 +300,24 @@ def main():
     print(f"{'=' * 60}")
     print(f"Files checked: {files_checked}")
     print(f"Violations:    {len(all_violations)}")
+
+    if clause_map is None:
+        print("\n[!] Clause map tools/tm30_clause_equations.txt not found;")
+        print("    clause-reference validation skipped.")
+    else:
+        print(f"Clause-reference violations: {len(clause_violations)}"
+              f"  (warnings: {len(clause_warnings)};"
+              f" unverified map entries: {unverified_count})")
+        for relpath, lineno, msg in clause_warnings:
+            print(f"  [warn] {relpath}:{lineno}: {msg}")
+        if clause_violations:
+            print("\n[x] FAIL: invalid TM-30-20 clause reference(s):")
+            for relpath, lineno, msg in clause_violations:
+                print(f"  {relpath}:{lineno}: {msg}")
+            print("\nEither the citation tag is wrong, or the clause map")
+            print(f"({CLAUSE_MAP_FILE}) is incomplete -- verify against the")
+            print("standard before editing the map.")
+            return 1
 
     if all_violations:
         print(f"\n[x] FAIL: {len(all_violations)} uncited float literal(s) found.\n")

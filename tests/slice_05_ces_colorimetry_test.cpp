@@ -395,8 +395,10 @@ TEST_CASE("CES colorimetry - planckian 3000K matches golden fixtures",
 // for a Planckian source (e.g., Planckian at 3000.00 K -> CCT ~= 3000.03 K).
 // This causes the reference illuminant (Planckian at 3000.03 K) to differ
 // slightly from the test SPD (Planckian at 3000.00 K), producing CES XYZ
-// deltas up to ~6e-4. The golden fixtures from luxpy exhibit the same
-// behavior. A tolerance of 1e-3 is appropriate for this self-consistency
+// deltas up to ~6e-4. This is inherent to the Ohno (2014) LUT method, not
+// implementation-specific (Smet et al. 2023,
+// doi:10.1080/15502724.2023.2248397, bound the max CCT error at ~0.4 K
+// for a 0.25% LUT). A tolerance of 1e-3 is appropriate for this self-consistency
 // check, reflecting the inherent CCT algorithm imprecision rather than
 // an implementation error.
 // TM-30-20 §3.3: CCT of a perfect Planckian is not identity.
@@ -650,7 +652,7 @@ void check_results_match(const CesColorimetryResult &a,
     INFO(label << " hue bin " << j);
     CHECK(nan_aware_close(a.gamut.local.Rf_hj[j], b.gamut.local.Rf_hj[j],
                           Tol_Rf));
-    CHECK(nan_aware_close(a.gamut.local.Rcs_hj[j], b.gamut.local.Rcs_hj[j],
+    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j], b.gamut.local.Rcs_hj_percent[j],
                           Tol_LocalShift));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
                           Tol_LocalShift));
@@ -683,7 +685,7 @@ void check_results_identical(const CesColorimetryResult &a,
   }
   for (std::size_t j = 0; j < 16; ++j) {
     INFO(label << " hue bin " << j);
-    CHECK(nan_aware_close(a.gamut.local.Rcs_hj[j], b.gamut.local.Rcs_hj[j],
+    CHECK(nan_aware_close(a.gamut.local.Rcs_hj_percent[j], b.gamut.local.Rcs_hj_percent[j],
                           kDeterminismTol));
     CHECK(nan_aware_close(a.gamut.local.Rhs_hj[j], b.gamut.local.Rhs_hj[j],
                           kDeterminismTol));

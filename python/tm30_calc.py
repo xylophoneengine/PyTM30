@@ -149,20 +149,21 @@ def _resolve_cmf(
 __all__ = ["TM30Calc", "Tm30Result", "Tm30BatchResult", "to_dataframe", "Cmf"]
 
 
-# -- Multi-level column support (luxpy lx_util.py backwards compatibility) --
+# -- Multi-level column support ------------------------------------------
 #
-# Mirrors the column-naming convention of lx_util.py's tm30_dict_to_dataframe():
+# Backwards-compatible with the author's internal lx_util.py wrapper.
+# Mirrors the column-naming convention of its tm30_dict_to_dataframe():
 # per-CES arrays (99 values/row) -> 'CES_01'..'CES_99', per-bin arrays (16
-# values/row) -> 'bin_01'..'bin_16', per-CES/bin [X,Y,Z]/[J,a,b] triples get a
-# third column level, and scalar fields are single-level (padded with '' to
-# match the deepest column's tuple length, same as lx_util.py's padded_cols).
+# values/row) -> 'bin_01'..'bin_16', per-CES/bin [X,Y,Z]/[J,a,b] triples get
+# a third column level, and scalar fields are single-level (padded with ''
+# to match the deepest column's tuple length, same as its padded_cols).
 #
-# Top-level column names are also aliased to luxpy's own dict key names
-# (verified against `luxpy.color.cri.iestm30.metrics_fast.spd_to_tm30()`'s
-# actual output) so that, e.g., `df['Rcshj']` works exactly like it did
-# against a luxpy-dict-derived DataFrame. Fields with no direct top-level
-# luxpy equivalent keep pytm30's own name -- see the comment below.
-_LUXPY_KEY_ALIASES: dict[str, str] = {
+# Top-level column names follow luxpy's spd_to_tm30() dict vocabulary so
+# existing downstream code keeps working -- e.g. `df['Rcshj']` works
+# exactly like it did against a luxpy-dict-derived DataFrame. Fields with
+# no direct top-level equivalent in that vocabulary keep pytm30's own
+# name -- see the comment below.
+_COMPAT_KEY_ALIASES: dict[str, str] = {
     "rf": "Rf",
     "rg": "Rg",
     # cct, duv: luxpy uses the same lowercase names already -- no alias needed.
@@ -193,7 +194,7 @@ def _field_column_tuples(
     wavelengths: np.ndarray | None,
 ) -> list[tuple[str, ...]]:
     """Build luxpy-style column-name tuples for one field."""
-    label = _LUXPY_KEY_ALIASES.get(key, key)
+    label = _COMPAT_KEY_ALIASES.get(key, key)
 
     if per_row_shape == ():
         return [(label,)]
@@ -324,7 +325,7 @@ class Tm30Result:
             raise AttributeError(
                 "rf_cesi is not available on this result -- call "
                 "eval(..., samples=True) to include it (samples defaults "
-                "to True; this result came from an explicit samples=False)."
+                "to False)."
             )
         return np.asarray(self._d["rf_cesi"])
 
@@ -618,7 +619,12 @@ class Tm30BatchResult:
 
     @property
     def rf_skin(self) -> np.ndarray:
-        """Skin fidelity Rf,skin - shape (N,).  TM-30-20 §4.2."""
+        """Skin fidelity Rf,skin - shape (N,).
+
+        PyTM30 research extension informed by TM-30-20 §4.2 (mean of the
+        CES15 and CES18 fidelity values); not a standardised TM-30
+        measure (§1.2, §4.0).
+        """
         return self._d["rf_skin"]
 
     @property
@@ -628,13 +634,17 @@ class Tm30BatchResult:
             raise AttributeError(
                 "rf_cesi is not available on this result -- call "
                 "eval(..., samples=True) to include it (samples defaults "
-                "to True; this result came from an explicit samples=False)."
+                "to False)."
             )
         return self._d["rf_cesi"]
 
     @property
     def rcs_hj(self) -> np.ndarray:
-        """Per-bin chroma shift Rcs,hj - shape (N, 16).  TM-30-20 §4.6."""
+        """Per-bin chroma shift Rcs,hj, in percent - shape (N, 16).
+
+        TM-30-20 §4.6: Eq. (62) computes a ratio; §4.6 requires percentage
+        representation, applied once in the core library.
+        """
         if "rcs_hj" not in self._d:
             raise AttributeError(
                 "rcs_hj is not available on this result -- call "
@@ -645,7 +655,11 @@ class Tm30BatchResult:
 
     @property
     def rhs_hj(self) -> np.ndarray:
-        """Per-bin hue shift Rhs,hj - shape (N, 16).  TM-30-20 §4.7."""
+        """Per-bin hue shift Rhs,hj, dimensionless ratio - shape (N, 16).
+
+        TM-30-20 §4.7: Eq. (63) is ratio-valued and §4.7 states no
+        percentage requirement; reported unscaled.
+        """
         if "rhs_hj" not in self._d:
             raise AttributeError(
                 "rhs_hj is not available on this result -- call "
@@ -1007,7 +1021,7 @@ class TM30Calc:
         wavelengths: np.ndarray | None = None,
         *,
         bins: bool = True,
-        samples: bool = True,
+        samples: bool = False,
         extras: bool = False,
     ) -> Tm30Result | Tm30BatchResult:
         """Evaluate TM-30 for one or many SPDs.
@@ -1037,9 +1051,11 @@ class TM30Calc:
             False to skip allocating/copying these arrays as a batch-size
             memory/bandwidth optimization.
         samples : bool
-            Include per-sample fidelity Rf,CESi.  Default True - pass
-            False to skip allocating/copying this array as a batch-size
-            memory/bandwidth optimization.
+            Include per-sample fidelity Rf,CESi.  Default False (matching
+            the C++ Tm30Request default) - pass True to include the
+            99-element per-sample array; leaving it off skips allocating/
+            copying that array as a batch-size memory/bandwidth
+            optimization.
         extras : bool
             Include additional fields: rf_hj, de_hj (16 each), CVG
             coordinates (cvg_j_test/x_test/y_test/j_ref/x_ref/y_ref, 16
@@ -1143,7 +1159,9 @@ class TM30Calc:
             Normalisation constant.  None (default): auto-compute
             k = 100/integral St*ybar dlambda -> Y = 100 (TM-30-20 §3.2 Eq. 4).
             K = 1.0: raw tristimulus integrals.
-            K = 683.0: photometric absolute (matches luxpy's relative=False).
+            K = 683.0: photometric absolute -- Km, the maximum luminous
+            efficacy of radiation at 555 nm (CIE/SI definition of the
+            candela); not a TM-30-20 quantity.
         cmf : Cmf, str, Path, or None
             CIE observer for this call. None (default): use this
             calculator's bound CMF. Explicit value: load+resample a

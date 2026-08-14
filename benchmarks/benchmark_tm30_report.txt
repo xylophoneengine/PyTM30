@@ -1,4 +1,16 @@
 ======================================================================
+0) ENVIRONMENT
+======================================================================
+Date (UTC):     2026-08-14 15:59
+Python:         3.12.13 (CPython)
+OS / machine:   macOS-26.6.1-arm64-arm-64bit (arm64)
+CPU:            Apple M4 Pro
+Power mode:     2 (macOS pmset powermode; 1 = low power)
+numpy:          2.5.2
+colour-science: 0.4.7
+pytm30:         0.1.0
+
+======================================================================
 1) TEST SETUP
 ======================================================================
 SPD corpus: 19 real standard-illuminant spectra from data/*.csv
@@ -28,22 +40,22 @@ Calculator: TM30Calc(tables loaded)
 2) SPEED
 ======================================================================
 pytm30 single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.1110 +/- 0.0366 ms/SPD (median 0.1290, max 0.1865)
+  0.1121 +/- 0.0379 ms/SPD (median 0.1306, max 0.1645)
 
 colour-science single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  1.1997 +/- 0.3046 ms/SPD (median 1.1523, max 9.1754)
+  1.0728 +/- 0.2510 ms/SPD (median 1.0510, max 7.6225)
 
-pytm30 is 10.8x faster, single eval
+pytm30 is 9.6x faster, single eval
 
 pytm30 true batch, all 19 SPDs in one call, 100 repetitions:
-  2.5342 +/- 0.0875 ms total (0.1334 ms/SPD)
+  2.5428 +/- 0.0480 ms total (0.1338 ms/SPD)
 
 colour-science pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  22.1565 +/- 0.6381 ms total (1.1661 ms/SPD)
+  20.3035 +/- 0.6518 ms total (1.0686 ms/SPD)
 
-pytm30 is 8.7x faster, batch
+pytm30 is 8.0x faster, batch
 
-Timing plot saved: /Users/zwenger/mini_projects/PyTM30/.claude/worktrees/perf+ces-xyz-weights/benchmarks/benchmark_tm30_timing.png
+Timing plot saved: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/benchmarks/benchmark_tm30_timing.png
 
 ======================================================================
 3) ACCURACY
@@ -51,12 +63,14 @@ Timing plot saved: /Users/zwenger/mini_projects/PyTM30/.claude/worktrees/perf+ce
 pytm30 vs colour-science 0.4.7 ('ANSI/IES TM-30-18'), 19 SPDs:
 
   Metric           Mean          Std   Max|Delta|
-  Rf             0.0003       0.0012       0.0043
+  Rf             0.0004       0.0012       0.0043
   Rg            -0.0003       0.0005       0.0013
-  CCT             0.045        0.017        0.069
+  CCT             0.050        0.014        0.069
   Duv          8.08e-07     3.41e-07     1.76e-06
 
-Plot saved: /Users/zwenger/mini_projects/PyTM30/.claude/worktrees/perf+ces-xyz-weights/benchmarks/benchmark_tm30_accuracy.png
+Plot saved: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/benchmarks/benchmark_tm30_accuracy.png
+
+README measured-claims block refreshed: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/README.md
 
 Done.
-Report saved: /Users/zwenger/mini_projects/PyTM30/.claude/worktrees/perf+ces-xyz-weights/benchmarks/benchmark_tm30_report.txt
+Report saved: /Users/zwenger/dev/tm30-working-copy/pytm30-fix/benchmarks/benchmark_tm30_report.txt

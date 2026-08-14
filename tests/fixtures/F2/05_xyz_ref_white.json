@@ -1,11 +1,11 @@
 {
   "spd_name": "F2",
-  "cri_type": "ies-tm30-20",
+  "standard": "ANSI/IES TM-30-20",
   "colour_science_version": "0.4.7",
   "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
-  "generated": "2026-07-29",
+  "generated": "2026-08-14",
   "stage": "05_xyz_ref_white",
-  "X": 100.45215410842006,
-  "Y": 100.00000000000001,
-  "Z": 68.44553575400774
+  "X": 100.45198663433959,
+  "Y": 99.99999999999999,
+  "Z": 68.44607559920036
 }

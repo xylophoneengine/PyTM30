@@ -1,5 +1,6 @@
 // TM-30-20: Gamut Area Index (Rg), per-bin local metrics, and CVG coordinates.
 //
+// TM-30-20 §4.3: hue-angle bins and bin-averaged (a', b') coordinates
 // TM-30-20 §4.4: Gamut Index (Rg)
 // TM-30-20 §4.5: Color Vector Graphic (CVG)
 // TM-30-20 §4.6: Local Chroma Shift (Rcs,hj)
@@ -29,49 +30,59 @@ static constexpr double kRfScale = 6.73; // TM-30-20 §4.1 Eq. (53)
 // TM-30-20 §4.1: Log rescale divisor.
 static constexpr double kLogRescale = 10.0; // TM-30-20 §4.1 Eq. (54)
 
-// TM-30-20 §4.6, §4.7: Local shift scaling.
-// Note: Eqs. (62)/(63) as printed are ratio-valued and carry NO x100
-// factor. §4.6/§4.7 only require Rcs,hj/Rhs,hj to be "represented as a
-// percentage" -- a reporting instruction, not equation content. luxpy
-// stores raw ratios; we match luxpy (compute raw, scale at report time).
-static constexpr double kLocalShiftScale = 1.0; // TM-30-20 §4.6, §4.7
+// TM-30-20 §4.6, Eq. (62): Rcs,hj is computed as a ratio, and §4.6
+// requires it to be represented as a percentage (Table E-1 gives a range
+// of roughly -100% to 100%; the Annex D report templates print
+// percentages). The conversion is applied exactly once, at struct fill in
+// compute_local_bin_metrics.
+static constexpr double kRcsRatioToPercent = 100.0; // TM-30-20 §4.6
 
-// CVG display scale -- implementation convention, NOT a §4.5 quantity.
-// §4.5 normalizes reference coordinates to a unit circle (radius 1) with
-// plot axis limits of +/-1.5; no x100 appears in Eqs. (58)-(61) or their
-// surrounding text. The x100 here is kept for luxpy fixture parity;
-// whitelisted in tools/check_constants_whitelist.txt.
-static constexpr double kCvgScale = 100.0;
+// TM-30-20 §4.7, Eq. (63): Rhs,hj is likewise ratio-valued, but §4.7
+// states no percentage requirement. Table E-1 gives its range as roughly
+// -1 to 1 and the Annex D report templates print bare decimals, so it is
+// reported as the raw ratio.
+static constexpr double kRhsScale = 1.0; // TM-30-20 §4.7
+
+// TM-30-20 §4.5: reference coordinates are normalised to a unit circle
+// (radius 1); the prescribed plot axis limits are +/-1.5 and the optional
+// guide circles are radii 0.8/0.9/1.1/1.2, all dimensionless multiples of
+// that unit circle. Eqs. (58)-(61) carry no scale factor. Any display
+// scaling belongs in a plotting layer, not here.
+static constexpr double kCvgScale = 1.0; // TM-30-20 §4.5
 
 // --- Bin Averages ---------------------------------------------------------
 
 BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
                         const HueBins &bins) {
-  // TM-30-20 §4.4
+  // TM-30-20 §4.3: the closing paragraph specifies the per-bin arithmetic
+  // mean of (a', b') for both the test and the reference condition; §4.4
+  // then consumes those averages for Rg.
   BinAverages avg{};
 
   for (int j = 0; j < kNumBins; ++j) {
-    // TM-30-20 §4.4
+    // TM-30-20 §4.3
     const auto &bin = bins[j];
     const std::size_t m = bin.size();
 
     if (m == 0) {
-      // Empty bin: mark as NaN
-      // TM-30-20 §4.4 edge case
+      // Implementation extension -- defensive handling of an empty bin.
+      // TM-30-20 §4.3 gives the per-bin CES count as 2 to 11; an empty
+      // bin is not contemplated by the standard. Marked NaN.
       avg.J_prime[j] = std::numeric_limits<double>::quiet_NaN();
       avg.a_prime[j] = std::numeric_limits<double>::quiet_NaN();
       avg.b_prime[j] = std::numeric_limits<double>::quiet_NaN();
       continue;
     }
 
-    // TM-30-20 §4.4: bin average J, a', b' - initialize accumulators
+    // TM-30-20 §4.3: bin average a', b' - initialize accumulators
+    // (J' is a PyTM30 extension; §4.3 specifies only a' and b')
     double sum_J = 0.0, sum_a = 0.0, sum_b = 0.0;
     for (int idx : bin) {
       sum_J += jab_ces[idx].J_prime;
       sum_a += jab_ces[idx].a_prime;
       sum_b += jab_ces[idx].b_prime;
     }
-    // TM-30-20 §4.4: arithmetic mean
+    // TM-30-20 §4.3: arithmetic mean
     avg.J_prime[j] = sum_J / static_cast<double>(m);
     avg.a_prime[j] = sum_a / static_cast<double>(m);
     avg.b_prime[j] = sum_b / static_cast<double>(m);
@@ -96,7 +107,8 @@ double polygon_area(const BinAverages &avg) {
   Vertex verts[16];
   int n = 0;
   for (int j = 0; j < kNumBins; ++j) {
-    // TM-30-20 §4.4 edge case: skip empty bins
+    // Implementation extension: skip empty bins (see bin_average).
+    // TM-30-20 §4.3 does not contemplate empty bins.
     if (std::isnan(avg.a_prime[j]))
       continue;
     verts[n].a = avg.a_prime[j]; // TM-30-20 §4.4
@@ -105,8 +117,9 @@ double polygon_area(const BinAverages &avg) {
   }
 
   if (n < 3) {
-    // Degenerate polygon: fewer than 3 vertices.
-    // TM-30-20 §4.4 edge case
+    // Implementation extension: degenerate-polygon guard. Fewer than 3
+    // vertices cannot bound an area, so the area is reported as 0.
+    // TM-30-20 §4.4 assumes all 16 bin averages exist.
     return 0.0;
   }
 
@@ -146,10 +159,11 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     const std::size_t m = bin.size();
 
     if (m == 0 || std::isnan(ref_avg.a_prime[j])) {
-      // Empty bin: set metrics to NaN
-      // TM-30-20 §4.6-§4.8 edge case
+      // Implementation extension: empty bin (see bin_average), metrics
+      // reported as NaN.
+      // TM-30-20 §4.6-§4.8 do not contemplate empty bins.
       metrics.Rf_hj[j] = std::numeric_limits<double>::quiet_NaN();
-      metrics.Rcs_hj[j] = std::numeric_limits<double>::quiet_NaN();
+      metrics.Rcs_hj_percent[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.Rhs_hj[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.DE_hj[j] = std::numeric_limits<double>::quiet_NaN();
       continue;
@@ -183,9 +197,11 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
                   ref_avg.b_prime[j] * ref_avg.b_prime[j]); // TM-30-20 §4.6
 
     if (r_ref < 1e-12) {
-      // Degenerate: reference at origin - shifts undefined.
-      // TM-30-20 §4.6 edge case
-      metrics.Rcs_hj[j] = 0.0;
+      // Implementation extension: degenerate guard, reference at the
+      // origin. Shifts reported as 0.
+      // TM-30-20 §4.6/§4.7 divide by the reference radial distance and
+      // do not contemplate a zero value.
+      metrics.Rcs_hj_percent[j] = 0.0;
       metrics.Rhs_hj[j] = 0.0;
       continue;
     }
@@ -198,13 +214,14 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     const double cos_t = std::cos(theta);
     const double sin_t = std::sin(theta);
 
-    // Local chroma shift: Eq. (62)
+    // Local chroma shift: Eq. (62) ratio, represented as a percentage
     // TM-30-20 §4.6 Eq. (62)
-    metrics.Rcs_hj[j] = kLocalShiftScale * (da * cos_t + db * sin_t) / r_ref;
+    metrics.Rcs_hj_percent[j] =
+        kRcsRatioToPercent * (da * cos_t + db * sin_t) / r_ref;
 
     // Local hue shift: Eq. (63) - note leading negative on first term
     // TM-30-20 §4.7 Eq. (63)
-    metrics.Rhs_hj[j] = kLocalShiftScale * (-da * sin_t + db * cos_t) / r_ref;
+    metrics.Rhs_hj[j] = kRhsScale * (-da * sin_t + db * cos_t) / r_ref;
   }
 
   return metrics;
@@ -214,8 +231,8 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 
 CvgCoordinates
 compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
-                        const std::array<Cam02Ucs, 99> & /*jab_ref*/,
-                        const HueBins & /*bins*/) {
+                        const std::array<Cam02Ucs, 99> &jab_ref,
+                        const HueBins &bins) {
 
   // TM-30-20 §4.5
   CvgCoordinates cvg{};
@@ -238,11 +255,29 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
       continue;
     }
 
-    // Reference hue angle from bin-averaged a', b'
-    // TM-30-20 §4.5: hbar_ref,j = atan2(bbar'r,j, abar'r,j)
-    // The spec calls for mean of individual hue angles, but the
-    // oracle (luxpy) uses the bin-averaged coordinates directly.
-    const double h_bar = std::atan2(ref_avg.b_prime[j], ref_avg.a_prime[j]);
+    // TM-30-20 §4.5 Eqs. (58)-(59): the reference circle position for bin j
+    // derives from the arithmetic mean of the individual CES hue angles in
+    // the bin, each taken from that sample's own reference-illuminant
+    // (a', b'). This is distinct from the hue angle of the bin-averaged
+    // coordinates, which would weight samples by chroma; Eqs. (58)-(59)
+    // weight every sample in the bin equally.
+    //
+    // std::atan2 returns [-pi, pi], so samples with negative b' (bins 9-16)
+    // come back negative and a raw mean would be meaningless; normalise
+    // each angle to [0, 2*pi) before averaging. After normalisation a plain arithmetic
+    // mean suffices: §4.3 places 0 deg on the positive a' axis with 16 bins
+    // of 22.5 deg increasing counterclockwise, and §4.6 confirms 0 deg is
+    // the boundary between bins 1 and 16, so no bin straddles the wrap
+    // point and circular-mean machinery is unnecessary.
+    double sum_h = 0.0; // TM-30-20 §4.5 Eqs. (58)-(59) accumulator
+    for (int idx : bins[j]) {
+      double h = std::atan2(jab_ref[idx].b_prime, jab_ref[idx].a_prime);
+      if (h < 0.0) {                 // TM-30-20 §4.3: hue angles in [0, 360)
+        h += 2.0 * std::numbers::pi; // TM-30-20 §4.3: full turn, [0, 2*pi)
+      }
+      sum_h += h;
+    }
+    const double h_bar = sum_h / static_cast<double>(bins[j].size());
 
     // Reference radial distance (for test coordinate offset)
     const double r_ref =
@@ -263,7 +298,9 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
     const double db = test_avg.b_prime[j] - ref_avg.b_prime[j];
 
     if (r_ref < 1e-12) {
-      // Degenerate: reference at origin
+      // Implementation extension: degenerate guard, reference at the
+      // origin (Eqs. (60)-(61) divide by it); test point placed on the
+      // reference circle.
       cvg.x_test[j] = kCvgScale * x_ref_raw;
       cvg.y_test[j] = kCvgScale * y_ref_raw;
     } else {

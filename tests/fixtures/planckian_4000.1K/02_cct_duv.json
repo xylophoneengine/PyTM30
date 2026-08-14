@@ -1,10 +1,10 @@
 {
   "spd_name": "planckian_4000.1K",
-  "cri_type": "ies-tm30-20",
+  "standard": "ANSI/IES TM-30-20",
   "colour_science_version": "0.4.7",
   "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
-  "generated": "2026-07-29",
+  "generated": "2026-08-14",
   "stage": "02_cct_duv",
-  "cct": 3999.965151191279,
+  "cct": 3999.9682823038397,
   "duv": 8.229012737433807e-06
 }

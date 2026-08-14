@@ -1,7 +1,12 @@
-// CCT and Duv via Ohno 2014 triangular search.
-// TM-30-20 §3.3: CCT determination using Ohno 2013 method
-// Reference: Ohno, Y. "Practical Use and Calculation of CCT and Duv."
-//            LEUKOS 10, no. 1 (2014): 47-55.
+// CCT and Duv via the Ohno triangular + parabolic search.
+//
+// TM-30-20 §3.3 prints no CCT algorithm; it incorporates one by normative
+// reference: Ohno, Y. "Practical Use and Calculation of CCT and Duv."
+// Leukos 10(1):47-55, doi:10.1080/15502724.2014.839020. (TM-30-20's
+// reference list dates the article 2013, online-first; Smet et al. 2023
+// cite it as 2014 -- same article, so the DOI is the stable citation.)
+// Per TM-30-20 §3.1, CCT determination uses the CIE 1931 2-deg observer,
+// unlike the 1964 10-deg observer used everywhere else.
 
 #include "tm30/cct.hpp"
 #include "tm30/chromaticity.hpp"
@@ -54,7 +59,8 @@ PlanckianLut load_planckian_lut(const std::string &filepath) {
 // -------------------------------------------------------------------------
 
 CctDuvResult compute_cct_duv(double u_test, double v_test,
-                             const PlanckianLut &lut) {
+                             const PlanckianLut &lut,
+                             const CctOptions &options) {
   const std::size_t n = lut.T.size();
 
   // --- Step 1: Find closest point in LUT by Euclidean distance in (u,v) ---
@@ -123,8 +129,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
       std::sqrt((up1 - um1) * (up1 - um1) + (vp1 - vm1) * (vp1 - vm1));
 
   // Projected distance along segment: x = (dm1^2 - dp1^2 + l^2) / (2*l)
-  // Clamp x to [0, l] for robustness
-  // TM-30-20 §3.3 (Ohno 2014 triangular geometry, algorithmic constants)
+  // TM-30-20 §3.3 incorporation: Ohno (2014) triangular geometry. The
+  // [0, l] clamp below is an implementation robustness extension, not
+  // part of the published method.
   double x = (dm1 * dm1 - dp1 * dp1 + l * l) / (2.0 * l);
   if (x < 0.0)
     x = 0.0;
@@ -148,7 +155,8 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // We determine sign by comparing v coordinates: v_test > v_ch -> positive
   // (In CIE 1960 UCS, the Planckian locus generally has negative slope,
   //  so being "above" means higher v at the same approximate u.)
-  // TM-30-20 §3.3 (sign convention for Duv)
+  // Duv sign convention per Ohno (2014); method incorporated by
+  // TM-30-20 §3.3 by normative reference.
   const double sign = (v_test >= vch) ? 1.0 : -1.0;
   const double duv_tri = duv_mag * sign;
 
@@ -159,7 +167,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // Using the formula from Ohno 2014 (equivalent to Lagrange interpolation)
 
   // Denominator for the quadratic coefficients
-  // TM-30-20 §3.3 (Ohno 2014 parabolic fit, guard against zero)
+  // TM-30-20 §3.3 incorporation: Ohno (2014) parabolic fit. The zero
+  // guard below is an implementation robustness extension, not part of
+  // the published method.
   double denom = (Tp1 - T0) * (Tm1 - Tp1) * (T0 - Tm1);
   if (std::abs(denom) < 1e-30)
     denom = 1e-30;
@@ -181,7 +191,9 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
       denom;
 
   // Vertex of parabola: T_par = -b / (2a)
-  // TM-30-20 §3.3 (Ohno 2014 parabolic vertex formula)
+  // Ohno (2014) parabolic vertex formula; method incorporated by
+  // TM-30-20 §3.3 by normative reference. The [Tm1, Tp1] clamp and the
+  // triangular fallback below are implementation robustness extensions.
   double T_par;
   if (std::abs(a) > 1e-30) {
     T_par = -b / (2.0 * a);
@@ -201,22 +213,44 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 
   // --- Step 6: Select between triangular and parabolic ---
 
-  // TM-30-20 uses a threshold of 0.002 (from Ohno 2014)
-  // TM-30-20 §3.3 threshold for triangular vs parabolic
-  // When |Duv| < 0.002, use triangular; otherwise parabolic.
-  // This matches the luxpy implementation for TM-30.
-  constexpr double duv_threshold = 0.002; // TM-30-20 §3.3
+  // The triangular/parabolic selection threshold is from Ohno (2014),
+  // the method incorporated by normative reference; the TM-30-20 text
+  // itself prints no threshold. When |Duv| < 0.002 the triangular
+  // solution is used; otherwise the parabolic one.
+  //
+  // Known bias, deliberately uncorrected: the triangular solution
+  // approximates the curved Planckian locus with a straight chord
+  // between LUT points, giving a small systematic CCT bias that shrinks
+  // with the square of the LUT spacing. Ohno (2014) publishes a
+  // constant correction factor for it, but that constant is fitted to
+  // the paper's 1%-step LUT; applied to this implementation's 0.25%
+  // grid it would overcorrect by roughly the ratio of the squared
+  // spacings (~16x) and worsen accuracy, so it is omitted. Smet et al.
+  // 2023 (doi:10.1080/15502724.2023.2248397) bound the uncorrected
+  // method's maximum CCT error at ~0.4 K for a 0.25% LUT.
+  // TM-30-20 §3.3 incorporation; threshold value from Ohno (2014).
+  constexpr double duv_threshold = 0.002;
 
-  // Apply linear shift to triangular solution (as in luxpy/TM-30)
-  // T_tri_shift = T_tri + (T_par - T_tri) * |duv_tri| / threshold
-  // TM-30-20 §3.3 (blend region clamp)
+  // Ohno (2014), as published: below the threshold the triangular
+  // solution is used as-is; above it the parabolic one.
+  //
+  // Optional refinement (opt-in, default off): the calculators supplied
+  // with TM-30 and CQS apply a shifted-triangular correction below the
+  // threshold, T = T_tri + (T_par - T_tri) * |duv_tri| / threshold. It is
+  // absent from the published method and from Smet et al. 2023's
+  // description of it, so there is nothing to cite; it is computed only
+  // when CctOptions::shifted_triangular_blend is set. The min(..., 1.0)
+  // clamp on the blend fraction is an implementation robustness
+  // extension.
   const double duv_abs = std::abs(duv_tri);
-  const double T_tri_shift =
-      T_tri + (T_par - T_tri) * std::min(duv_abs / duv_threshold, 1.0);
 
   CctDuvResult result;
   if (duv_abs < duv_threshold) {
-    result.cct = T_tri_shift;
+    double cct = T_tri;
+    if (options.shifted_triangular_blend) {
+      cct = T_tri + (T_par - T_tri) * std::min(duv_abs / duv_threshold, 1.0);
+    }
+    result.cct = cct;
     result.duv = duv_tri;
   } else {
     result.cct = T_par;
@@ -231,9 +265,10 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 // -------------------------------------------------------------------------
 
 CctDuvResult compute_cct_duv_from_xyz(double X, double Y, double Z,
-                                      const PlanckianLut &lut) {
+                                      const PlanckianLut &lut,
+                                      const CctOptions &options) {
   const UvCoord uv = xyz_to_uv(X, Y, Z);
-  return compute_cct_duv(uv.u, uv.v, lut);
+  return compute_cct_duv(uv.u, uv.v, lut, options);
 }
 
 } // namespace tm30

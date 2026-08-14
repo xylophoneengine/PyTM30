@@ -50,7 +50,7 @@ std::vector<double> generate_planckian(double cct,
 /// generate_reference_spd() with already_resampled=true, instead of
 /// re-interpolating it on every call.
 ///
-/// TM-30-20 §3.5: "Linear interpolation shall be used."
+/// TM-30-20 §3.5 requires linear interpolation.
 DaylightBasis
 resample_daylight_basis(const std::vector<double> &target_wavelengths,
                         const DaylightBasis &basis);

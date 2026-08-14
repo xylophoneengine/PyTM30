@@ -39,8 +39,6 @@ constexpr double kDuvMaxAbs = 0.05;
 
 // TM-30-20 §3.5: Full CES wavelength range is 380-780 nm.
 // If the test SPD does not cover this range, extrapolation is needed.
-constexpr double kFullRangeMin = 380.0; // TM-30-20 §3.5
-constexpr double kFullRangeMax = 780.0; // TM-30-20 §3.5
 } // namespace
 
 // ==========================================================================
@@ -60,13 +58,13 @@ static Validity compute_validity(const CesColorimetryResult &cr,
   // C78.377-2017 white bins), no numerical Duv threshold.
   v.duv_out_of_range = (std::abs(cr.duv) > kDuvMaxAbs);
 
-  // Test SPD does not cover the full 380-780 nm grid -> zero-fill applied
-  // per TM-30-20 §3.5 ("missing values shall be replaced by zeros"; the test
-  // SPD "shall never be interpolated or extrapolated"). Flat-extrapolation
-  // of CES/CMF reference tables from 400-700 to 380-780 is a separate
-  // provision (TM-30-20 §1.3 / Annex A) and is unrelated to this flag.
-  v.extrapolated = (spd.min_wavelength() > kFullRangeMin ||
-                    spd.max_wavelength() < kFullRangeMax);
+  // Test SPD did not cover the full 380-780 nm grid; the missing edge
+  // values were zero-filled at Spd construction per TM-30-20 §3.5, which
+  // requires zeros for missing values and forbids interpolating or
+  // extrapolating the test SPD. Flat-extrapolation of CES/CMF reference
+  // tables from 400-700 to 380-780 is a separate provision (TM-30-20
+  // §1.3 / Annex A) and is unrelated to this flag.
+  v.extrapolated = spd.zero_filled();
 
   return v;
 }
@@ -339,6 +337,15 @@ try_evaluate_cached(std::span<const SpdView> spds,
 
         // Run the pipeline using the pre-resampled tables - no CES/CMF
         // resampling happens here.
+        // Guard: the row's §3.5-conformed grid must match the grid the
+        // cached tables were resampled to. Rows and the bound grid are
+        // conformed by the same Spd recipe, so a mismatch means this
+        // row's input grid differs from the bound grid.
+        if (spd.wavelengths() != tables.wavelengths) {
+          throw InvalidSpd("SPD wavelength grid does not match the fixed "
+                           "grid the cached tables are bound to");
+        }
+
         Tm30Result result;
         result.colorimetry =
             compute_ces_colorimetry_cached(spd.values(), tables, planckian_lut);
@@ -366,6 +373,15 @@ try_evaluate_cached(std::span<const SpdView> spds,
         Spd spd(
             std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
             std::vector<double>(sv.values.begin(), sv.values.end()));
+
+        // Guard: the row's §3.5-conformed grid must match the grid the
+        // cached tables were resampled to. Rows and the bound grid are
+        // conformed by the same Spd recipe, so a mismatch means this
+        // row's input grid differs from the bound grid.
+        if (spd.wavelengths() != tables.wavelengths) {
+          throw InvalidSpd("SPD wavelength grid does not match the fixed "
+                           "grid the cached tables are bound to");
+        }
 
         Tm30Result result;
         result.colorimetry =
@@ -403,6 +419,12 @@ try_evaluate_cached(std::span<const SpdView> spds,
           Spd spd(
               std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
               std::vector<double>(sv.values.begin(), sv.values.end()));
+
+          // Guard: see the sequential loop body above.
+          if (spd.wavelengths() != tables.wavelengths) {
+            throw InvalidSpd("SPD wavelength grid does not match the fixed "
+                             "grid the cached tables are bound to");
+          }
 
           Tm30Result result;
           result.colorimetry = compute_ces_colorimetry_cached(

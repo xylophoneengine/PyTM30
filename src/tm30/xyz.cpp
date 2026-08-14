@@ -4,6 +4,7 @@
 // TM-30-20 §3.6: Calculation of Tristimulus Values
 #include "tm30/xyz.hpp"
 #include "tm30/integrate.hpp"
+#include "tm30/spd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -247,12 +248,45 @@ XyzTriple spd_to_xyz(const std::vector<double> &spd_wavelengths,
   }
 }
 
+std::vector<XyzTriple> spd_to_xyz_batch_prepared(
+    const std::vector<double> &spd_wavelengths,
+    const std::vector<std::vector<double>> &spd_matrix,
+    const CmfData &cmf_resampled, std::optional<double> K) {
+  if (cmf_resampled.x_bar.size() != spd_wavelengths.size()) {
+    throw std::invalid_argument(
+        "cmf_resampled does not match the wavelength grid: expected " +
+        std::to_string(spd_wavelengths.size()) + " samples, got " +
+        std::to_string(cmf_resampled.x_bar.size()));
+  }
+  std::vector<XyzTriple> results;
+  results.reserve(spd_matrix.size());
+  for (const auto &vals : spd_matrix) {
+    SourceXyz src =
+        compute_source_xyz(spd_wavelengths, vals, cmf_resampled.x_bar,
+                           cmf_resampled.y_bar, cmf_resampled.z_bar);
+    if (K.has_value()) {
+      double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+      results.push_back(XyzTriple{src.X * scale, src.Y * scale, src.Z * scale});
+    } else {
+      results.push_back(XyzTriple{src.X, src.Y, src.Z});
+    }
+  }
+  return results;
+}
+
 std::vector<XyzTriple>
 spd_to_xyz_batch(const std::vector<double> &spd_wavelengths,
                  const std::vector<std::vector<double>> &spd_matrix,
                  const CmfData &cmf_data, std::optional<double> K,
                  std::optional<double> lambda_min,
                  std::optional<double> lambda_max) {
+  if (!lambda_min.has_value() && !lambda_max.has_value()) {
+    // No clipping: the grid is the integration grid; delegate so the
+    // prepared path and this one cannot diverge.
+    return spd_to_xyz_batch_prepared(spd_wavelengths, spd_matrix,
+                                     resample_cmf(spd_wavelengths, cmf_data),
+                                     K);
+  }
   const ClipIndices idx =
       compute_clip_indices(spd_wavelengths, lambda_min, lambda_max);
 
@@ -296,12 +330,16 @@ spd_to_Yuv_batch(const std::vector<double> &spd_wavelengths,
                  std::optional<double> lambda_max) {
   auto xyzs = spd_to_xyz_batch(spd_wavelengths, spd_matrix, cmf_data, K,
                                lambda_min, lambda_max);
-  std::vector<YuvTriple> results;
-  results.reserve(xyzs.size());
-  for (const auto &xyz : xyzs) {
-    results.push_back(xyz_to_Yuv(xyz.X, xyz.Y, xyz.Z));
-  }
-  return results;
+  return xyz_to_Yuv_batch(xyzs);
+}
+
+std::vector<YuvTriple> spd_to_Yuv_batch_prepared(
+    const std::vector<double> &spd_wavelengths,
+    const std::vector<std::vector<double>> &spd_matrix,
+    const CmfData &cmf_resampled, std::optional<double> K) {
+  auto xyzs =
+      spd_to_xyz_batch_prepared(spd_wavelengths, spd_matrix, cmf_resampled, K);
+  return xyz_to_Yuv_batch(xyzs);
 }
 
 std::vector<YuvTriple> xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs) {
@@ -331,12 +369,16 @@ XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
   return XyzTriple{src.X, src.Y, src.Z};
 }
 
-std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
-                                        const std::vector<double> &wavelengths,
-                                        const DaylightBasis &basis,
-                                        const CmfData &cmf_data,
-                                        std::optional<double> K) {
-  CmfData cmf_resampled = resample_cmf(wavelengths, cmf_data);
+std::vector<XyzTriple> cct_to_xyz_batch_prepared(
+    const std::vector<double> &ccts, const std::vector<double> &wavelengths,
+    const DaylightBasis &basis, const CmfData &cmf_resampled,
+    std::optional<double> K) {
+  if (cmf_resampled.y_bar.size() != wavelengths.size()) {
+    throw std::invalid_argument(
+        "cmf_resampled does not match the wavelength grid: expected " +
+        std::to_string(wavelengths.size()) + " samples, got " +
+        std::to_string(cmf_resampled.y_bar.size()));
+  }
   std::vector<XyzTriple> results;
   results.reserve(ccts.size());
   for (double cct : ccts) {
@@ -355,32 +397,72 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
   return results;
 }
 
+std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
+                                        const std::vector<double> &wavelengths,
+                                        const DaylightBasis &basis,
+                                        const CmfData &cmf_data,
+                                        std::optional<double> K) {
+  return cct_to_xyz_batch_prepared(
+      ccts, wavelengths, basis, resample_cmf(wavelengths, cmf_data), K);
+}
+
 CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
                         const std::vector<double> &spd_values,
                         const CmfData &cmf_data,
                         const PlanckianLut &planckian_lut) {
-  CmfData cmf_resampled = resample_cmf(spd_wavelengths, cmf_data);
+  // TM-30-20 §3.5: conform the SPD (drop samples outside 380-780 nm,
+  // zero-fill to cover the range, reject steps > 5 nm) before any
+  // integration -- the same conformance the full pipeline applies, so
+  // this entry point cannot yield a different CCT for the same source.
+  const Spd spd(spd_wavelengths, spd_values);
+  CmfData cmf_resampled = resample_cmf(spd.wavelengths(), cmf_data);
   SourceXyz src =
-      compute_source_xyz(spd_wavelengths, spd_values, cmf_resampled.x_bar,
+      compute_source_xyz(spd.wavelengths(), spd.values(), cmf_resampled.x_bar,
                          cmf_resampled.y_bar, cmf_resampled.z_bar);
   return compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut);
+}
+
+std::vector<CctDuvResult> spd_to_cct_batch_prepared(
+    const std::vector<double> &raw_wavelengths,
+    const std::vector<std::vector<double>> &spd_matrix,
+    const CmfData &cmf_resampled, const PlanckianLut &planckian_lut) {
+  // Per-row §3.5 conformance. Spd is the single owner of the §3.5
+  // recipe -- do not inline a copy of it here for speed (that is the
+  // drift the remediation removed); the planned ValidatedGrid refactor
+  // removes the per-row grid cost instead
+  // (docs/PLAN_validate_once_per_grid.md).
+  std::vector<CctDuvResult> results;
+  results.reserve(spd_matrix.size());
+  for (const auto &vals : spd_matrix) {
+    const Spd spd(raw_wavelengths, vals);
+    if (spd.wavelengths().size() != cmf_resampled.x_bar.size()) {
+      throw std::invalid_argument(
+          "cmf_resampled does not match the conformed grid: expected " +
+          std::to_string(spd.wavelengths().size()) + " samples, got " +
+          std::to_string(cmf_resampled.x_bar.size()));
+    }
+    SourceXyz src =
+        compute_source_xyz(spd.wavelengths(), spd.values(),
+                           cmf_resampled.x_bar, cmf_resampled.y_bar,
+                           cmf_resampled.z_bar);
+    results.push_back(
+        compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut));
+  }
+  return results;
 }
 
 std::vector<CctDuvResult>
 spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
                  const std::vector<std::vector<double>> &spd_matrix,
                  const CmfData &cmf_data, const PlanckianLut &planckian_lut) {
-  CmfData cmf_resampled = resample_cmf(spd_wavelengths, cmf_data);
-  std::vector<CctDuvResult> results;
-  results.reserve(spd_matrix.size());
-  for (const auto &vals : spd_matrix) {
-    SourceXyz src =
-        compute_source_xyz(spd_wavelengths, vals, cmf_resampled.x_bar,
-                           cmf_resampled.y_bar, cmf_resampled.z_bar);
-    results.push_back(
-        compute_cct_duv_from_xyz(src.X, src.Y, src.Z, planckian_lut));
-  }
-  return results;
+  // TM-30-20 §3.5 conformance, same as spd_to_cct. The shared grid is
+  // conformed once via a unit-value probe so the CMF is resampled once;
+  // rows are then handled by the prepared variant above.
+  const Spd grid_probe(spd_wavelengths,
+                       std::vector<double>(spd_wavelengths.size(), 1.0));
+  CmfData cmf_resampled = resample_cmf(grid_probe.wavelengths(), cmf_data);
+  return spd_to_cct_batch_prepared(spd_wavelengths, spd_matrix,
+                                   cmf_resampled, planckian_lut);
 }
 
 double spd_to_power(const std::vector<double> &wavelengths,
@@ -402,12 +484,49 @@ double spd_to_power(const std::vector<double> &wavelengths,
   return kMaxLuminousEfficacy * trapezoidal_integrate(clip_wl, weighted);
 }
 
+std::vector<double> spd_to_power_batch_prepared(
+    const std::vector<double> &wavelengths,
+    const std::vector<std::vector<double>> &spd_matrix,
+    const CmfData &cmf_resampled, bool photometric) {
+  if (photometric && cmf_resampled.y_bar.size() != wavelengths.size()) {
+    throw std::invalid_argument(
+        "cmf_resampled does not match the wavelength grid: expected " +
+        std::to_string(wavelengths.size()) + " samples, got " +
+        std::to_string(cmf_resampled.y_bar.size()));
+  }
+  std::vector<double> results;
+  results.reserve(spd_matrix.size());
+  std::vector<double> weighted;
+  for (const auto &vals : spd_matrix) {
+    if (!photometric) {
+      results.push_back(trapezoidal_integrate(wavelengths, vals));
+      continue;
+    }
+    weighted.resize(vals.size());
+    for (std::size_t i = 0; i < vals.size(); ++i) {
+      weighted[i] = vals[i] * cmf_resampled.y_bar[i];
+    }
+    results.push_back(kMaxLuminousEfficacy *
+                      trapezoidal_integrate(wavelengths, weighted));
+  }
+  return results;
+}
+
 std::vector<double>
 spd_to_power_batch(const std::vector<double> &wavelengths,
                    const std::vector<std::vector<double>> &spd_matrix,
                    const CmfData &cmf_data, bool photometric,
                    std::optional<double> lambda_min,
                    std::optional<double> lambda_max) {
+  if (!lambda_min.has_value() && !lambda_max.has_value()) {
+    // No clipping: delegate so the prepared path and this one cannot
+    // diverge. The radiometric branch never touches the CMF; resample
+    // only when it is used.
+    return spd_to_power_batch_prepared(
+        wavelengths, spd_matrix,
+        photometric ? resample_cmf(wavelengths, cmf_data) : CmfData{},
+        photometric);
+  }
   const ClipIndices idx =
       compute_clip_indices(wavelengths, lambda_min, lambda_max);
   std::vector<double> clip_wl(wavelengths.begin() + idx.lo,

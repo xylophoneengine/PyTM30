@@ -63,8 +63,11 @@ compute_rf_cesi(const std::array<double, 99> &delta_e_array) {
 }
 
 double compute_rf_skin(const std::array<double, 99> &rf_cesi) {
-  // TM-30-20 §4.2: Rf,skin = (Rf,CES15 + Rf,CES18) / 2
-  // CES indices are 1-based: CES15 -> index 14, CES18 -> index 17
+  // Rf,skin = (Rf,CES15 + Rf,CES18) / 2 -- PyTM30 research extension.
+  // TM-30-20 §4.2 describes the CES15/CES18 mean as correlating with the
+  // broader skin-sample set, but it is not one of the standard's 50
+  // measures (§1.2) and per §4.0 is not identified as part of the TM-30
+  // method. CES indices are 1-based: CES15 -> index 14, CES18 -> index 17.
   return (rf_cesi[14] + rf_cesi[17]) / 2.0;
 }
 

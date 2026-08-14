@@ -16,6 +16,7 @@
 #include "tolerances.hpp"
 
 #include <cmath>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -687,6 +688,74 @@ TEST_CASE("spd_to_power_batch - returns one scalar per SPD, not a triple",
 
   auto results = spd_to_power_batch(wl, spds, cmf, false);
   REQUIRE(results.size() == 3);
+}
+
+// -------------------------------------------------------------------------
+// *_prepared variants - pre-resampled-CMF fast paths used by the Python
+// bindings' per-grid cache. Must be bit-identical to the plain calls.
+// -------------------------------------------------------------------------
+
+TEST_CASE("prepared batch variants match their plain counterparts "
+          "bit-for-bit",
+          "[xyz][Yuv][power][batch]") {
+  auto [wl, d65] = load_spd_csv(data_path("d65_1nm.csv"));
+  auto [wl_a, illa] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
+  CmfData cmf = load_cmf(data_path("cmf_1964_10.csv"));
+  DaylightBasis basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  std::vector<std::vector<double>> batch = {d65, illa};
+
+  CmfData cmf_resampled = resample_cmf(wl, cmf);
+
+  // spd_to_xyz_batch (no clipping) vs prepared
+  auto xyz_plain = spd_to_xyz_batch(wl, batch, cmf);
+  auto xyz_prep = spd_to_xyz_batch_prepared(wl, batch, cmf_resampled);
+  REQUIRE(xyz_prep.size() == xyz_plain.size());
+  for (std::size_t i = 0; i < xyz_plain.size(); ++i) {
+    REQUIRE(xyz_prep[i].X == xyz_plain[i].X);
+    REQUIRE(xyz_prep[i].Y == xyz_plain[i].Y);
+    REQUIRE(xyz_prep[i].Z == xyz_plain[i].Z);
+  }
+
+  // spd_to_Yuv_batch vs prepared
+  auto yuv_plain = spd_to_Yuv_batch(wl, batch, cmf);
+  auto yuv_prep = spd_to_Yuv_batch_prepared(wl, batch, cmf_resampled);
+  for (std::size_t i = 0; i < yuv_plain.size(); ++i) {
+    REQUIRE(yuv_prep[i].Y == yuv_plain[i].Y);
+    REQUIRE(yuv_prep[i].u_prime == yuv_plain[i].u_prime);
+    REQUIRE(yuv_prep[i].v_prime == yuv_plain[i].v_prime);
+  }
+
+  // spd_to_power_batch, radiometric and photometric, vs prepared
+  auto pow_rad_plain = spd_to_power_batch(wl, batch, cmf, false);
+  auto pow_rad_prep = spd_to_power_batch_prepared(wl, batch, CmfData{}, false);
+  REQUIRE(pow_rad_prep == pow_rad_plain);
+  auto pow_photo_plain = spd_to_power_batch(wl, batch, cmf, true);
+  auto pow_photo_prep =
+      spd_to_power_batch_prepared(wl, batch, cmf_resampled, true);
+  REQUIRE(pow_photo_prep == pow_photo_plain);
+
+  // cct_to_xyz_batch vs prepared
+  std::vector<double> ccts = {2700.0, 4500.0, 6500.0};
+  auto cx_plain = cct_to_xyz_batch(ccts, wl, basis, cmf);
+  auto cx_prep = cct_to_xyz_batch_prepared(ccts, wl, basis, cmf_resampled);
+  for (std::size_t i = 0; i < cx_plain.size(); ++i) {
+    REQUIRE(cx_prep[i].X == cx_plain[i].X);
+    REQUIRE(cx_prep[i].Y == cx_plain[i].Y);
+    REQUIRE(cx_prep[i].Z == cx_plain[i].Z);
+  }
+
+  // A CMF resampled to a different-length grid is rejected.
+  std::vector<double> wl_5nm;
+  for (double w = 380.0; w <= 780.0; w += 5.0) {
+    wl_5nm.push_back(w);
+  }
+  CmfData cmf_81 = resample_cmf(wl_5nm, cmf);
+  REQUIRE_THROWS_AS(spd_to_xyz_batch_prepared(wl, batch, cmf_81),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(spd_to_power_batch_prepared(wl, batch, cmf_81, true),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(cct_to_xyz_batch_prepared(ccts, wl, basis, cmf_81),
+                    std::invalid_argument);
 }
 
 } // namespace

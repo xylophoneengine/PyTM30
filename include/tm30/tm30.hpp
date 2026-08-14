@@ -48,15 +48,18 @@ struct SpdView {
 
 /// Controls what gets included in batch output.
 ///
-/// One decision per batch run. In the batch path, flags bound the output
-/// buffer size (memory-bandwidth win, not FLOP win - ~85-90% of compute
-/// is upstream of the binning fork).
+/// One decision per batch run. The C++ pipeline computes every metric
+/// unconditionally and ignores these flags (the Tm30Request parameters in
+/// tm30.cpp are deliberately unnamed); they are consumed by the Python
+/// binding layer, which uses them to gate which arrays are allocated and
+/// copied into each per-SPD result dict.
 struct Tm30Request {
   /// Include per-bin metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj) and CVG
   /// coordinates in the output.
   bool bins = true;
 
-  /// Include per-sample fidelity Rf,CESi and Rf,skin in the output.
+  /// Include per-sample fidelity Rf,CESi in the output. (Rf,skin is a
+  /// scalar and is always included.)
   bool samples = false;
 };
 
@@ -79,10 +82,10 @@ struct Validity {
   /// bounds).
   bool cct_out_of_range = false;
 
-  /// The test SPD does not cover the full 380-780 nm grid. Missing values
-  /// were zero-filled per TM-30-20 §3.5 (which forbids interpolating or
-  /// extrapolating the test SPD). Not the same as CES/CMF flat
-  /// extrapolation (TM-30-20 §1.3 / Annex A).
+  /// The test SPD did not cover the full 380-780 nm grid; the missing
+  /// edge values were zero-filled at Spd construction per TM-30-20 §3.5
+  /// (which forbids interpolating or extrapolating the test SPD). Not
+  /// the same as CES/CMF flat extrapolation (TM-30-20 §1.3 / Annex A).
   bool extrapolated = false;
 };
 
@@ -157,7 +160,9 @@ public:
   /// Per-sample fidelity Rf,CESi (99 values).             TM-30-20 §4.2
   const std::array<double, 99> &rf_cesi() const;
 
-  /// Skin fidelity Rf,skin (average of CES15 + CES18).    TM-30-20 §4.2
+  /// Skin fidelity Rf,skin (average of CES15 + CES18). PyTM30 research
+  /// extension informed by TM-30-20 §4.2; not a standardised measure
+  /// (§1.2, §4.0).
   double rf_skin() const;
 
   /// Full gamut result: Rg, per-bin metrics, CVG.         TM-30-20 §4.4-§4.8

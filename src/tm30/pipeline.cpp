@@ -26,7 +26,7 @@ CesColorimetryResult compute_ces_colorimetry(
     const DaylightBasis &daylight_basis, const PlanckianLut &planckian_lut) {
 
   // -- Step 1: Resample CES reflectance data to SPD wavelength grid ------
-  // TM-30-20 §3.5: "Linear interpolation shall be used."
+  // TM-30-20 §3.5 requires linear interpolation.
   const CesData ces_resampled = resample_ces(spd_wavelengths, ces_data);
   // TM-30-20 §3.5
 
@@ -126,7 +126,8 @@ CesColorimetryResult compute_ces_colorimetry(
   // -- Step 14: Per-sample fidelity and skin fidelity -----------------
   // TM-30-20 §4.2 Eq. (55)-(56): Rf,CESi for each CES
   result.rf_cesi = compute_rf_cesi(delta_e_array);
-  // TM-30-20 §4.2: Rf,skin = (Rf,CES15 + Rf,CES18) / 2
+  // Rf,skin = (Rf,CES15 + Rf,CES18) / 2 -- PyTM30 research extension
+  // informed by TM-30-20 §4.2; not a standardised measure (§1.2, §4.0).
   result.rf_skin = compute_rf_skin(result.rf_cesi);
 
   return result;
@@ -254,7 +255,8 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   // -- Step 14: Per-sample fidelity and skin fidelity -----------------
   // TM-30-20 §4.2 Eq. (55)-(56): Rf,CESi for each CES
   result.rf_cesi = compute_rf_cesi(delta_e_array);
-  // TM-30-20 §4.2: Rf,skin = (Rf,CES15 + Rf,CES18) / 2
+  // Rf,skin = (Rf,CES15 + Rf,CES18) / 2 -- PyTM30 research extension
+  // informed by TM-30-20 §4.2; not a standardised measure (§1.2, §4.0).
   result.rf_skin = compute_rf_skin(result.rf_cesi);
 
   return result;

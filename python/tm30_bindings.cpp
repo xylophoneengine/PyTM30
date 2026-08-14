@@ -187,7 +187,7 @@ struct PyTm30 {
     return result;
   }
 
-  /// Per-bin chroma shift Rcs,hj (16 values) - returns numpy array.
+  /// Per-bin chroma shift Rcs,hj, in percent (16 values) - numpy array.
   nb::object rcs_hj() const {
     const auto &lcm = tm30_->local_chroma_shift();
     auto np = nb::module_::import_("numpy");
@@ -195,11 +195,11 @@ struct PyTm30 {
     auto nd = nb::cast<nb::ndarray<>>(result);
     double *buf = static_cast<double *>(nd.data());
     for (int j = 0; j < 16; ++j)
-      buf[j] = lcm.Rcs_hj[j];
+      buf[j] = lcm.Rcs_hj_percent[j];
     return result;
   }
 
-  /// Per-bin hue shift Rhs,hj (16 values) - returns numpy array.
+  /// Per-bin hue shift Rhs,hj, dimensionless ratio (16 values) - numpy array.
   nb::object rhs_hj() const {
     const auto &lcm = tm30_->local_chroma_shift();
     auto np = nb::module_::import_("numpy");
@@ -425,6 +425,42 @@ struct BatchContext {
   // shares that grid. Unset (nullopt) until set_fixed_grid() is called.
   std::optional<tm30::ResampledTables> fixed_tables_;
 
+  // Per-grid resampled-CMF cache for the AAA_to_BBB convenience methods:
+  // the resample depends only on (grid, source CMF), so repeated calls
+  // on one grid reuse the previous resample. Keyed on the exact grid
+  // vector; bypassed whenever a per-call custom CMF is supplied.
+  struct ResampledCmfCache {
+    std::vector<double> key;
+    tm30::CmfData cmf;
+    bool valid = false;
+
+    /// Resample `source` to `grid`, reusing the previous result when the
+    /// grid is unchanged.
+    const tm30::CmfData &get(const std::vector<double> &grid,
+                             const tm30::CmfData &source) {
+      if (!valid || key != grid) {
+        cmf = tm30::resample_cmf(grid, source);
+        key = grid;
+        valid = true;
+      }
+      return cmf;
+    }
+
+    bool hit(const std::vector<double> &k) const { return valid && key == k; }
+    void store(std::vector<double> k, tm30::CmfData c) {
+      key = std::move(k);
+      cmf = std::move(c);
+      valid = true;
+    }
+  };
+
+  // 2-deg CMF resampled to the §3.5-conformed form of the grid, keyed by
+  // the raw grid (spd_to_cct).
+  ResampledCmfCache cct2_cache_;
+  // 10-deg CMF resampled to the call grid, unclipped
+  // (spd_to_xyz / spd_to_Yuv / photometric spd_to_power).
+  ResampledCmfCache cmf10_cache_;
+
   // Phase 2: persistent worker pool. Created eagerly when the context is
   // constructed with persistent_workers=true and n_workers>1; passed to
   // try_evaluate/try_evaluate_cached so repeated eval() calls reuse the
@@ -535,18 +571,28 @@ struct BatchContext {
     const double *wl_data = static_cast<const double *>(wl.data());
     std::vector<double> wl_vec(wl_data, wl_data + nwl);
 
-    fixed_tables_ = tm30::prepare_resampled_tables(wl_vec, cmf_2deg, cmf_10deg,
-                                                   ces_data, daylight_basis);
+    // Conform the bound grid per TM-30-20 §3.5 exactly as Spd conforms
+    // every row at construction (drop outside 380-780 nm, zero-fill down
+    // to 380 / up to 780 nm), by running the grid through Spd itself --
+    // one recipe, no duplicate. The cached tables are then resampled to
+    // the SAME conformed grid the row Spd objects will carry, so
+    // per-row values and cached tables always align. An invalid grid
+    // (step > 5 nm, range short of 400-700 nm) surfaces here, at bind
+    // time, as InvalidSpd -> ValueError.
+    const tm30::Spd grid_probe(wl_vec,
+                               std::vector<double>(wl_vec.size(), 1.0));
+
+    fixed_tables_ = tm30::prepare_resampled_tables(
+        grid_probe.wavelengths(), cmf_2deg, cmf_10deg, ces_data,
+        daylight_basis);
   }
 
   // NOTE: `bins`/`samples` gate which arrays get allocated and copied into
   // the per-SPD Python dict at *this* layer - `samples` controls `rf_cesi`,
-  // `bins` controls `rcs_hj`/`rhs_hj`. That's the actual memory-bandwidth
-  // win the docs describe (not a FLOP win): the underlying C++ pipeline in
-  // src/tm30/tm30.cpp still computes every field unconditionally regardless
-  // of these flags - see Tm30Request's doc comment in include/tm30/tm30.hpp
-  // ("~85-90% of compute is upstream of the binning fork"). That part is
-  // unchanged and intentionally out of scope here. `extras` below is the
+  // `bins` controls `rcs_hj`/`rhs_hj`. The underlying C++ pipeline in
+  // src/tm30/tm30.cpp computes every field unconditionally regardless of
+  // these flags (see Tm30Request's doc comment in include/tm30/tm30.hpp),
+  // so the gate is a marshaling/memory win only. `extras` below is the
   // same kind of gate: it only controls whether its additional fields get
   // array-copied into the per-SPD dict (the C++ pipeline computes them
   // unconditionally either way, same as bins/samples).
@@ -601,7 +647,7 @@ struct BatchContext {
         double *buf_rcs = static_cast<double *>(nd_rcs.data());
         double *buf_rhs = static_cast<double *>(nd_rhs.data());
         for (int j = 0; j < 16; ++j) {
-          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
+          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj_percent[j];
           buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
         }
         d["rcs_hj"] = arr_rcs;
@@ -760,7 +806,7 @@ struct BatchContext {
         double *buf_rcs = static_cast<double *>(nd_rcs.data());
         double *buf_rhs = static_cast<double *>(nd_rhs.data());
         for (int j = 0; j < 16; ++j) {
-          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj[j];
+          buf_rcs[j] = opt->colorimetry.gamut.local.Rcs_hj_percent[j];
           buf_rhs[j] = opt->colorimetry.gamut.local.Rhs_hj[j];
         }
         d["rcs_hj"] = arr_rcs;
@@ -910,15 +956,21 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
     }
 
-    tm30::CmfData fresh_cmf;
-    const tm30::CmfData *cmf_to_use = &cmf_10deg;
-    if (!cmf_path_arg.is_none()) {
-      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      cmf_to_use = &fresh_cmf;
+    std::vector<tm30::XyzTriple> xyzs;
+    if (cmf_path_arg.is_none() && !lambda_min_opt.has_value() &&
+        !lambda_max_opt.has_value()) {
+      // Common case (default CMF, no clipping): per-grid cache skips the
+      // CMF resample on repeated same-grid calls.
+      xyzs = tm30::spd_to_xyz_batch_prepared(
+          wl, spd_vecs, cmf10_cache_.get(wl, cmf_10deg), K_opt);
+    } else if (cmf_path_arg.is_none()) {
+      xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, cmf_10deg, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, fresh_cmf, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
     }
-
-    auto xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, *cmf_to_use, K_opt,
-                                       lambda_min_opt, lambda_max_opt);
 
     auto np = nb::module_::import_("numpy");
     auto result =
@@ -983,15 +1035,20 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
     }
 
-    tm30::CmfData fresh_cmf;
-    const tm30::CmfData *cmf_to_use = &cmf_10deg;
-    if (!cmf_path_arg.is_none()) {
-      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      cmf_to_use = &fresh_cmf;
+    std::vector<tm30::YuvTriple> yuvs;
+    if (cmf_path_arg.is_none() && !lambda_min_opt.has_value() &&
+        !lambda_max_opt.has_value()) {
+      // Same per-grid CMF cache as spd_to_xyz (identical resample).
+      yuvs = tm30::spd_to_Yuv_batch_prepared(
+          wl, spd_vecs, cmf10_cache_.get(wl, cmf_10deg), K_opt);
+    } else if (cmf_path_arg.is_none()) {
+      yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, cmf_10deg, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, fresh_cmf, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
     }
-
-    auto yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, *cmf_to_use, K_opt,
-                                       lambda_min_opt, lambda_max_opt);
 
     auto np = nb::module_::import_("numpy");
     auto result =
@@ -1058,9 +1115,11 @@ struct BatchContext {
 
     std::vector<tm30::XyzTriple> xyzs;
     if (cmf_path_arg.is_none()) {
-      xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
-                                    fixed_tables_->daylight_basis, cmf_10deg,
-                                    K_opt);
+      // fixed_tables_ already holds the 10-deg CMF resampled to exactly
+      // this grid; reuse it instead of resampling per call.
+      xyzs = tm30::cct_to_xyz_batch_prepared(
+          ccts, fixed_tables_->wavelengths, fixed_tables_->daylight_basis,
+          fixed_tables_->cmf_10deg, K_opt);
     } else {
       tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
       xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
@@ -1129,7 +1188,19 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
 
     std::vector<double> results;
-    if (cmf_path_arg.is_none()) {
+    if (cmf_path_arg.is_none() && !lambda_min_opt.has_value() &&
+        !lambda_max_opt.has_value()) {
+      // Common case (default CMF, no clipping): the radiometric branch
+      // never touches the CMF; the photometric branch reuses the same
+      // per-grid 10-deg cache as spd_to_xyz/spd_to_Yuv.
+      if (photometric) {
+        results = tm30::spd_to_power_batch_prepared(
+            wl, spd_vecs, cmf10_cache_.get(wl, cmf_10deg), true);
+      } else {
+        results = tm30::spd_to_power_batch_prepared(wl, spd_vecs,
+                                                    tm30::CmfData{}, false);
+      }
+    } else if (cmf_path_arg.is_none()) {
       results = tm30::spd_to_power_batch(wl, spd_vecs, cmf_10deg, photometric,
                                          lambda_min_opt, lambda_max_opt);
     } else {
@@ -1186,15 +1257,25 @@ struct BatchContext {
       spd_vecs[i].assign(data + i * nwl, data + (i + 1) * nwl);
     }
 
-    tm30::CmfData fresh_cmf;
-    const tm30::CmfData *cmf_to_use = &cmf_2deg;
-    if (!cmf_path_arg.is_none()) {
-      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      cmf_to_use = &fresh_cmf;
+    std::vector<tm30::CctDuvResult> results;
+    if (cmf_path_arg.is_none()) {
+      // Per-grid cache: the §3.5 grid probe and the 2-deg CMF resample
+      // depend only on the grid, so repeated calls on one grid (the
+      // common case: the calculator's own fixed grid) skip both. The
+      // cache is keyed on the raw grid and bypassed for per-call custom
+      // CMFs.
+      if (!cct2_cache_.hit(wl)) {
+        // TM-30-20 §3.5: unit-value probe conforms the grid once.
+        const tm30::Spd probe(wl, std::vector<double>(wl.size(), 1.0));
+        cct2_cache_.store(wl,
+                          tm30::resample_cmf(probe.wavelengths(), cmf_2deg));
+      }
+      results = tm30::spd_to_cct_batch_prepared(wl, spd_vecs, cct2_cache_.cmf,
+                                                planckian_lut);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      results = tm30::spd_to_cct_batch(wl, spd_vecs, fresh_cmf, planckian_lut);
     }
-
-    auto results =
-        tm30::spd_to_cct_batch(wl, spd_vecs, *cmf_to_use, planckian_lut);
 
     auto np = nb::module_::import_("numpy");
     auto result =
@@ -1246,9 +1327,10 @@ NB_MODULE(tm30_core, m) {
               "(pytm30 advisory; TM-30-20 §2.0 prints no numerical CCT "
               "bounds).")
       .def_rw("extrapolated", &tm30::Validity::extrapolated,
-              "Test SPD does not cover 380-780 nm; zero-fill was applied "
-              "per TM-30-20 §3.5. CES/CMF tables are flat-extrapolated "
-              "per §1.3 / Annex A -- unrelated to this flag.");
+              "Test SPD did not cover 380-780 nm; missing edge values "
+              "were zero-filled at construction per TM-30-20 §3.5. "
+              "CES/CMF tables are flat-extrapolated per §1.3 / Annex A "
+              "-- unrelated to this flag.");
 
   // -- Tm30 class --------------------------------------------------
 
@@ -1287,16 +1369,18 @@ NB_MODULE(tm30_core, m) {
                    "Average dE' across 99 CES.  TM-30-20 §4.1.")
       .def_prop_ro(
           "rf_skin", &PyTm30::rf_skin,
-          "Skin fidelity Rf,skin (average of CES15 + CES18).  TM-30-20 §4.2.")
+          "Skin fidelity Rf,skin (average of CES15 + CES18).  PyTM30 "
+          "research extension informed by TM-30-20 §4.2; not a "
+          "standardised TM-30 measure (§1.2, §4.0).")
       .def_prop_ro("rf_cesi", &PyTm30::rf_cesi,
                    "Per-sample fidelity Rf,CESi - numpy array of 99 values.  "
                    "TM-30-20 §4.2.")
       .def_prop_ro("rcs_hj", &PyTm30::rcs_hj,
-                   "Per-bin chroma shift Rcs,hj - numpy array of 16 values.  "
-                   "TM-30-20 §4.6.")
+                   "Per-bin chroma shift Rcs,hj, in percent - numpy array of "
+                   "16 values.  TM-30-20 §4.6 (percentage representation).")
       .def_prop_ro("rhs_hj", &PyTm30::rhs_hj,
-                   "Per-bin hue shift Rhs,hj - numpy array of 16 values.  "
-                   "TM-30-20 §4.7.")
+                   "Per-bin hue shift Rhs,hj, dimensionless ratio - numpy "
+                   "array of 16 values.  TM-30-20 §4.7.")
       .def_prop_ro("rf_hj", &PyTm30::rf_hj,
                    "Per-bin local fidelity Rf,hj - numpy array of 16 values.  "
                    "TM-30-20 §4.8.")
@@ -1381,7 +1465,7 @@ NB_MODULE(tm30_core, m) {
            "Load SPDs from a 2-D numpy array (N_spds x N_wl). "
            "wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
-           nb::arg("samples") = true, nb::arg("extras") = false,
+           nb::arg("samples") = false, nb::arg("extras") = false,
            nb::arg("n_workers") = 1,
            "Run TM-30 on all prepared SPDs. Returns list of dicts "
            "(or None for failed SPDs). extras=True additionally includes "
@@ -1395,7 +1479,7 @@ NB_MODULE(tm30_core, m) {
            "`wavelengths`. Call once at construction; evaluate_cached() then "
            "reuses this cache for every SPD sharing this grid.")
       .def("evaluate_cached", &BatchContext::evaluate_cached,
-           nb::arg("bins") = true, nb::arg("samples") = true,
+           nb::arg("bins") = true, nb::arg("samples") = false,
            nb::arg("extras") = false, nb::arg("n_workers") = 1,
            "Like evaluate(), but uses the grid-fixed tables cached by "
            "set_fixed_grid() and skips CES/CMF/daylight-basis resampling "
