@@ -22,8 +22,12 @@ Versions and environment referenced throughout:
   (arm64)
 
 The byte-reproducibility claims for the tables in data/ hold for exactly
-this pinned combination (CI pins colour-science 0.4.7 and numpy 2.5.2);
-whether other versions reproduce the bytes has not been tested. Metric
+this pinned combination on the generating platform (macOS arm64); whether
+other versions reproduce the bytes has not been tested. Across
+architectures the bytes differ in the last ULP (numpy/libm rounding), so
+CI pins colour-science 0.4.7 and numpy 2.5.2 on Linux and enforces numeric
+equivalence (<= 64 ULP, or 1e-12 absolute near zero) via
+tools/check_data_reproducibility.py rather than byte identity. Metric
 agreement at the documented tolerances is not expected to be
 version-sensitive, but the byte-level claim is made only for the pinned
 environment.

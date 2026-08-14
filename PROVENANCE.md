@@ -17,13 +17,17 @@ Spectral data is sourced from colour-science (BSD-3-Clause) and CIE publications
 > Website: <https://www.colour-science.org>
 Per-table provenance is recorded in tools/generate_data_colour_science.py. Every
 shipped table is byte-reproducible by running that script and
-tools/generate_planckian_lut.py against colour-science 0.4.7 with numpy 2.5.2.
-Last verified 2026-08-14 on macOS arm64 (Python 3.12.13, all 30 tables, zero
-byte differences); the data-reproducibility CI job in .github/workflows/ci.yml
-repeats the check on Linux with both versions pinned. Byte-level
-reproducibility is claimed only for that pinned combination -- other versions
-of colour-science or numpy may produce numerically equivalent but
-byte-different tables and have not been tested.
+tools/generate_planckian_lut.py on the generating platform, macOS arm64,
+against colour-science 0.4.7 (verified byte-identical there under both
+numpy 2.3.3 and numpy 2.5.2; last verified 2026-08-14, all tables, zero byte
+differences). Byte-identity does NOT transfer across architectures: numpy and
+libm round differently in the last ULP (observed max 17 ULP regenerating on
+Linux x86_64), so the data-reproducibility CI job regenerates the tables on
+Linux with the same pins and enforces numeric equivalence instead -- identical
+structure and every value within 64 ULP (or 1e-12 absolutely, for near-zero
+cancellation results) via tools/check_data_reproducibility.py. Byte-level
+reproducibility is claimed only for the pinned combination on macOS arm64;
+other versions of colour-science or numpy have not been tested.
 The CES reflectance data and the TM-30-20 method originate with the IES and CIE.
 
 ## Validation
