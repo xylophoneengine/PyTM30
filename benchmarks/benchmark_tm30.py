@@ -14,6 +14,8 @@ Run from the PyTM30/ directory:
     python3 benchmarks/benchmark_tm30.py
 """
 
+import platform
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -77,9 +79,50 @@ def hist_panel(ax, data, color, xlabel, title):
 
 
 # ===================================================================
-# 1) TEST SETUP
+# 0) ENVIRONMENT -- timings are meaningless without the machine and the
+#    library versions they were taken on, and byte-level reproducibility
+#    of results is only claimed for pinned versions.
 # ===================================================================
 print("=" * 70)
+print("0) ENVIRONMENT")
+print("=" * 70)
+
+CPU_LABEL = platform.machine()
+print(f"Date (UTC):     {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}")
+print(f"Python:         {platform.python_version()} ({platform.python_implementation()})")
+print(f"OS / machine:   {platform.platform()} ({platform.machine()})")
+if sys.platform == "darwin":
+    try:
+        cpu = subprocess.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        if cpu:
+            CPU_LABEL = cpu
+            print(f"CPU:            {cpu}")
+        # Timings taken in low-power mode are not comparable to normal
+        # ones; record the mode so a skewed run is recognisable later.
+        pm = subprocess.run(["pmset", "-g"], capture_output=True, text=True,
+                            timeout=5).stdout
+        for line in pm.splitlines():
+            if "powermode" in line:
+                print(f"Power mode:     {line.split()[-1]} "
+                      "(macOS pmset powermode; 1 = low power)")
+    except Exception:
+        pass  # environment report is best-effort, never fails the run
+print(f"numpy:          {np.__version__}")
+if HAVE_COLOUR:
+    print(f"colour-science: {colour.__version__}")
+try:
+    from importlib.metadata import version as _pkg_version
+    print(f"pytm30:         {_pkg_version('pytm30')}")
+except Exception:
+    print("pytm30:         (not installed as a package -- run from source tree)")
+
+# ===================================================================
+# 1) TEST SETUP
+# ===================================================================
+print("\n" + "=" * 70)
 print("1) TEST SETUP")
 print("=" * 70)
 
@@ -288,6 +331,53 @@ else:
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
     print(f"\nPlot saved: {out_path}")
+
+# ===================================================================
+# 4) README SYNC -- rewrite the measured-claims block in README.md so
+#    the published numbers can never go stale: rerunning this benchmark
+#    IS the edit. Comparative claims, so only runs when colour-science
+#    was available.
+# ===================================================================
+if HAVE_COLOUR:
+    readme_path = BENCH_DIR.parent / "README.md"
+    begin = "<!-- benchmark-results:begin -->"
+    end = "<!-- benchmark-results:end -->"
+    n = len(corpus)
+    single_speedup = cs_single_ms.mean() / single_ms.mean()
+    batch_speedup = cs_batch_ms_total.mean() / batch_ms_total.mean()
+    rf_max = float(np.abs(np.asarray(deltas["Rf"])).max())
+    rg_max = float(np.abs(np.asarray(deltas["Rg"])).max())
+    cct_max = float(np.abs(np.asarray(deltas["CCT"])).max())
+    block = f"""{begin}
+<!-- Auto-written by benchmarks/benchmark_tm30.py; do not edit by hand.
+     Rerun the benchmark to refresh numbers, plot, and environment. -->
+The payoff, measured against colour-science on the bundled illuminant
+corpus (`benchmarks/benchmark_tm30.py`):
+
+| Path | colour-science | pytm30 | Speedup |
+|---|---|---|---|
+| Single eval | {cs_single_ms.mean():.3f} ms/SPD | {single_ms.mean():.3f} ms/SPD | **{single_speedup:.1f}x** |
+| Batch ({n} SPDs per call) | {cs_batch_ms_total.mean() / n:.3f} ms/SPD | {batch_ms_total.mean() / n:.3f} ms/SPD | **{batch_speedup:.1f}x** |
+
+Accuracy on the same corpus: Rf within {rf_max:.3f}, Rg within
+{rg_max:.3f}, and CCT within {cct_max:.2f} K of colour-science's own
+values.
+
+Measured on: {CPU_LABEL}, Python {platform.python_version()},
+numpy {np.__version__}, colour-science {colour.__version__} -- full
+environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
+
+![Timing distributions, pytm30 vs colour-science](benchmarks/benchmark_tm30_timing.png)
+{end}"""
+    text = readme_path.read_text()
+    if begin in text and end in text:
+        pre, rest = text.split(begin, 1)
+        _, post = rest.split(end, 1)
+        readme_path.write_text(pre + block + post)
+        print(f"\nREADME measured-claims block refreshed: {readme_path}")
+    else:
+        print(f"\nREADME markers not found; claims block NOT updated. "
+              f"Add '{begin}' ... '{end}' to README.md to enable the sync.")
 
 print("\nDone.")
 print(f"Report saved: {log_path}")

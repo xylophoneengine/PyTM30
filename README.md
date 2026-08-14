@@ -25,6 +25,14 @@ evaluation**. Their pipelines are geared toward one spectrum (or a modest
 handful) at a time; once you're scoring tens of thousands of SPDs, per-call
 Python overhead and repeated table resampling dominate the runtime.
 
+That ceiling matters as soon as TM-30 stops being a one-off report figure
+and becomes the inner loop of a workflow. Sweeping an LED mixing space,
+Monte-Carlo tolerancing of a design, optimising a spectrum against Rf/Rg
+targets, or scoring a large measured dataset all mean running the full
+pipeline thousands to millions of times and at that point per-SPD
+milliseconds are the difference between an interactive tool and an
+overnight job.
+
 That was exactly the workload I needed: evaluate huge batches of spectra,
 fast. So I designed a different architecture for it - a wavelength grid
 resampled and cached once instead of per call, a true contiguous-array batch
@@ -35,10 +43,27 @@ slice by slice, by AI coding agents, verifying every stage against
 colour-science (and, in the original internal version, luxpy) as an
 accuracy oracle.
 
+<!-- benchmark-results:begin -->
+<!-- Auto-written by benchmarks/benchmark_tm30.py; do not edit by hand.
+     Rerun the benchmark to refresh numbers, plot, and environment. -->
 The payoff, measured against colour-science on the bundled illuminant
-corpus (`benchmarks/benchmark_tm30.py`): pytm30 runs **~6.4x faster** on
-single-SPD evaluation and **~5x faster** in batch, with Rf/Rg/CCT/Duv within
-floating-point noise of colour-science's own values.
+corpus (`benchmarks/benchmark_tm30.py`):
+
+| Path | colour-science | pytm30 | Speedup |
+|---|---|---|---|
+| Single eval | 1.073 ms/SPD | 0.112 ms/SPD | **9.6x** |
+| Batch (19 SPDs per call) | 1.069 ms/SPD | 0.134 ms/SPD | **8.0x** |
+
+Accuracy on the same corpus: Rf within 0.004, Rg within
+0.001, and CCT within 0.07 K of colour-science's own
+values.
+
+Measured on: Apple M4 Pro, Python 3.12.13,
+numpy 2.5.2, colour-science 0.4.7 -- full
+environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
+
+![Timing distributions, pytm30 vs colour-science](benchmarks/benchmark_tm30_timing.png)
+<!-- benchmark-results:end -->
 
 ---
 
@@ -49,7 +74,7 @@ floating-point noise of colour-science's own values.
   - [Contents](#contents)
   - [Quick Start (Python)](#quick-start-python)
     - [The full result set - `extras=True`](#the-full-result-set---extrastrue)
-    - [Convenience: SPD -> XYZ / Yuv](#convenience-spd--xyz--yuv)
+    - [Convenience: SPD -\> XYZ / Yuv](#convenience-spd---xyz--yuv)
     - [Configure CMF Observer](#configure-cmf-observer)
     - [Configure Integration Range](#configure-integration-range)
   - [Quick Start (C++)](#quick-start-c)
@@ -64,6 +89,7 @@ floating-point noise of colour-science's own values.
       - [Which mode should I use?](#which-mode-should-i-use)
   - [Data Files \& Provenance](#data-files--provenance)
   - [Tests](#tests)
+    - [Formatting](#formatting)
   - [Design Principles](#design-principles)
   - [Project Structure](#project-structure)
   - [Author](#author)
@@ -199,11 +225,11 @@ const auto& colorimetry = m.colorimetry_result();    // full raw result
 
 ### Prerequisites
 
-| Tool           | Version              | Notes                                                                                                                                                  |
-| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tool           | Version                | Notes                                                                                                                                                  |
+| -------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | C++20 compiler | GCC >=11 or Clang >=14 | Includes Apple Clang on macOS. No compiler-specific extensions - should build clean under `-std=c++20` on Linux, macOS, and Windows, x86_64 and arm64. |
-| CMake          | >=3.20                | `pip install cmake` works fine if you'd rather not touch your system package manager.                                                                  |
-| Python         | >=3.10                | Only needed for the Python bindings.                                                                                                                   |
+| CMake          | >=3.20                 | `pip install cmake` works fine if you'd rather not touch your system package manager.                                                                  |
+| Python         | >=3.10                 | Only needed for the Python bindings.                                                                                                                   |
 
 > **Platform status:** the code is written to be portable (standard C++20,
 > no platform-specific extensions or intrinsics), but it has so far only
@@ -296,13 +322,13 @@ calc = TM30Calc(n_workers=4, persistent_workers=True)  # reuse threads across ca
 
 #### Which mode should I use?
 
-| Situation                                                                                   | Use                                                                                                                                                       |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Single SPD, small batches, or "just give me correct numbers"                                | default `TM30Calc()` / `n_workers=1`                                                                                                                      |
-| You have a matrix and want it computed                                                      | batch `eval(matrix)` with `n_workers=1` - same per-SPD speed as looping single evals, one call instead of N                                               |
-| You're already looping per SPD (per-SPD grids, per-SPD post-processing, streaming)          | one SPD per call - no throughput penalty vs batching, but no benefit either                                                                               |
-| One-off *large* batch (a few hundred SPDs or more per call)                                 | `n_workers=4` (spawn per call) - can meaningfully speed up multi-core machines; below ~50 SPDs/call the per-call thread-spawn tax can outweigh the gain   |
-| Many repeated large-batch calls on one long-lived calculator (server loop, mass evaluation) | `n_workers=4, persistent_workers=True` - threads stay alive across calls instead of respawning each time                                                 |
+| Situation                                                                                   | Use                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single SPD, small batches, or "just give me correct numbers"                                | default `TM30Calc()` / `n_workers=1`                                                                                                                    |
+| You have a matrix and want it computed                                                      | batch `eval(matrix)` with `n_workers=1` - same per-SPD speed as looping single evals, one call instead of N                                             |
+| You're already looping per SPD (per-SPD grids, per-SPD post-processing, streaming)          | one SPD per call - no throughput penalty vs batching, but no benefit either                                                                             |
+| One-off *large* batch (a few hundred SPDs or more per call)                                 | `n_workers=4` (spawn per call) - can meaningfully speed up multi-core machines; below ~50 SPDs/call the per-call thread-spawn tax can outweigh the gain |
+| Many repeated large-batch calls on one long-lived calculator (server loop, mass evaluation) | `n_workers=4, persistent_workers=True` - threads stay alive across calls instead of respawning each time                                                |
 
 Rule of thumb: **single or small -> default * one big batch -> `n_workers>1` *
 repeated big batches -> try `persistent_workers=True`**. Speedups are
@@ -315,15 +341,15 @@ a multiplier.
 
 ## Data Files & Provenance
 
-| File                                                                                             | Description                                                    | Range                |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | -------------------- |
-| `ces.csv` / `ces_5nm.csv`                                                                        | 99 CES reflectance spectra                                     | 380-780 nm           |
-| `cmf_1964_10.csv`                                                                                | CIE 1964 10-deg CMFs (default observer)                           | 360-830 nm, 1 nm     |
-| `cmf_1931_2.csv` / `cie_1931_2.csv`                                                              | CIE 1931 2-deg CMFs (general / CCT-default)                       | 360-830 / 380-780 nm |
-| `cmf_2006_2.csv` / `cmf_2006_10.csv`                                                             | CIE 2006 physiologically-based CMFs                            | 360-830 nm           |
-| `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                             | CIE 2015 CMFs                                                  | 360-830 nm           |
-| `daylight_basis.csv`                                                                             | CIE daylight vectors S0, S1, S2                                | 300-830 nm, 5 nm     |
-| `planckian_uv.csv`                                                                               | Planckian locus LUT (u,v)                                      | 1000-25000 K         |
+| File                                                                                                 | Description                                                    | Range                |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------- |
+| `ces.csv` / `ces_5nm.csv`                                                                            | 99 CES reflectance spectra                                     | 380-780 nm           |
+| `cmf_1964_10.csv`                                                                                    | CIE 1964 10-deg CMFs (default observer)                        | 360-830 nm, 1 nm     |
+| `cmf_1931_2.csv` / `cie_1931_2.csv`                                                                  | CIE 1931 2-deg CMFs (general / CCT-default)                    | 360-830 / 380-780 nm |
+| `cmf_2006_2.csv` / `cmf_2006_10.csv`                                                                 | CIE 2006 physiologically-based CMFs                            | 360-830 nm           |
+| `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                                 | CIE 2015 CMFs                                                  | 360-830 nm           |
+| `daylight_basis.csv`                                                                                 | CIE daylight vectors S0, S1, S2                                | 300-830 nm, 5 nm     |
+| `planckian_uv.csv`                                                                                   | Planckian locus LUT (u,v)                                      | 1000-25000 K         |
 | `d65_1nm.csv`, `fl1_1nm.csv`...`fl12_1nm.csv`, `hp1_1nm.csv`...`hp5_1nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |
 
 All data tables are sourced from **[colour-science](https://github.com/colour-science/colour-science)**
