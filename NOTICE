@@ -1,0 +1,21 @@
+PyTM30 implements ANSI/IES TM-30-20 from the published standard:
+
+    ANSI/IES TM-30-20, "IES Method for Evaluating Light Source Color
+    Rendition", An American National Standard, Illuminating Engineering
+    Society, New York, 2020, incorporating Errata 1 (2021).
+    ISBN 978-0-87995-379-9. (IES standards are issued without DOIs.)
+
+Spectral data (CES reflectances, CMFs, daylight basis functions, illuminants)
+is sourced from colour-science (BSD-3-Clause) and CIE publications:
+
+    Mansencal, T., Mauderer, M., Parsons, M., et al. (2025). Colour 0.4.7
+    [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.17837391
+    Repository: https://github.com/colour-science/colour
+    Website: https://www.colour-science.org
+
+See tools/generate_data_colour_science.py for per-table provenance.
+
+Numerical accuracy is cross-validated against colour-science (BSD-3-Clause).
+No code from any GPL-licensed project is incorporated.
+
+The CES reflectance data and TM-30-20 method originate with the IES and CIE.
