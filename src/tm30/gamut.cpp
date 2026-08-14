@@ -36,12 +36,12 @@ static constexpr double kLogRescale = 10.0; // TM-30-20 §4.1 Eq. (54)
 // stores raw ratios; we match luxpy (compute raw, scale at report time).
 static constexpr double kLocalShiftScale = 1.0; // TM-30-20 §4.6, §4.7
 
-// CVG display scale -- implementation convention, NOT a §4.5 quantity.
-// §4.5 normalizes reference coordinates to a unit circle (radius 1) with
-// plot axis limits of +/-1.5; no x100 appears in Eqs. (58)-(61) or their
-// surrounding text. The x100 here is kept for luxpy fixture parity;
-// whitelisted in tools/check_constants_whitelist.txt.
-static constexpr double kCvgScale = 100.0;
+// TM-30-20 §4.5: reference coordinates are normalised to a unit circle
+// (radius 1); the prescribed plot axis limits are +/-1.5 and the optional
+// guide circles are radii 0.8/0.9/1.1/1.2, all dimensionless multiples of
+// that unit circle. Eqs. (58)-(61) carry no scale factor. Any display
+// scaling belongs in a plotting layer, not here.
+static constexpr double kCvgScale = 1.0; // TM-30-20 §4.5
 
 // --- Bin Averages ---------------------------------------------------------
 

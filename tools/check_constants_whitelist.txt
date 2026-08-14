@@ -21,10 +21,3 @@ src/tm30/xyz.cpp:147
 src/tm30/tm30.cpp:34
 src/tm30/tm30.cpp:35
 src/tm30/tm30.cpp:38
-
-# CVG display scale factor kCvgScale = 100.0 (src/tm30/gamut.cpp).
-# TM-30-20 §4.5 normalizes CVG coordinates to a unit circle (radius 1)
-# and prescribes plot axis limits of +/-1.5 -- no x100 anywhere in §4.5
-# or Eqs. (58)-(61). The x100 is an implementation display convention
-# retained for luxpy fixture parity, not a spec-derived quantity.
-src/tm30/gamut.cpp:44
