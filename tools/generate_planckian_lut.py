@@ -2,25 +2,32 @@
 """
 generate_planckian_lut.py -- Regenerate data/planckian_uv.csv.
 
-This table is NOT extracted from luxpy -- it is independently computed
-from first principles:
+Values are computed from first principles in this script and are
+byte-reproducible from it:
 
-  1. Planck's law blackbody spectral radiance (TM-30-20 Sec 3.3 Eq. 5-6,
-     c2 = 1.4388e-2 m*K), evaluated at each candidate CCT.
+  1. Planck's law blackbody spectral radiance (TM-30-20 Sec 3.3
+     Eq. (5)-(6), c2 = 1.4388e-2 m*K), evaluated at each candidate CCT.
   2. Integrated against the CIE 1931 2-degree standard observer CMF
-     (the just-verified, colour-science-sourced cmf_1931_2.csv, full
-     360-830nm range) via trapezoidal integration.
+     (data/cmf_1931_2.csv, sourced from colour-science; 380-780nm at
+     1nm) via trapezoidal integration.
   3. Converted to CIE 1960 UCS (u,v) via u=4X/(X+15Y+3Z), v=6Y/(X+15Y+3Z).
 
 Overall SPD scale is irrelevant to (u,v) (they are chromaticity ratios),
 so no 560nm normalisation is needed here (unlike the reference-illuminant
 generator in reference.cpp, which needs the actual SPD).
 
-Temperature grid: reverse-engineered from the original repo's
-planckian_uv.csv -- geometric sequence T[n] = 1000 * 1.0025^n,
-n = 0..1488 (1489 points, 1000K to ~41073K). Cross-checked against
-colour.temperature.CCT_to_uv_Planck1900 (colour-science's own Planckian
-(u,v) utility) at several sample points -- agreement to ~1.4e-6.
+Temperature grid: geometric sequence T[n] = 1000 * 1.0025^n,
+n = 0..1488 (1489 points, 1000K to ~41073K). The grid parameters
+(1000K start, 0.25% geometric increment) follow the LUT used by the
+calculator supplied with ANSI/IES TM-30; see Smet et al., "Recommended
+Method for Determining the Correlated Color Temperature and Distance
+from the Planckian Locus of a Light Source", Leukos 2023,
+doi:10.1080/15502724.2023.2248397, which records the TM-30 calculator
+as using a 0.25% increment LUT.
+
+Output is cross-checked against colour.temperature.CCT_to_uv_Planck1900
+(colour-science's own Planckian (u,v) utility) at several sample points
+-- agreement to ~1.4e-6.
 """
 import os
 import csv
