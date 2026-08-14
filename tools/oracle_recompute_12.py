@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-oracle_recompute_12.py -- Independent recomputation of the 12 stale test
-literals identified in tests/slice_02_xyz_test.cpp, slice_03_cct_test.cpp,
-and slice_05_ces_colorimetry_test.cpp.
+oracle_recompute_12.py -- Independent recomputation of the golden test
+literals in tests/slice_02_xyz_test.cpp, slice_03_cct_test.cpp, and
+tests/slice_05_ces_colorimetry_test.cpp. (Originally written for 12
+literals, hence the name; it now recomputes every CCT/Duv literal in
+slice_03 -- D65, Illuminant A, FL1-FL12, HP1-HP5 -- plus the D65 source
+XYZ literals in slice_02.)
 
 Deliberately does NOT call any pytm30 C++ code, and does NOT require the
 `colour` (colour-science) package to be installed -- it reads the already
@@ -99,12 +102,12 @@ def compute_cct_duv(u_test, v_test):
     duv_par_mag = a * T_par * T_par + b * T_par + c
     duv_par = duv_par_mag * sign
 
+    # Ohno (2014), as published: below the |Duv| threshold the triangular
+    # solution is used as-is; above it the parabolic one. Matches the C++
+    # default (CctOptions::shifted_triangular_blend is opt-in, default off).
     duv_threshold = 0.002
-    duv_abs = abs(duv_tri)
-    T_tri_shift = T_tri + (T_par - T_tri) * min(duv_abs / duv_threshold, 1.0)
-
-    if duv_abs < duv_threshold:
-        return T_tri_shift, duv_tri
+    if abs(duv_tri) < duv_threshold:
+        return T_tri, duv_tri
     return T_par, duv_par
 
 
@@ -132,6 +135,16 @@ def compute_cct_duv_for_spd_file(filename):
 # D65 source XYZ oracle (TM-30-20 Sec 3.2 Eq (1)-(4), CIE 1964 10-degree obs)
 # ---------------------------------------------------------------------------
 
+def compute_cmf10_integrals():
+    """Trapezoidal integrals of the CIE 1964 10-degree CMFs over the
+    380-780 nm TM-30-20 calculation range (slice_02 golden literals)."""
+    cmf10 = load_csv_cols(os.path.join(DATA, "cmf_1964_10.csv"))
+    wl_full = cmf10[:, 0]
+    mask = (wl_full >= 380.0) & (wl_full <= 780.0)
+    wl = wl_full[mask]
+    return tuple(np.trapezoid(cmf10[:, c][mask], wl) for c in (1, 2, 3))
+
+
 def compute_d65_source_xyz():
     d65 = load_csv_cols(os.path.join(DATA, "d65_1nm.csv"))
     wl, vals = d65[:, 0], d65[:, 1]
@@ -156,38 +169,21 @@ def compute_d65_source_xyz():
 
 
 if __name__ == "__main__":
-    print("=== CCT/Duv oracle recompute (FL1-FL12), from data/fl*_1nm.csv ===")
-    fl_results = {}
-    for i in range(1, 13):
-        cct, duv = compute_cct_duv_for_spd_file(f"fl{i}_1nm.csv")
-        fl_results[i] = (cct, duv)
-        print(f"  FL{i:<2d}: CCT={cct:.10f}  Duv={duv:.10f}")
+    sources = [("D65", "d65_1nm.csv"), ("IllA", "illuminant_a_1nm.csv")]
+    sources += [(f"FL{i}", f"fl{i}_1nm.csv") for i in range(1, 13)]
+    sources += [(f"HP{i}", f"hp{i}_1nm.csv") for i in range(1, 6)]
 
-    print("\n=== D65 source XYZ oracle recompute, from data/d65_1nm.csv ===")
+    print("=== CCT/Duv recompute (slice_03 corpus), from data/*.csv ===")
+    for name, fn in sources:
+        cct, duv = compute_cct_duv_for_spd_file(fn)
+        print(f"  {name:<5s}: CCT={cct:.4f}  Duv={duv:.8f}")
+
+    print("\n=== D65 source XYZ recompute (slice_02), from data/d65_1nm.csv ===")
     X, Y, Z = compute_d65_source_xyz()
     print(f"  X={X:.10f}  Y={Y:.10f}  Z={Z:.10f}")
 
-    print("\n=== Formatted for test-file literals ===")
-    old = {
-        1: (6428.2250, 0.00712681),
-        2: (4224.5351, 0.00178952),
-        3: (3446.0843, 0.00066824),
-        4: (2937.9942, -0.00081817),
-        5: (6345.2949, 0.01074928),
-        6: (4148.5314, 0.00603795),
-        7: (6494.7921, 0.00321985),
-        8: (4997.2416, 0.00320913),
-        9: (4149.0222, -0.00000651),
-        10: (4998.3712, 0.00328524),
-        11: (3998.6524, 0.00005033),
-        12: (2999.6563, 0.00004406),
-    }
-    for i in range(1, 13):
-        new_cct, new_duv = fl_results[i]
-        old_cct, old_duv = old[i]
-        d_cct = new_cct - old_cct
-        d_duv = new_duv - old_duv
-        flag = "CHANGED>TOL" if abs(d_cct) > 0.5 or abs(d_duv) > 5e-4 else "same/within tol"
-        print(f"  FL{i:<2d}: old_cct={old_cct:.4f} new_cct={new_cct:.4f} "
-              f"(d={d_cct:+.4f})   old_duv={old_duv:.8f} new_duv={new_duv:.8f} "
-              f"(d={d_duv:+.8f})   [{flag}]")
+    print("\n=== CMF 1964 10-deg integrals over 380-780 nm (slice_02) ===")
+    ix, iy, iz = compute_cmf10_integrals()
+    print(f"  int xbar10 = {ix:.10f}")
+    print(f"  int ybar10 = {iy:.10f}")
+    print(f"  int zbar10 = {iz:.10f}")

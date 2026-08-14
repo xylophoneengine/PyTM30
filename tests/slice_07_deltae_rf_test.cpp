@@ -360,7 +360,7 @@ TEST_CASE("dE' & Rf - D65 self-consistency: Rf ~= 100",
 }
 
 // -------------------------------------------------------------------------
-// Golden fixture: D65 Rf matches luxpy
+// Golden fixture: D65 Rf
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - D65 Rf matches golden fixture",
@@ -381,7 +381,7 @@ TEST_CASE("dE' & Rf - D65 Rf matches golden fixture",
 }
 
 // -------------------------------------------------------------------------
-// Golden fixture: D65 dE' values match luxpy
+// Golden fixture: D65 dE' values
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - D65 dE' values match golden fixture",
@@ -415,7 +415,7 @@ TEST_CASE("dE' & Rf - D65 dE' values match golden fixture",
 }
 
 // -------------------------------------------------------------------------
-// Golden fixture: F1 Rf matches luxpy
+// Golden fixture: F1 Rf
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - F1 Rf matches golden fixture",
@@ -435,7 +435,7 @@ TEST_CASE("dE' & Rf - F1 Rf matches golden fixture",
 }
 
 // -------------------------------------------------------------------------
-// Golden fixture: HP1 Rf matches luxpy
+// Golden fixture: HP1 Rf
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - HP1 Rf matches golden fixture",

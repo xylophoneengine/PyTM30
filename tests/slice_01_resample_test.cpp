@@ -176,7 +176,7 @@ TEST_CASE("SPD validation - negative values throw", "[spd][slice01]") {
 // -- Validation: insufficient wavelength range ---------------------------
 
 TEST_CASE("SPD validation - range < 400-700 throws", "[spd][slice01]") {
-  // TM-30-20 §3.5: "Minimum required range: 400 to 700 nm"
+  // TM-30-20 §3.5: the minimum range an SPD must cover is 400-700 nm.
   std::vector<double> wl = {420.0, 600.0}; // starts above 400
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
@@ -306,7 +306,7 @@ TEST_CASE("SPD - missing edge values are zero-filled to 380-780 nm",
 // -------------------------------------------------------------------------
 
 TEST_CASE("Resample - linear interpolation accuracy", "[resample][slice01]") {
-  // TM-30-20 §3.5: "Linear interpolation shall be used."
+  // TM-30-20 §3.5 mandates linear interpolation.
   //
   // Construct CesData with two wavelengths and one CES sample.
   // Interpolate at midpoint - should give exact average.

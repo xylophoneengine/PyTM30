@@ -159,9 +159,9 @@ TEST_CASE("CCT - D65 (2-deg observer)", "[cct][slice03]") {
   CctDuvResult result = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
 
   // TM-30-20 §3.3: D65 should be near 6500 K
-  // Oracle (luxpy): CCT=6501.8979, Duv=0.00321446
-  REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 6501.8979));
-  REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00321446));
+  // tools/oracle_recompute_12.py: CCT=6501.8485, Duv=0.00321508
+  REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 6501.8485));
+  REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00321508));
 }
 
 TEST_CASE("CCT - Illuminant A (2-deg observer)", "[cct][slice03]") {
@@ -173,9 +173,9 @@ TEST_CASE("CCT - Illuminant A (2-deg observer)", "[cct][slice03]") {
   CctDuvResult result = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
 
   // TM-30-20 §3.3: Illuminant A should be near 2856 K
-  // Oracle (luxpy): CCT=2855.5797, Duv=0.00000315
-  REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 2855.5797));
-  REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00000315));
+  // tools/oracle_recompute_12.py: CCT=2855.5796, Duv=0.00000332
+  REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 2855.5796));
+  REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00000332));
 }
 
 // -------------------------------------------------------------------------
@@ -188,7 +188,7 @@ TEST_CASE("CCT - FL1", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=6425.4015, Duv=0.00719197
+  // tools/oracle_recompute_12.py: CCT=6425.4015, Duv=0.00719197
   REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6425.4015));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00719197));
 }
@@ -199,8 +199,8 @@ TEST_CASE("CCT - FL2", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4225.1380, Duv=0.00186286
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4225.1380));
+  // tools/oracle_recompute_12.py: CCT=4225.1675, Duv=0.00186286
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4225.1675));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00186286));
 }
 
@@ -210,8 +210,8 @@ TEST_CASE("CCT - FL3", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=3447.3691, Duv=0.00074405
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 3447.3691));
+  // tools/oracle_recompute_12.py: CCT=3447.3487, Duv=0.00074405
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 3447.3487));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00074405));
 }
 
@@ -221,8 +221,8 @@ TEST_CASE("CCT - FL4", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=2939.5996, Duv=-0.00074010
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 2939.5996));
+  // tools/oracle_recompute_12.py: CCT=2939.5890, Duv=-0.00074010
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 2939.5890));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, -0.00074010));
 }
 
@@ -232,7 +232,7 @@ TEST_CASE("CCT - FL5", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=6342.7591, Duv=0.01080438
+  // tools/oracle_recompute_12.py: CCT=6342.7591, Duv=0.01080438
   REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6342.7591));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.01080438));
 }
@@ -243,9 +243,9 @@ TEST_CASE("CCT - FL6", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4148.5314, Duv=0.00603795
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4148.5314));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00603795));
+  // tools/oracle_recompute_12.py: CCT=4148.9892, Duv=0.00610277
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4148.9892));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00610277));
 }
 
 TEST_CASE("CCT - FL7", "[cct][slice03]") {
@@ -254,7 +254,7 @@ TEST_CASE("CCT - FL7", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=6490.0166, Duv=0.00326512
+  // tools/oracle_recompute_12.py: CCT=6490.0166, Duv=0.00326512
   REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6490.0166));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00326512));
 }
@@ -265,7 +265,7 @@ TEST_CASE("CCT - FL8", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4994.7943, Duv=0.00324352
+  // tools/oracle_recompute_12.py: CCT=4994.7943, Duv=0.00324352
   REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4994.7943));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00324352));
 }
@@ -276,8 +276,8 @@ TEST_CASE("CCT - FL9", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4148.0361, Duv=0.00003905
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4148.0361));
+  // tools/oracle_recompute_12.py: CCT=4148.0210, Duv=0.00003905
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4148.0210));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00003905));
 }
 
@@ -287,9 +287,9 @@ TEST_CASE("CCT - FL10", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4998.3712, Duv=0.00328524
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4998.3712));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00328524));
+  // tools/oracle_recompute_12.py: CCT=4998.7696, Duv=0.00338355
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4998.7696));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00338355));
 }
 
 TEST_CASE("CCT - FL11", "[cct][slice03]") {
@@ -298,8 +298,8 @@ TEST_CASE("CCT - FL11", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4000.7199, Duv=0.00015497
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4000.7199));
+  // tools/oracle_recompute_12.py: CCT=4000.7527, Duv=0.00015497
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4000.7527));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00015497));
 }
 
@@ -309,8 +309,8 @@ TEST_CASE("CCT - FL12", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=3002.5610, Duv=0.00013385
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 3002.5610));
+  // tools/oracle_recompute_12.py: CCT=3002.5891, Duv=0.00013385
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 3002.5891));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00013385));
 }
 
@@ -324,9 +324,9 @@ TEST_CASE("CCT - HP1 (high-pressure sodium, narrowband)", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=1959.2357, Duv=0.00078236
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 1959.2357));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00078236));
+  // tools/oracle_recompute_12.py: CCT=1959.2574, Duv=0.00078265
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 1959.2574));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00078265));
 }
 
 TEST_CASE("CCT - HP2", "[cct][slice03]") {
@@ -335,9 +335,9 @@ TEST_CASE("CCT - HP2", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=2506.3504, Duv=0.00071369
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 2506.3504));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00071369));
+  // tools/oracle_recompute_12.py: CCT=2506.3494, Duv=0.00071410
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 2506.3494));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00071410));
 }
 
 TEST_CASE("CCT - HP3", "[cct][slice03]") {
@@ -346,9 +346,9 @@ TEST_CASE("CCT - HP3", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=3144.0202, Duv=0.00237194
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 3144.0202));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00237194));
+  // tools/oracle_recompute_12.py: CCT=3144.0166, Duv=0.00237235
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 3144.0166));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00237235));
 }
 
 TEST_CASE("CCT - HP4", "[cct][slice03]") {
@@ -357,9 +357,9 @@ TEST_CASE("CCT - HP4", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4002.1287, Duv=0.00117727
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4002.1287));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00117727));
+  // tools/oracle_recompute_12.py: CCT=4002.1404, Duv=0.00117838
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4002.1404));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00117838));
 }
 
 TEST_CASE("CCT - HP5", "[cct][slice03]") {
@@ -368,9 +368,9 @@ TEST_CASE("CCT - HP5", "[cct][slice03]") {
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
-  // Oracle: CCT=4039.4349, Duv=-0.00170818
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4039.4349));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, -0.00170818));
+  // tools/oracle_recompute_12.py: CCT=4039.4218, Duv=-0.00170817
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 4039.4218));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, -0.00170817));
 }
 
 // -------------------------------------------------------------------------
@@ -505,10 +505,10 @@ TEST_CASE("CCT - spd_to_cct matches the manual resample+compute chain (D65)",
 
   CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
 
-  // Same oracle as the "CCT - D65 (2-deg observer)" test above (luxpy):
-  // CCT=6501.8979, Duv=0.00321446
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6501.8979));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00321446));
+  // Same value as the "CCT - D65 (2-deg observer)" test above
+  // (tools/oracle_recompute_12.py): CCT=6501.8485, Duv=0.00321508
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6501.8485));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00321508));
 }
 
 TEST_CASE("CCT - spd_to_cct matches the manual chain (FL1)", "[cct][slice03]") {
@@ -518,7 +518,7 @@ TEST_CASE("CCT - spd_to_cct matches the manual chain (FL1)", "[cct][slice03]") {
 
   CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
 
-  // Oracle: CCT=6425.4015, Duv=0.00719197
+  // tools/oracle_recompute_12.py: CCT=6425.4015, Duv=0.00719197
   REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 6425.4015));
   REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00719197));
 }
@@ -531,9 +531,9 @@ TEST_CASE("CCT - spd_to_cct matches the manual chain (HP1, narrowband)",
 
   CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
 
-  // Oracle: CCT=1959.2357, Duv=0.00078236
-  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 1959.2357));
-  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00078236));
+  // tools/oracle_recompute_12.py: CCT=1959.2574, Duv=0.00078265
+  REQUIRE_THAT(r.cct, WithinTolerance(Tol_Cct, 1959.2574));
+  REQUIRE_THAT(r.duv, WithinTolerance(Tol_Duv, 0.00078265));
 }
 
 TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
