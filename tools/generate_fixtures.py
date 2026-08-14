@@ -267,18 +267,15 @@ def cie_d_values(cct, wl, round_M=True):
     used") -- NOT colour-science's own sd_CIE_illuminant_D_series(), which
     defaults to Sprague interpolation for these datasets.
 
-    round_M: CIE 015:2004 recommends rounding M1/M2 to 3 decimal places
-    only for *nominal* designated illuminants (D65, D50, D75, ...) -- see
-    luxpy's own daylightphase() docstring ("Round M1, M2 values to 3
-    decimals as recommended by CIE when calculating daylight phases for
-    nominal CCTs"), which is conditioned on a `cct_is_nominal` flag and is
-    OFF by default. Confirmed empirically: rounding M1/M2 when generating
-    the *reference illuminant* at a computed (non-nominal) CCT introduces
-    a ~2e-4 relative shape error against the original luxpy-oracle
-    fixtures; using unrounded M1/M2 for that case reproduces the original
-    reference SPD to ~2e-8 (float-noise level). round_M=True is correct
-    for nominal test sources (cie_d_sd, below); round_M=False is used by
-    generate_reference_spd_values() for the internal reference illuminant.
+    round_M: CIE 15:2004 recommends rounding M1/M2 to 3 decimal places
+    when computing the daylight phases for nominal designated illuminants
+    (D50, D65, D75, ...); the recommendation is specific to nominal CCTs.
+    round_M=True is therefore correct for nominal test sources (cie_d_sd,
+    below). The reference illuminant is generated at a *computed*,
+    non-nominal CCT, to which the rounding recommendation does not apply:
+    round_M=False is used by generate_reference_spd_values(), matching
+    reference.cpp, which computes M1/M2 unrounded per TM-30-20 Sec 3.3
+    Eq. (8)-(9).
     """
     x, y = CCT_to_xy_CIE_D(cct)
     M = 0.0241 + 0.2562 * x - 0.7341 * y
