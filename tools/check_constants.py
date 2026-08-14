@@ -76,6 +76,10 @@ def load_clause_map():
             if not line or line.startswith("#"):
                 continue
             clause, _, spec = line.partition(":")
+            # Strip the trailing '# ...' clause-title comment before
+            # tokenising, so titles never affect range or 'unverified'
+            # parsing.
+            spec = spec.partition("#")[0]
             parts = spec.split()
             if not parts:
                 continue

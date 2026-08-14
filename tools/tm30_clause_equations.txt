@@ -1,10 +1,25 @@
 # TM-30-20 clause -> printed-equation map, used by check_constants.py to
 # validate `TM-30-20 §x.y ... Eq. (nn)` citation tags in src/ and include/.
 #
+# Document identity (the exact edition these equation numbers refer to):
+#   ANSI/IES TM-30-20, "IES Method for Evaluating Light Source Color
+#   Rendition", An American National Standard, incorporating Errata 1
+#   (errata list last updated May 7, 2021).
+#   Copyright 2018 by the Illuminating Engineering Society; approved as
+#   an American National Standard July 27, 2018; Annexes E and F
+#   approved September 23, 2019.
+#   ISBN 978-0-87995-379-9.
+#
+# The equation numbers in this map are specific to THIS edition.
+# Equation numbering can drift between revisions: any other edition or
+# revision must be re-verified clause by clause before editing this map.
+#
 # Format, one clause per line:
 #   <clause>: <first>-<last>              equations printed in that clause
 #   <clause>: <n>                         single equation
 #   <clause>: none                        clause prints no numbered equations
+# A trailing '# ...' comment on an entry line is ignored by the parser;
+# it carries the clause title for human lookup.
 # Append 'unverified' to any entry not yet confirmed against a licensed
 # copy of ANSI/IES TM-30-20. Unverified entries produce warnings, not
 # failures.
@@ -12,24 +27,24 @@
 # All entries verified against ANSI/IES TM-30-20 (+Errata 1) directly,
 # 2026-08-14: every equation number below matches the printed clause.
 # Clauses listed 'none' print no numbered equations.
-1.2: none
-1.3: none
-2.0: none
-3.1: none
-3.2: 1-4
-3.3: 5-20
-3.4: none
-3.5: none
-3.6: 21-28
-3.7: none
-3.7.1: 29-51
-3.8: 52
-4.0: none
-4.1: 53-54
-4.2: 55-56
-4.3: none
-4.4: 57
-4.5: 58-61
-4.6: 62
-4.7: 63
-4.8: 64-65
+1.2:   none    # Calculated Measures
+1.3:   none    # Changes from IES TM-30-15
+2.0:   none    # Scope
+3.1:   none    # Colorimetric Observer
+3.2:   1-4     # Test Source
+3.3:   5-20    # Reference Illuminant
+3.4:   none    # Color Evaluation Samples (CES)
+3.5:   none    # Range and Interpolation of Data
+3.6:   21-28   # Calculation of Tristimulus Values
+3.7:   none    # Color Space and Chromatic Adaptation Transformation
+3.7.1: 29-51   # Calculation of Color Coordinates
+3.8:   52      # Color Difference Formula
+4.0:   none    # Calculated Measures
+4.1:   53-54   # Fidelity Index (Rf)
+4.2:   55-56   # Sample Color Fidelity (Rf,CESi)
+4.3:   none    # Hue-Angle Bins
+4.4:   57      # Gamut Index (Rg)
+4.5:   58-61   # Color Vector Graphic (CVG)
+4.6:   62      # Local Chroma Shift (Rcs,hj)
+4.7:   63      # Local Hue Shift (Rhs,hj)
+4.8:   64-65   # Local Color Fidelity (Rf,hj)
