@@ -48,15 +48,18 @@ struct SpdView {
 
 /// Controls what gets included in batch output.
 ///
-/// One decision per batch run. In the batch path, flags bound the output
-/// buffer size (memory-bandwidth win, not FLOP win - ~85-90% of compute
-/// is upstream of the binning fork).
+/// One decision per batch run. The C++ pipeline computes every metric
+/// unconditionally and ignores these flags (the Tm30Request parameters in
+/// tm30.cpp are deliberately unnamed); they are consumed by the Python
+/// binding layer, which uses them to gate which arrays are allocated and
+/// copied into each per-SPD result dict.
 struct Tm30Request {
   /// Include per-bin metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj) and CVG
   /// coordinates in the output.
   bool bins = true;
 
-  /// Include per-sample fidelity Rf,CESi and Rf,skin in the output.
+  /// Include per-sample fidelity Rf,CESi in the output. (Rf,skin is a
+  /// scalar and is always included.)
   bool samples = false;
 };
 
