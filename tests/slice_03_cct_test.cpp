@@ -567,5 +567,129 @@ TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
   REQUIRE(batch_results[2].duv == single_fl1.duv);
 }
 
+// -------------------------------------------------------------------------
+// spd_to_cct §3.5 conformance (grid handling identical to the pipeline)
+// -------------------------------------------------------------------------
+
+TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per §3.5",
+          "[cct][slice03]") {
+  auto [wl_full, vals_full] = load_spd_csv(data_path("d65_1nm.csv"));
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  // Slice the bundled D65 down to the §3.5 minimum range 400-700 nm.
+  std::vector<double> wl_narrow, vals_narrow;
+  for (std::size_t i = 0; i < wl_full.size(); ++i) {
+    if (wl_full[i] >= 400.0 && wl_full[i] <= 700.0) {
+      wl_narrow.push_back(wl_full[i]);
+      vals_narrow.push_back(vals_full[i]);
+    }
+  }
+  REQUIRE(wl_narrow.size() == 301);
+
+  // Hand-build the §3.5-conformed equivalent: full 380-780 grid, zeros
+  // outside 400-700.
+  std::vector<double> vals_padded(wl_full.size(), 0.0);
+  for (std::size_t i = 0; i < wl_full.size(); ++i) {
+    if (wl_full[i] >= 400.0 && wl_full[i] <= 700.0) {
+      vals_padded[i] = vals_full[i];
+    }
+  }
+
+  CctDuvResult narrow = spd_to_cct(wl_narrow, vals_narrow, cmf, lut);
+  CctDuvResult padded = spd_to_cct(wl_full, vals_padded, cmf, lut);
+
+  // Bit-identical: both routes reduce to the same conformed arrays.
+  REQUIRE(narrow.cct == padded.cct);
+  REQUIRE(narrow.duv == padded.duv);
+}
+
+TEST_CASE("CCT - spd_to_cct rejects a wavelength step above 5 nm (§3.5)",
+          "[cct][slice03]") {
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  std::vector<double> wl, vals;
+  for (double w = 380.0; w <= 780.0; w += 10.0) {
+    wl.push_back(w);
+    vals.push_back(1.0);
+  }
+  REQUIRE_THROWS_AS(spd_to_cct(wl, vals, cmf, lut), InvalidSpd);
+  std::vector<std::vector<double>> batch = {vals};
+  REQUIRE_THROWS_AS(spd_to_cct_batch(wl, batch, cmf, lut), InvalidSpd);
+}
+
+TEST_CASE("CCT - spd_to_cct_batch matches spd_to_cct on a 400-700 nm grid",
+          "[cct][slice03]") {
+  auto [wl_full, vals_d65] = load_spd_csv(data_path("d65_1nm.csv"));
+  auto [wl_a, vals_a] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  std::vector<double> wl_narrow;
+  std::vector<double> d65_narrow, a_narrow;
+  for (std::size_t i = 0; i < wl_full.size(); ++i) {
+    if (wl_full[i] >= 400.0 && wl_full[i] <= 700.0) {
+      wl_narrow.push_back(wl_full[i]);
+      d65_narrow.push_back(vals_d65[i]);
+      a_narrow.push_back(vals_a[i]);
+    }
+  }
+
+  std::vector<std::vector<double>> batch = {d65_narrow, a_narrow};
+  auto batch_results = spd_to_cct_batch(wl_narrow, batch, cmf, lut);
+  CctDuvResult single_d65 = spd_to_cct(wl_narrow, d65_narrow, cmf, lut);
+  CctDuvResult single_a = spd_to_cct(wl_narrow, a_narrow, cmf, lut);
+
+  REQUIRE(batch_results.size() == 2);
+  REQUIRE(batch_results[0].cct == single_d65.cct);
+  REQUIRE(batch_results[0].duv == single_d65.duv);
+  REQUIRE(batch_results[1].cct == single_a.cct);
+  REQUIRE(batch_results[1].duv == single_a.duv);
+}
+
+TEST_CASE("CCT - spd_to_cct_batch_prepared matches spd_to_cct_batch "
+          "bit-for-bit",
+          "[cct][slice03]") {
+  auto [wl_full, vals_d65] = load_spd_csv(data_path("d65_1nm.csv"));
+  auto [wl_a, vals_a] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
+  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
+
+  // Narrow grid so the §3.5 conform is not the identity.
+  std::vector<double> wl_narrow, d65_narrow, a_narrow;
+  for (std::size_t i = 0; i < wl_full.size(); ++i) {
+    if (wl_full[i] >= 400.0 && wl_full[i] <= 700.0) {
+      wl_narrow.push_back(wl_full[i]);
+      d65_narrow.push_back(vals_d65[i]);
+      a_narrow.push_back(vals_a[i]);
+    }
+  }
+  std::vector<std::vector<double>> batch = {d65_narrow, a_narrow};
+
+  // Prepared inputs, exactly as the bindings cache builds them.
+  Spd probe(wl_narrow, std::vector<double>(wl_narrow.size(), 1.0));
+  CmfData cmf_resampled = resample_cmf(probe.wavelengths(), cmf);
+
+  auto plain = spd_to_cct_batch(wl_narrow, batch, cmf, lut);
+  auto prepared =
+      spd_to_cct_batch_prepared(wl_narrow, batch, cmf_resampled, lut);
+
+  REQUIRE(prepared.size() == plain.size());
+  for (std::size_t i = 0; i < plain.size(); ++i) {
+    REQUIRE(prepared[i].cct == plain[i].cct);
+    REQUIRE(prepared[i].duv == plain[i].duv);
+  }
+
+  // Mismatched CMF (resampled to a different-length grid) is rejected.
+  std::vector<double> wl_5nm;
+  for (double w = 380.0; w <= 780.0; w += 5.0) {
+    wl_5nm.push_back(w);
+  }
+  CmfData cmf_81 = resample_cmf(wl_5nm, cmf);
+  REQUIRE_THROWS_AS(spd_to_cct_batch_prepared(wl_narrow, batch, cmf_81, lut),
+                    std::invalid_argument);
+}
+
 } // namespace
 } // namespace tm30::test

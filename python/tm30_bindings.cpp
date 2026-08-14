@@ -425,6 +425,42 @@ struct BatchContext {
   // shares that grid. Unset (nullopt) until set_fixed_grid() is called.
   std::optional<tm30::ResampledTables> fixed_tables_;
 
+  // Per-grid resampled-CMF cache for the AAA_to_BBB convenience methods:
+  // the resample depends only on (grid, source CMF), so repeated calls
+  // on one grid reuse the previous resample. Keyed on the exact grid
+  // vector; bypassed whenever a per-call custom CMF is supplied.
+  struct ResampledCmfCache {
+    std::vector<double> key;
+    tm30::CmfData cmf;
+    bool valid = false;
+
+    /// Resample `source` to `grid`, reusing the previous result when the
+    /// grid is unchanged.
+    const tm30::CmfData &get(const std::vector<double> &grid,
+                             const tm30::CmfData &source) {
+      if (!valid || key != grid) {
+        cmf = tm30::resample_cmf(grid, source);
+        key = grid;
+        valid = true;
+      }
+      return cmf;
+    }
+
+    bool hit(const std::vector<double> &k) const { return valid && key == k; }
+    void store(std::vector<double> k, tm30::CmfData c) {
+      key = std::move(k);
+      cmf = std::move(c);
+      valid = true;
+    }
+  };
+
+  // 2-deg CMF resampled to the §3.5-conformed form of the grid, keyed by
+  // the raw grid (spd_to_cct).
+  ResampledCmfCache cct2_cache_;
+  // 10-deg CMF resampled to the call grid, unclipped
+  // (spd_to_xyz / spd_to_Yuv / photometric spd_to_power).
+  ResampledCmfCache cmf10_cache_;
+
   // Phase 2: persistent worker pool. Created eagerly when the context is
   // constructed with persistent_workers=true and n_workers>1; passed to
   // try_evaluate/try_evaluate_cached so repeated eval() calls reuse the
@@ -920,15 +956,21 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
     }
 
-    tm30::CmfData fresh_cmf;
-    const tm30::CmfData *cmf_to_use = &cmf_10deg;
-    if (!cmf_path_arg.is_none()) {
-      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      cmf_to_use = &fresh_cmf;
+    std::vector<tm30::XyzTriple> xyzs;
+    if (cmf_path_arg.is_none() && !lambda_min_opt.has_value() &&
+        !lambda_max_opt.has_value()) {
+      // Common case (default CMF, no clipping): per-grid cache skips the
+      // CMF resample on repeated same-grid calls.
+      xyzs = tm30::spd_to_xyz_batch_prepared(
+          wl, spd_vecs, cmf10_cache_.get(wl, cmf_10deg), K_opt);
+    } else if (cmf_path_arg.is_none()) {
+      xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, cmf_10deg, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, fresh_cmf, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
     }
-
-    auto xyzs = tm30::spd_to_xyz_batch(wl, spd_vecs, *cmf_to_use, K_opt,
-                                       lambda_min_opt, lambda_max_opt);
 
     auto np = nb::module_::import_("numpy");
     auto result =
@@ -993,15 +1035,20 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
     }
 
-    tm30::CmfData fresh_cmf;
-    const tm30::CmfData *cmf_to_use = &cmf_10deg;
-    if (!cmf_path_arg.is_none()) {
-      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      cmf_to_use = &fresh_cmf;
+    std::vector<tm30::YuvTriple> yuvs;
+    if (cmf_path_arg.is_none() && !lambda_min_opt.has_value() &&
+        !lambda_max_opt.has_value()) {
+      // Same per-grid CMF cache as spd_to_xyz (identical resample).
+      yuvs = tm30::spd_to_Yuv_batch_prepared(
+          wl, spd_vecs, cmf10_cache_.get(wl, cmf_10deg), K_opt);
+    } else if (cmf_path_arg.is_none()) {
+      yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, cmf_10deg, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, fresh_cmf, K_opt,
+                                    lambda_min_opt, lambda_max_opt);
     }
-
-    auto yuvs = tm30::spd_to_Yuv_batch(wl, spd_vecs, *cmf_to_use, K_opt,
-                                       lambda_min_opt, lambda_max_opt);
 
     auto np = nb::module_::import_("numpy");
     auto result =
@@ -1068,9 +1115,11 @@ struct BatchContext {
 
     std::vector<tm30::XyzTriple> xyzs;
     if (cmf_path_arg.is_none()) {
-      xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
-                                    fixed_tables_->daylight_basis, cmf_10deg,
-                                    K_opt);
+      // fixed_tables_ already holds the 10-deg CMF resampled to exactly
+      // this grid; reuse it instead of resampling per call.
+      xyzs = tm30::cct_to_xyz_batch_prepared(
+          ccts, fixed_tables_->wavelengths, fixed_tables_->daylight_basis,
+          fixed_tables_->cmf_10deg, K_opt);
     } else {
       tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
       xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
@@ -1139,7 +1188,19 @@ struct BatchContext {
       lambda_max_opt = nb::cast<double>(lambda_max_arg);
 
     std::vector<double> results;
-    if (cmf_path_arg.is_none()) {
+    if (cmf_path_arg.is_none() && !lambda_min_opt.has_value() &&
+        !lambda_max_opt.has_value()) {
+      // Common case (default CMF, no clipping): the radiometric branch
+      // never touches the CMF; the photometric branch reuses the same
+      // per-grid 10-deg cache as spd_to_xyz/spd_to_Yuv.
+      if (photometric) {
+        results = tm30::spd_to_power_batch_prepared(
+            wl, spd_vecs, cmf10_cache_.get(wl, cmf_10deg), true);
+      } else {
+        results = tm30::spd_to_power_batch_prepared(wl, spd_vecs,
+                                                    tm30::CmfData{}, false);
+      }
+    } else if (cmf_path_arg.is_none()) {
       results = tm30::spd_to_power_batch(wl, spd_vecs, cmf_10deg, photometric,
                                          lambda_min_opt, lambda_max_opt);
     } else {
@@ -1196,15 +1257,25 @@ struct BatchContext {
       spd_vecs[i].assign(data + i * nwl, data + (i + 1) * nwl);
     }
 
-    tm30::CmfData fresh_cmf;
-    const tm30::CmfData *cmf_to_use = &cmf_2deg;
-    if (!cmf_path_arg.is_none()) {
-      fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      cmf_to_use = &fresh_cmf;
+    std::vector<tm30::CctDuvResult> results;
+    if (cmf_path_arg.is_none()) {
+      // Per-grid cache: the §3.5 grid probe and the 2-deg CMF resample
+      // depend only on the grid, so repeated calls on one grid (the
+      // common case: the calculator's own fixed grid) skip both. The
+      // cache is keyed on the raw grid and bypassed for per-call custom
+      // CMFs.
+      if (!cct2_cache_.hit(wl)) {
+        // TM-30-20 §3.5: unit-value probe conforms the grid once.
+        const tm30::Spd probe(wl, std::vector<double>(wl.size(), 1.0));
+        cct2_cache_.store(wl,
+                          tm30::resample_cmf(probe.wavelengths(), cmf_2deg));
+      }
+      results = tm30::spd_to_cct_batch_prepared(wl, spd_vecs, cct2_cache_.cmf,
+                                                planckian_lut);
+    } else {
+      tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
+      results = tm30::spd_to_cct_batch(wl, spd_vecs, fresh_cmf, planckian_lut);
     }
-
-    auto results =
-        tm30::spd_to_cct_batch(wl, spd_vecs, *cmf_to_use, planckian_lut);
 
     auto np = nb::module_::import_("numpy");
     auto result =

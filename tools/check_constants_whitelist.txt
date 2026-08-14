@@ -8,7 +8,7 @@
 # constant, not a TM-30-20 spec citation. TM-30-20 works entirely in
 # relative (Y=100-normalized) colorimetry and never defines this constant,
 # so there is no honest "TM-30-20 §x.y" citation to attach here.
-src/tm30/xyz.cpp:147
+src/tm30/xyz.cpp:148
 
 # Validity thresholds (kCctMin/kCctMax/kDuvMaxAbs in src/tm30/tm30.cpp).
 # TM-30-20 §2.0 Scope states the applicability domain qualitatively
