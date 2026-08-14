@@ -8,8 +8,10 @@ byte-reproducible from it:
   1. Planck's law blackbody spectral radiance (TM-30-20 Sec 3.3
      Eq. (5)-(6), c2 = 1.4388e-2 m*K), evaluated at each candidate CCT.
   2. Integrated against the CIE 1931 2-degree standard observer CMF
-     (data/cmf_1931_2.csv, sourced from colour-science; 380-780nm at
-     1nm) via trapezoidal integration.
+     (data/cmf_1931_2.csv, sourced from colour-science; full 360-830nm
+     range at 1nm -- not data/cie_1931_2.csv, the separate 380-780nm
+     table used for the test source's CCT input) via trapezoidal
+     integration.
   3. Converted to CIE 1960 UCS (u,v) via u=4X/(X+15Y+3Z), v=6Y/(X+15Y+3Z).
 
 Overall SPD scale is irrelevant to (u,v) (they are chromaticity ratios),
