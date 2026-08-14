@@ -535,8 +535,20 @@ struct BatchContext {
     const double *wl_data = static_cast<const double *>(wl.data());
     std::vector<double> wl_vec(wl_data, wl_data + nwl);
 
-    fixed_tables_ = tm30::prepare_resampled_tables(wl_vec, cmf_2deg, cmf_10deg,
-                                                   ces_data, daylight_basis);
+    // Conform the bound grid per TM-30-20 §3.5 exactly as Spd conforms
+    // every row at construction (drop outside 380-780 nm, zero-fill down
+    // to 380 / up to 780 nm), by running the grid through Spd itself --
+    // one recipe, no duplicate. The cached tables are then resampled to
+    // the SAME conformed grid the row Spd objects will carry, so
+    // per-row values and cached tables always align. An invalid grid
+    // (step > 5 nm, range short of 400-700 nm) surfaces here, at bind
+    // time, as InvalidSpd -> ValueError.
+    const tm30::Spd grid_probe(wl_vec,
+                               std::vector<double>(wl_vec.size(), 1.0));
+
+    fixed_tables_ = tm30::prepare_resampled_tables(
+        grid_probe.wavelengths(), cmf_2deg, cmf_10deg, ces_data,
+        daylight_basis);
   }
 
   // NOTE: `bins`/`samples` gate which arrays get allocated and copied into

@@ -337,6 +337,15 @@ try_evaluate_cached(std::span<const SpdView> spds,
 
         // Run the pipeline using the pre-resampled tables - no CES/CMF
         // resampling happens here.
+        // Guard: the row's §3.5-conformed grid must match the grid the
+        // cached tables were resampled to. Rows and the bound grid are
+        // conformed by the same Spd recipe, so a mismatch means this
+        // row's input grid differs from the bound grid.
+        if (spd.wavelengths() != tables.wavelengths) {
+          throw InvalidSpd("SPD wavelength grid does not match the fixed "
+                           "grid the cached tables are bound to");
+        }
+
         Tm30Result result;
         result.colorimetry =
             compute_ces_colorimetry_cached(spd.values(), tables, planckian_lut);
@@ -364,6 +373,15 @@ try_evaluate_cached(std::span<const SpdView> spds,
         Spd spd(
             std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
             std::vector<double>(sv.values.begin(), sv.values.end()));
+
+        // Guard: the row's §3.5-conformed grid must match the grid the
+        // cached tables were resampled to. Rows and the bound grid are
+        // conformed by the same Spd recipe, so a mismatch means this
+        // row's input grid differs from the bound grid.
+        if (spd.wavelengths() != tables.wavelengths) {
+          throw InvalidSpd("SPD wavelength grid does not match the fixed "
+                           "grid the cached tables are bound to");
+        }
 
         Tm30Result result;
         result.colorimetry =
@@ -401,6 +419,12 @@ try_evaluate_cached(std::span<const SpdView> spds,
           Spd spd(
               std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
               std::vector<double>(sv.values.begin(), sv.values.end()));
+
+          // Guard: see the sequential loop body above.
+          if (spd.wavelengths() != tables.wavelengths) {
+            throw InvalidSpd("SPD wavelength grid does not match the fixed "
+                             "grid the cached tables are bound to");
+          }
 
           Tm30Result result;
           result.colorimetry = compute_ces_colorimetry_cached(

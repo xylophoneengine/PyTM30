@@ -653,5 +653,69 @@ TEST_CASE("Parallel - persistent workers: plain path bit-identical, and "
   }
 }
 
+
+// ======================================================================
+//  Cached path vs TM-30-20 §3.5 grid conformance
+// ======================================================================
+
+TEST_CASE("Cached path - narrow bound grid conforms like Spd",
+          "[parallel][slice13][cached][spd]") {
+  // A 400-700 nm @ 5 nm input grid is zero-filled to 380-780 nm inside
+  // Spd (TM-30-20 §3.5). The cached tables must be resampled to that
+  // SAME conformed grid, or per-row values and tables misalign. Binding
+  // through an Spd probe (as the Python layer does) and comparing the
+  // cached result against the plain per-row path must be bit-identical.
+  auto &t = tables();
+
+  std::vector<double> wl;
+  for (double w = 400.0; w <= 700.0; w += 5.0)
+    wl.push_back(w);
+  std::vector<double> vals(wl.size());
+  for (std::size_t i = 0; i < wl.size(); ++i)
+    vals[i] = 1.0 + 0.001 * (wl[i] - 400.0);
+
+  const Spd probe(wl, std::vector<double>(wl.size(), 1.0));
+  ResampledTables rtab = prepare_resampled_tables(
+      probe.wavelengths(), t.cmf_2deg, t.cmf_10deg, t.ces, t.basis);
+
+  std::vector<SpdView> batch{SpdView{wl, vals}};
+  Tm30Request req{/*bins=*/true, /*samples=*/true};
+
+  auto cached = try_evaluate_cached(batch, rtab, t.lut, req, /*n_workers=*/1);
+  auto plain = try_evaluate(batch, t.cmf_2deg, t.cmf_10deg, t.ces, t.basis,
+                            t.lut, req, /*n_workers=*/1);
+
+  REQUIRE(cached.size() == 1);
+  REQUIRE(plain.size() == 1);
+  REQUIRE(cached[0].has_value());
+  REQUIRE(plain[0].has_value());
+  REQUIRE(vectors_equal(cached, plain)); // exact ==, not tolerance
+  CHECK(cached[0]->validity.extrapolated); // zero-fill happened
+}
+
+TEST_CASE("Cached path - grid/tables misalignment yields nullopt, not "
+          "garbage",
+          "[parallel][slice13][cached][spd]") {
+  // Tables resampled to the RAW (unconformed) narrow grid cannot serve
+  // rows whose Spd conforms to 380-780 nm; the guard must turn the row
+  // into nullopt instead of integrating misaligned arrays.
+  auto &t = tables();
+
+  std::vector<double> wl;
+  for (double w = 400.0; w <= 700.0; w += 5.0)
+    wl.push_back(w);
+  std::vector<double> vals(wl.size(), 1.0);
+
+  ResampledTables raw_tab =
+      prepare_resampled_tables(wl, t.cmf_2deg, t.cmf_10deg, t.ces, t.basis);
+
+  std::vector<SpdView> batch{SpdView{wl, vals}};
+  Tm30Request req{/*bins=*/true, /*samples=*/true};
+
+  auto res = try_evaluate_cached(batch, raw_tab, t.lut, req, /*n_workers=*/1);
+  REQUIRE(res.size() == 1);
+  REQUIRE_FALSE(res[0].has_value());
+}
+
 } // namespace
 } // namespace tm30::test
