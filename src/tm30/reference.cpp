@@ -273,13 +273,17 @@ generate_reference_spd(double cct, const std::vector<double> &wavelengths,
       cct, wavelengths, basis, already_resampled); // TM-30-20 §3.3 Eq. (7)
 
   // Compute Y for each component via trapezoidal integration.
-  // TM-30-20 §3.6: Y = integral SPD(lambda) * ybar10(lambda) dlambda
+  // TM-30-20 §3.3: the blend components are Y-normalised before mixing;
+  // the normalisation requirement sits in §3.3 -- Eq. (18) and the k_r
+  // factor of Eq. (20). (Not §3.6: Eqs. (21)-(28) there all carry the
+  // sample reflectance Ri(lambda), and the blend components have no
+  // reflectance term.) Per §3.1 the 1964 10-deg ybar is used here.
   auto compute_Y = [&](const std::vector<double> &spd) -> double {
     std::vector<double> integrand(n);
     for (std::size_t i = 0; i < n; ++i) {
       integrand[i] = spd[i] * cmf_y_bar[i];
     }
-    return trapezoidal_integrate(wavelengths, integrand); // TM-30-20 §3.6
+    return trapezoidal_integrate(wavelengths, integrand); // TM-30-20 §3.3
   };
 
   const double Y_planck = compute_Y(planck);

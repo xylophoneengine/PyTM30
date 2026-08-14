@@ -3,6 +3,7 @@
 /// @file gamut.hpp
 /// TM-30-20 Gamut Area Index (Rg), local per-bin metrics, and CVG coordinates.
 ///
+/// TM-30-20 §4.3: hue-angle bins and bin-averaged (a', b') coordinates
 /// TM-30-20 §4.4: Gamut Index (Rg)
 /// TM-30-20 §4.5: Color Vector Graphic (CVG)
 /// TM-30-20 §4.6: Local Chroma Shift (Rcs,hj)
@@ -21,11 +22,13 @@ namespace tm30 {
 /// For each bin j, the arithmetic mean of the CAM02-UCS coordinates
 /// of all CES assigned to that bin.
 ///
-/// TM-30-20 §4.4
+/// TM-30-20 §4.3: the closing paragraph specifies the per-bin arithmetic
+/// mean of (a', b') for both conditions; §4.4 consumes the averages for
+/// Rg. J' is a PyTM30 extension -- §4.3 specifies only a' and b'.
 struct BinAverages {
-  std::array<double, 16> J_prime; // Average J' per bin  // TM-30-20 §4.4
-  std::array<double, 16> a_prime; // Average a' per bin  // TM-30-20 §4.4
-  std::array<double, 16> b_prime; // Average b' per bin  // TM-30-20 §4.4
+  std::array<double, 16> J_prime; // Average J' per bin  // PyTM30 extension
+  std::array<double, 16> a_prime; // Average a' per bin  // TM-30-20 §4.3
+  std::array<double, 16> b_prime; // Average b' per bin  // TM-30-20 §4.3
 };
 
 /// Per-bin local metrics.
@@ -70,11 +73,11 @@ struct CvgCoordinates {
 
 /// Complete gamut result: Rg, per-bin local metrics, bin averages, and CVG.
 ///
-/// TM-30-20 §4.4-§4.8
+/// TM-30-20 §4.3-§4.8
 struct GamutResult {
   double Rg;             // Gamut area index         // TM-30-20 §4.4 Eq. (57)
-  BinAverages test_avg;  // Test bin averages       // TM-30-20 §4.4
-  BinAverages ref_avg;   // Reference bin averages  // TM-30-20 §4.4
+  BinAverages test_avg;  // Test bin averages       // TM-30-20 §4.3
+  BinAverages ref_avg;   // Reference bin averages  // TM-30-20 §4.3
   LocalBinMetrics local; // Per-bin local metrics   // TM-30-20 §4.6-§4.8
   CvgCoordinates cvg;    // CVG coordinates         // TM-30-20 §4.5
 };
@@ -88,7 +91,7 @@ struct GamutResult {
 /// @param bins     16 hue-angle bins with CES indices.
 /// @return         BinAverages with per-bin average J', a', b'.
 ///
-/// TM-30-20 §4.4
+/// TM-30-20 §4.3 (closing paragraph); §4.4 consumes the averages for Rg.
 BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
                         const HueBins &bins);
 
@@ -161,7 +164,7 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
 /// @param bins        Hue-angle bin assignments (16 bins).
 /// @return            Complete GamutResult.
 ///
-/// TM-30-20 §4.4-§4.8
+/// TM-30-20 §4.3-§4.8
 GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
                           const std::array<Cam02Ucs, 99> &jab_ref,
                           const std::array<double, 99> &delta_e,

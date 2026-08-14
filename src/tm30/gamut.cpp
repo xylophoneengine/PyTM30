@@ -1,5 +1,6 @@
 // TM-30-20: Gamut Area Index (Rg), per-bin local metrics, and CVG coordinates.
 //
+// TM-30-20 §4.3: hue-angle bins and bin-averaged (a', b') coordinates
 // TM-30-20 §4.4: Gamut Index (Rg)
 // TM-30-20 §4.5: Color Vector Graphic (CVG)
 // TM-30-20 §4.6: Local Chroma Shift (Rcs,hj)
@@ -53,11 +54,13 @@ static constexpr double kCvgScale = 1.0; // TM-30-20 §4.5
 
 BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
                         const HueBins &bins) {
-  // TM-30-20 §4.4
+  // TM-30-20 §4.3: the closing paragraph specifies the per-bin arithmetic
+  // mean of (a', b') for both the test and the reference condition; §4.4
+  // then consumes those averages for Rg.
   BinAverages avg{};
 
   for (int j = 0; j < kNumBins; ++j) {
-    // TM-30-20 §4.4
+    // TM-30-20 §4.3
     const auto &bin = bins[j];
     const std::size_t m = bin.size();
 
@@ -70,14 +73,15 @@ BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
       continue;
     }
 
-    // TM-30-20 §4.4: bin average J, a', b' - initialize accumulators
+    // TM-30-20 §4.3: bin average a', b' - initialize accumulators
+    // (J' is a PyTM30 extension; §4.3 specifies only a' and b')
     double sum_J = 0.0, sum_a = 0.0, sum_b = 0.0;
     for (int idx : bin) {
       sum_J += jab_ces[idx].J_prime;
       sum_a += jab_ces[idx].a_prime;
       sum_b += jab_ces[idx].b_prime;
     }
-    // TM-30-20 §4.4: arithmetic mean
+    // TM-30-20 §4.3: arithmetic mean
     avg.J_prime[j] = sum_J / static_cast<double>(m);
     avg.a_prime[j] = sum_a / static_cast<double>(m);
     avg.b_prime[j] = sum_b / static_cast<double>(m);
