@@ -20,7 +20,7 @@ VIBECODE-ALERT!!! Opencode and Claude did help me.
 The two existing Python implementations of TM-30,
 [luxpy](https://github.com/ksmet1977/luxpy) and
 [colour-science](https://github.com/colour-science/colour-science), are both
-mature, well-validated references - but neither is built for **mass
+mature, well-validated references, but neither is built for **mass
 evaluation**. Their pipelines are geared toward one spectrum (or a modest
 handful) at a time; once you're scoring tens of thousands of SPDs, per-call
 Python overhead and repeated table resampling dominate the runtime.
@@ -33,15 +33,25 @@ pipeline thousands to millions of times and at that point per-SPD
 milliseconds are the difference between an interactive tool and an
 overnight job.
 
-That was exactly the workload I needed: evaluate huge batches of spectra,
-fast. So I designed a different architecture for it - a wavelength grid
-resampled and cached once instead of per call, a true contiguous-array batch
-API instead of a Python loop over single-SPD calls, a zero-heap-allocation
-hot path, domain validity (out-of-range CCT/Duv) modeled as result data
-rather than exceptions - and had it implemented from the TM-30-20 spec,
-slice by slice, by AI coding agents, verifying every stage against
-colour-science (and, in the original internal version, luxpy) as an
-accuracy oracle.
+That was exactly the workload I needed: evaluating huge batches of
+spectra, fast. The existing implementations could not be tuned into that
+role, because their bottleneck is architectural rather than slow inner
+maths. So I designed a different architecture. The wavelength grid is
+assumed constant, so every reference table is resampled once and cached
+instead of being re-interpolated on each call. A true contiguous-array
+batch API replaces the Python loop over single-SPD calls. The hot path
+allocates nothing on the heap. Domain validity (out-of-range CCT or Duv)
+is modeled as result data rather than as exceptions. I then implemented
+it from the TM-30-20 spec, slice by slice, with the help of AI coding
+agents, and verified every stage against colour-science (and, in the
+initial internal version, luxpy) as an accuracy oracle.
+
+None of the speed comes from touching the mathematics. The numerics are
+derived from the TM-30-20 text, and every numeric constant in the core
+cites its clause, enforced by a CI gate. The speedup is pure data-flow
+organisation: resample once, allocate nothing per SPD, stay native. Two
+implementations can agree to floating-point precision and still sit an
+order of magnitude apart on throughput.
 
 <!-- benchmark-results:begin -->
 <!-- Auto-written by benchmarks/benchmark_tm30.py; do not edit by hand.
@@ -49,10 +59,10 @@ accuracy oracle.
 The payoff, measured against colour-science on the bundled illuminant
 corpus (`benchmarks/benchmark_tm30.py`):
 
-| Path | colour-science | pytm30 | Speedup |
-|---|---|---|---|
-| Single eval | 1.073 ms/SPD | 0.112 ms/SPD | **9.6x** |
-| Batch (19 SPDs per call) | 1.069 ms/SPD | 0.134 ms/SPD | **8.0x** |
+| Path                     | colour-science | pytm30       | Speedup  |
+| ------------------------ | -------------- | ------------ | -------- |
+| Single eval              | 1.073 ms/SPD   | 0.112 ms/SPD | **9.6x** |
+| Batch (19 SPDs per call) | 1.069 ms/SPD   | 0.134 ms/SPD | **8.0x** |
 
 Accuracy on the same corpus: Rf within 0.004, Rg within
 0.001, and CCT within 0.07 K of colour-science's own
