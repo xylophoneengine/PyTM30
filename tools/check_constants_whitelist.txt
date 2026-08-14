@@ -28,4 +28,4 @@ src/tm30/tm30.cpp:38
 # supplied with TM-30 and CQS but absent from the published Ohno (2014)
 # method, so there is no clause or publication to cite; the clamp itself
 # is an implementation robustness extension.
-src/tm30/cct.cpp:240
+src/tm30/cct.cpp:251
