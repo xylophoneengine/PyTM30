@@ -110,7 +110,7 @@ bin-averaged coordinates, which weights samples by chroma. PyTM30
 additionally carries the bin-average J' alongside the (x, y) coordinates
 as a convenience; §4.5 is strictly two-dimensional.
 
-## Local colour fidelity vs local shifts (§4.8, §4.6, §4.7) — conformance note
+## Local colour fidelity vs local shifts (§4.8, §4.6, §4.7) - conformance note
 
 §4.8 bases local colour fidelity on the individual colour shifts of the
 CES within each bin (Eq. (64) averages individual Delta E' values,
