@@ -65,8 +65,9 @@ BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
     const std::size_t m = bin.size();
 
     if (m == 0) {
-      // Empty bin: mark as NaN
-      // TM-30-20 §4.4 edge case
+      // Implementation extension -- defensive handling of an empty bin.
+      // TM-30-20 §4.3 gives the per-bin CES count as 2 to 11; an empty
+      // bin is not contemplated by the standard. Marked NaN.
       avg.J_prime[j] = std::numeric_limits<double>::quiet_NaN();
       avg.a_prime[j] = std::numeric_limits<double>::quiet_NaN();
       avg.b_prime[j] = std::numeric_limits<double>::quiet_NaN();
@@ -106,7 +107,8 @@ double polygon_area(const BinAverages &avg) {
   Vertex verts[16];
   int n = 0;
   for (int j = 0; j < kNumBins; ++j) {
-    // TM-30-20 §4.4 edge case: skip empty bins
+    // Implementation extension: skip empty bins (see bin_average).
+    // TM-30-20 §4.3 does not contemplate empty bins.
     if (std::isnan(avg.a_prime[j]))
       continue;
     verts[n].a = avg.a_prime[j]; // TM-30-20 §4.4
@@ -115,8 +117,9 @@ double polygon_area(const BinAverages &avg) {
   }
 
   if (n < 3) {
-    // Degenerate polygon: fewer than 3 vertices.
-    // TM-30-20 §4.4 edge case
+    // Implementation extension: degenerate-polygon guard. Fewer than 3
+    // vertices cannot bound an area, so the area is reported as 0.
+    // TM-30-20 §4.4 assumes all 16 bin averages exist.
     return 0.0;
   }
 
@@ -156,8 +159,9 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     const std::size_t m = bin.size();
 
     if (m == 0 || std::isnan(ref_avg.a_prime[j])) {
-      // Empty bin: set metrics to NaN
-      // TM-30-20 §4.6-§4.8 edge case
+      // Implementation extension: empty bin (see bin_average), metrics
+      // reported as NaN.
+      // TM-30-20 §4.6-§4.8 do not contemplate empty bins.
       metrics.Rf_hj[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.Rcs_hj_percent[j] = std::numeric_limits<double>::quiet_NaN();
       metrics.Rhs_hj[j] = std::numeric_limits<double>::quiet_NaN();
@@ -193,8 +197,10 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
                   ref_avg.b_prime[j] * ref_avg.b_prime[j]); // TM-30-20 §4.6
 
     if (r_ref < 1e-12) {
-      // Degenerate: reference at origin - shifts undefined.
-      // TM-30-20 §4.6 edge case
+      // Implementation extension: degenerate guard, reference at the
+      // origin. Shifts reported as 0.
+      // TM-30-20 §4.6/§4.7 divide by the reference radial distance and
+      // do not contemplate a zero value.
       metrics.Rcs_hj_percent[j] = 0.0;
       metrics.Rhs_hj[j] = 0.0;
       continue;
@@ -292,7 +298,9 @@ compute_cvg_coordinates(const BinAverages &test_avg, const BinAverages &ref_avg,
     const double db = test_avg.b_prime[j] - ref_avg.b_prime[j];
 
     if (r_ref < 1e-12) {
-      // Degenerate: reference at origin
+      // Implementation extension: degenerate guard, reference at the
+      // origin (Eqs. (60)-(61) divide by it); test point placed on the
+      // reference circle.
       cvg.x_test[j] = kCvgScale * x_ref_raw;
       cvg.y_test[j] = kCvgScale * y_ref_raw;
     } else {
