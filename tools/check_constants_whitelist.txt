@@ -21,3 +21,11 @@ src/tm30/xyz.cpp:147
 src/tm30/tm30.cpp:34
 src/tm30/tm30.cpp:35
 src/tm30/tm30.cpp:38
+
+# Blend-fraction clamp min(x, 1.0) in the opt-in shifted-triangular
+# correction (CctOptions::shifted_triangular_blend, default off,
+# src/tm30/cct.cpp). The correction is present in the calculators
+# supplied with TM-30 and CQS but absent from the published Ohno (2014)
+# method, so there is no clause or publication to cite; the clamp itself
+# is an implementation robustness extension.
+src/tm30/cct.cpp:240

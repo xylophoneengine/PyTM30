@@ -59,7 +59,8 @@ PlanckianLut load_planckian_lut(const std::string &filepath) {
 // -------------------------------------------------------------------------
 
 CctDuvResult compute_cct_duv(double u_test, double v_test,
-                             const PlanckianLut &lut) {
+                             const PlanckianLut &lut,
+                             const CctOptions &options) {
   const std::size_t n = lut.T.size();
 
   // --- Step 1: Find closest point in LUT by Euclidean distance in (u,v) ---
@@ -219,16 +220,26 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // TM-30-20 §3.3 incorporation; threshold value from Ohno (2014).
   constexpr double duv_threshold = 0.002;
 
-  // Apply linear shift to triangular solution (as in luxpy/TM-30)
-  // T_tri_shift = T_tri + (T_par - T_tri) * |duv_tri| / threshold
-  // TM-30-20 §3.3 (blend region clamp)
+  // Ohno (2014), as published: below the threshold the triangular
+  // solution is used as-is; above it the parabolic one.
+  //
+  // Optional refinement (opt-in, default off): the calculators supplied
+  // with TM-30 and CQS apply a shifted-triangular correction below the
+  // threshold, T = T_tri + (T_par - T_tri) * |duv_tri| / threshold. It is
+  // absent from the published method and from Smet et al. 2023's
+  // description of it, so there is nothing to cite; it is computed only
+  // when CctOptions::shifted_triangular_blend is set. The min(..., 1.0)
+  // clamp on the blend fraction is an implementation robustness
+  // extension.
   const double duv_abs = std::abs(duv_tri);
-  const double T_tri_shift =
-      T_tri + (T_par - T_tri) * std::min(duv_abs / duv_threshold, 1.0);
 
   CctDuvResult result;
   if (duv_abs < duv_threshold) {
-    result.cct = T_tri_shift;
+    double cct = T_tri;
+    if (options.shifted_triangular_blend) {
+      cct = T_tri + (T_par - T_tri) * std::min(duv_abs / duv_threshold, 1.0);
+    }
+    result.cct = cct;
     result.duv = duv_tri;
   } else {
     result.cct = T_par;
@@ -243,9 +254,10 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 // -------------------------------------------------------------------------
 
 CctDuvResult compute_cct_duv_from_xyz(double X, double Y, double Z,
-                                      const PlanckianLut &lut) {
+                                      const PlanckianLut &lut,
+                                      const CctOptions &options) {
   const UvCoord uv = xyz_to_uv(X, Y, Z);
-  return compute_cct_duv(uv.u, uv.v, lut);
+  return compute_cct_duv(uv.u, uv.v, lut, options);
 }
 
 } // namespace tm30

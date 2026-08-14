@@ -46,6 +46,19 @@ struct PlanckianLut {
 /// @throws std::runtime_error on file-not-found or parse failure.
 PlanckianLut load_planckian_lut(const std::string &filepath);
 
+/// Options for the CCT/Duv solver.
+struct CctOptions {
+  /// Apply the shifted-triangular correction below the |Duv| selection
+  /// threshold: T = T_tri + (T_par - T_tri) * |Duv_tri| / threshold.
+  ///
+  /// This refinement is present in the calculators supplied with TM-30
+  /// and CQS but is absent from the published Ohno (2014) method (and
+  /// from Smet et al. 2023's description of it), so there is nothing to
+  /// cite for it. It is therefore opt-in and OFF by default; the default
+  /// follows the published method exactly.
+  bool shifted_triangular_blend = false;
+};
+
 /// Compute CCT and Duv from CIE 1960 UCS (u,v) chromaticity.
 ///
 /// Uses the Ohno 2014 triangular + parabolic search algorithm.
@@ -57,7 +70,8 @@ PlanckianLut load_planckian_lut(const std::string &filepath);
 /// @param lut     Pre-computed Planckian locus LUT (CIE 1931 2-deg observer).
 /// @return        CctDuvResult with CCT (K) and Duv.
 CctDuvResult compute_cct_duv(double u_test, double v_test,
-                             const PlanckianLut &lut);
+                             const PlanckianLut &lut,
+                             const CctOptions &options = {});
 
 /// Compute CCT and Duv from CIE 1931 2-deg XYZ tristimulus values.
 ///
@@ -69,6 +83,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 /// @param lut Pre-computed Planckian locus LUT.
 /// @return    CctDuvResult with CCT (K) and Duv.
 CctDuvResult compute_cct_duv_from_xyz(double X, double Y, double Z,
-                                      const PlanckianLut &lut);
+                                      const PlanckianLut &lut,
+                                      const CctOptions &options = {});
 
 } // namespace tm30
