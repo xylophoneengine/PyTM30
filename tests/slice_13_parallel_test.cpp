@@ -452,15 +452,23 @@ TEST_CASE("Parallel - n_workers larger than batch size", "[parallel][slice13]"
 //  4. Mandatory timing-regression test (n_workers=1 default path)
 // ======================================================================
 //
-// Baselines measured on THIS machine (2026-08-04, AMD Ryzen 3 PRO 3300U,
-// 4 cores, GCC 13.3 -O3) BEFORE the n_workers feature landed, via
-// tools/bench_cpp_baseline.cpp:
-//   batch1  (1 SPD/call):  median 0.1437-0.1444 ms  -> constant 0.145
-//   batch19 (19 SPD/call): median 2.8486-2.8569 ms  -> constant 2.86
-// A std::thread spawn+join costs ~40 us on this machine, so a buggy
-// n_workers=1 that spawns one thread would land at ~0.185 ms on batch1 -
-// +28%, far above the 1.10x gate. Median noise across runs is <0.5%,
-// so 1.10x is a ~20x margin over noise. If this machine changes, re-run
+// Baselines re-measured on THIS machine (2026-08-15, Apple M4 Pro, 12
+// cores, Apple clang 21.0.0 -O3, macOS power mode 2/high) via
+// tools/bench_cpp_baseline.cpp. The previous constants (0.145 / 2.86)
+// were calibrated on a different machine (AMD Ryzen 3 PRO 3300U) and are
+// no longer meaningful as a regression gate now that this machine's
+// build is roughly 4x faster on both legs:
+//   batch1  (1 SPD/call):  median 0.0317-0.0379 ms (mostly ~0.032, with
+//                          occasional load-induced spikes) -> constant 0.038
+//   batch19 (19 SPD/call): median 0.648-0.666 ms           -> constant 0.67
+// A std::thread spawn+join costs ~14-17 us on this machine (vs ~40 us on
+// the old one), so a buggy n_workers=1 that spawns one thread would add
+// ~16 us: +42% on batch1 (0.038 -> ~0.054 ms), far above the 1.10x gate.
+// Noise here is not as tight as the old machine's <0.5%: repeated runs
+// under background load (load average ~2) mostly cluster within ~2-3% of
+// the constants above but occasionally spike ~15-20% higher, which is why
+// the constants are set near the observed maximum rather than the median.
+// If this machine or its load characteristics change, re-run
 // tools/bench_cpp_baseline.cpp and update the constants.
 
 TEST_CASE("Parallel - n_workers=1 timing regression vs pre-change baseline",
@@ -474,20 +482,20 @@ TEST_CASE("Parallel - n_workers=1 timing regression vs pre-change baseline",
   try_evaluate_cached(c.views, rtab, t.lut, Tm30Request{true, true}, 1);
 
   // batch1: the per-call overhead is the largest fraction here - a
-  // single spawned thread (+40 us) would be a +28% regression, easily
+  // single spawned thread (+16 us) would be a +42% regression, easily
   // above the 10% gate.
   const double t1 =
       min_median_ms(300, std::vector<SpdView>{c.views[0]}, rtab, t.lut, 1);
-  INFO("n_workers=1 batch1 median: " << t1 << " ms (baseline 0.145, gate "
-                                     << 0.145 * 1.10 << ")");
-  REQUIRE(t1 < 0.145 * 1.10);
+  INFO("n_workers=1 batch1 median: " << t1 << " ms (baseline 0.038, gate "
+                                     << 0.038 * 1.10 << ")");
+  REQUIRE(t1 < 0.038 * 1.10);
 
-  // batch19: gross-regression gate (spawn-1-thread is only +1.4% here,
+  // batch19: gross-regression gate (spawn-1-thread is only +2.4% here,
   // but the batch1 leg above catches that specific bug).
   const double t19 = min_median_ms(100, c.views, rtab, t.lut, 1);
-  INFO("n_workers=1 batch19 median: " << t19 << " ms (baseline 2.86, gate "
-                                      << 2.86 * 1.10 << ")");
-  REQUIRE(t19 < 2.86 * 1.10);
+  INFO("n_workers=1 batch19 median: " << t19 << " ms (baseline 0.67, gate "
+                                      << 0.67 * 1.10 << ")");
+  REQUIRE(t19 < 0.67 * 1.10);
 }
 
 // ======================================================================
