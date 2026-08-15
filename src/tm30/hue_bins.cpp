@@ -35,10 +35,15 @@ HueBins bin_by_hue(const std::array<Cam02Ucs, 99> &jab_ref,
       (*out_hue_angles)[i] = h;
     }
 
-    // Assign to bin. TM-30-20 S4.3:
-    // Bin j (0-indexed) spans [j x 22.5-deg, (j+1) x 22.5-deg).
-    // Half-open intervals: boundary value goes to the bin starting at that
-    // angle (higher bin index). Bin 15 spans [337.5-deg, 360.0-deg] inclusive.
+    // Assign to bin: bin j (0-indexed) spans j x 22.5-deg to
+    // (j + 1) x 22.5-deg.  TM-30-20 S4.3
+    //
+    // S4.3 fixes the 16 sections but does not cover a hue angle landing
+    // exactly on a boundary, so PyTM30 picks: truncation makes the
+    // intervals [lo, hi), which sends such a sample to the bin starting at
+    // that angle (the higher index). Bin 15 covers [337.5-deg, 360.0-deg]
+    // closed at both ends, since h is normalised to [0, 2pi). See
+    // docs/divergences.md, "Hue angles exactly on a bin boundary".
     int bin = static_cast<int>(h / kBinWidth); // TM-30-20 S4.3
     if (std::isnan(h) || bin < 0) {
       // Degenerate input (e.g. an all-zero SPD) propagates NaN through

@@ -176,6 +176,27 @@ implement S2.0's qualitative scope statement. The standard prints no
 numerical CCT or Duv bounds; the numbers are PyTM30 sanity bounds and are
 documented as such at their definition sites.
 
+## Hue angles exactly on a bin boundary (S4.3)
+
+S4.3 divides the a'-b' plane into 16 sections of 22.5 deg, with 0 deg on
+the +a' axis and the bin label j increasing counterclockwise. It does not
+cover which of the two neighbouring bins a sample takes when its hue angle
+lands exactly on a boundary. In exact arithmetic that never happens, so
+there is nothing for the standard to say; in floating point it does happen,
+and an implementation has to pick one.
+
+PyTM30 truncates -- `static_cast<int>(h / kBinWidth)` -- which makes every
+interval [j x 22.5 deg, (j+1) x 22.5 deg): a sample on a boundary joins the
+bin starting there, the higher index. Bin 15 covers [337.5 deg, 360 deg]
+closed at both ends, because h is normalised to [0, 2pi) and h == 2pi
+clamps back to 15.
+
+The choice only ever moves a sample that sits exactly on a boundary, and
+tests/slice_14_hue_bin_stability_test.cpp asserts it directly: a
+perturbation carrying a sample exactly onto a boundary leaves its bin
+unchanged when the crossing runs downward, and changes it when the crossing
+runs upward.
+
 ## Apparent errata in the standard
 
 Two apparent typos in TM-30-20 (not corrected by Errata 1), and the

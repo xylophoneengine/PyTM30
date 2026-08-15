@@ -63,6 +63,14 @@
 //   * a perturbation whose measured hue shift is smaller than the
 //     sample's boundary distance does NOT change its bin;
 //   * a perturbation whose measured hue shift exceeds it DOES;
+//   * a perturbation landing the sample exactly ON the boundary follows
+//     the library's half-open intervals -- it stays in the bin that starts
+//     at that boundary, so it is a flip for an upward crossing and not one
+//     for a downward crossing (docs/divergences.md, "Hue angles exactly on
+//     a bin boundary"). This case is reached, not hypothetical: the eps
+//     bisection runs to adjacent doubles, and which side of the boundary
+//     the last non-flipping perturbation lands on is a last-bit matter
+//     that differs between the x86-64 and arm64 CI legs;
 //   * the perturbation magnitude at that threshold scales down with the
 //     boundary distance;
 //   * across the threshold, Rf, CCT and Duv are unchanged to rounding
@@ -563,6 +571,11 @@ struct EdgeCase {
   std::size_t ces = 0;
   double boundary_deg = 0.0;
   double dist_deg = 0.0; ///< achieved boundary distance
+  /// boundary_deg - hue, wrapped: negative when the sample sits ABOVE its
+  /// boundary and the crossing therefore runs downward. Decides which side
+  /// of the flip inequality is the non-strict one - see the flip-threshold
+  /// test case.
+  double signed_to_edge = 0.0;
   int bin_before = -1;
   int bin_after = -1;
   double dir = 1.0; ///< LCG sign multiplier that moves hue toward the edge
@@ -732,6 +745,7 @@ private:
     // The crossed boundary is the 22.5 deg multiple nearest the sample.
     c.boundary_deg = kBinWidthDeg * std::round(p_lo.hue / kBinWidthDeg);
     const double signed_to_edge = signed_hue_diff(c.boundary_deg, p_lo.hue);
+    c.signed_to_edge = signed_to_edge;
     c.dist_deg = std::abs(signed_to_edge);
 
     const std::vector<double> spd = mix(t);
@@ -915,10 +929,31 @@ TEST_CASE("hue-bin stability - the perturbation needed to flip a bin "
   // ASSERTED: the bin changes exactly when the measured hue shift crosses
   // the measured boundary distance. Both quantities are measured on the
   // machine running the test, so no libm agreement is required.
+  //
+  // Which side of that crossing owns the boundary itself is the library's
+  // choice, not the standard's (docs/divergences.md, "Hue angles exactly on
+  // a bin boundary"): bin assignment truncates, so the intervals are
+  // [lo, hi) and a sample landing exactly ON a boundary stays in the bin
+  // that starts there. For a downward crossing -- bin_before is the upper
+  // bin, signed_to_edge < 0 -- a hue shift exactly equal to the boundary
+  // distance is therefore not yet a flip, and the no-flip inequality is the
+  // non-strict one; an upward crossing is the mirror image.
+  //
+  // That equality is reached in practice, not just in principle. The eps
+  // bisection runs to adjacent doubles, so the last non-flipping
+  // perturbation lands within one ULP of the boundary: on a 1e-7 deg
+  // boundary distance the CI x86-64 legs land exactly on it (hue shift
+  // 1.000000000000 x distance) while the arm64 legs land one ULP short.
+  // Asserting the strict inequality on both sides fails on the former.
   for (const auto &c : E.cases()) {
     INFO("distance " << c.dist_deg << " deg");
-    CHECK(c.shift_no_flip_deg < c.dist_deg); // did not reach the boundary
-    CHECK(c.shift_flip_deg >= c.dist_deg);   // crossed it
+    if (c.signed_to_edge < 0.0) {
+      CHECK(c.shift_no_flip_deg <= c.dist_deg); // reached it at most
+      CHECK(c.shift_flip_deg > c.dist_deg);     // passed it
+    } else {
+      CHECK(c.shift_no_flip_deg < c.dist_deg); // did not reach the boundary
+      CHECK(c.shift_flip_deg >= c.dist_deg);   // reached or passed it
+    }
     CHECK(c.eps_no_flip > 0.0);
     CHECK(c.eps_flip > c.eps_no_flip);
   }
