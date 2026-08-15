@@ -16,6 +16,7 @@ This file is in scope too, so it also uses escapes rather than literal glyphs.
 from __future__ import annotations
 
 import importlib.util
+import re
 import unittest
 from pathlib import Path
 
@@ -58,19 +59,32 @@ class SelfConsistency(unittest.TestCase):
         )
 
     def test_self_is_fixed_point(self):
-        changed, unmapped = fu.process(TARGET, check_only=True)
+        changed, errors, notices = fu.process(TARGET, check_only=True)
         self.assertFalse(changed, "running the hook on itself would rewrite it")
-        self.assertEqual(unmapped, [])
+        self.assertEqual(errors, [])
+        self.assertEqual(notices, [])
 
     def test_this_test_file_is_ascii(self):
         text = Path(__file__).resolve().read_text(encoding="utf-8")
         self.assertTrue(text.isascii())
 
-    def test_section_sign_is_the_only_exemption(self):
-        self.assertEqual(fu.ALLOWED, {"\u00a7"})  # SECTION SIGN
-        kept, unmapped = fu.transliterate("// TM-30-20 \u00a73.5")
-        self.assertEqual(kept, "// TM-30-20 \u00a73.5")
-        self.assertEqual(unmapped, [])
+    def test_nothing_is_exempt(self):
+        self.assertEqual(fu.ALLOWED, frozenset())
+
+    def test_section_sign_becomes_S(self):
+        # Spec citations are the reason this mapping exists; check_constants.py
+        # matches the same "S" form.
+        out, flagged, removed = fu.transliterate("// TM-30-20 \u00a73.5")
+        self.assertEqual(out, "// TM-30-20 S3.5")
+        self.assertEqual(flagged, [])
+        self.assertEqual(removed, [])
+
+    def test_section_sign_keeps_citation_width(self):
+        # "S" is one column, same as the glyph it replaces, so no citation line
+        # crosses the 80-column limit and gets rewrapped by clang-format.
+        src = "// TM-30-20 \u00a73.7.1 Eq. (30)"
+        out, _, _ = fu.transliterate(src)
+        self.assertEqual(len(out), len(src))
 
 
 class TableIntegrity(unittest.TestCase):
@@ -109,16 +123,16 @@ class TableIntegrity(unittest.TestCase):
 
     def test_every_key_transliterates_to_ascii(self):
         joined = " ".join(fu.TABLE)
-        out, unmapped = fu.transliterate(joined)
-        self.assertEqual(unmapped, [])
+        out, flagged, _removed = fu.transliterate(joined)
+        self.assertEqual(flagged, [])
         self.assertTrue(out.isascii())
 
 
 class Behaviour(unittest.TestCase):
     def check(self, src: str, expected: str):
-        out, unmapped = fu.transliterate(src)
+        out, flagged, _removed = fu.transliterate(src)
         self.assertEqual(out, expected)
-        self.assertEqual(unmapped, [])
+        self.assertEqual(flagged, [])
 
     def test_cmf_bar_notation(self):
         # base letter + COMBINING MACRON, and the precomposed y form
@@ -140,7 +154,7 @@ class Behaviour(unittest.TestCase):
 
     def test_box_drawing_preserves_column_width(self):
         src = "\u2500" * 10  # BOX DRAWINGS LIGHT HORIZONTAL
-        out, _ = fu.transliterate(src)
+        out, _, _ = fu.transliterate(src)
         self.assertEqual(out, "-" * 10)
         self.assertEqual(len(out), len(src))
 
@@ -149,8 +163,8 @@ class Behaviour(unittest.TestCase):
 
     def test_idempotent(self):
         src = "x\u0304 \u221an \u222bS d\u03bb \u0394E' 2\u00b0 \u2500\u2500 \u2714 10\u00b2 x\u2081 caf\u00e9 \u2014 \u2013"
-        once, _ = fu.transliterate(src)
-        twice, _ = fu.transliterate(once)
+        once, _, _ = fu.transliterate(src)
+        twice, _, _ = fu.transliterate(once)
         self.assertEqual(once, twice)
         self.assertTrue(once.isascii())
 
@@ -158,8 +172,8 @@ class Behaviour(unittest.TestCase):
 class UnmappedReporting(unittest.TestCase):
     def test_unmapped_char_is_reported_and_left_in_place(self):
         # ANGLE has no table entry and no ASCII NFKD form.
-        out, unmapped = fu.transliterate("angle \u2220 here")
-        self.assertEqual(unmapped, ["\u2220"])
+        out, flagged, _removed = fu.transliterate("angle \u2220 here")
+        self.assertEqual(flagged, ["\u2220"])
         self.assertIn("\u2220", out)
 
     def test_process_reports_file_and_line(self):
@@ -168,11 +182,12 @@ class UnmappedReporting(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "sample.py"
             p.write_text("ok\nbad \u2220\n", encoding="utf-8")
-            changed, report = fu.process(p, check_only=True)
+            changed, errors, notices = fu.process(p, check_only=True)
             self.assertFalse(changed)  # nothing else to rewrite
-            self.assertEqual(len(report), 1)
-            self.assertIn("sample.py:2", report[0])
-            self.assertIn("U+2220", report[0])
+            self.assertEqual(notices, [])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("sample.py:2:5", errors[0])  # line AND column
+            self.assertIn("U+2220", errors[0])
 
 
 class Scope(unittest.TestCase):
@@ -184,6 +199,151 @@ class Scope(unittest.TestCase):
         self.assertFalse(fu.in_scope("tests/fixtures/a1.json"))
         self.assertFalse(fu.in_scope("LICENSE"))
         self.assertFalse(fu.in_scope("notebook.ipynb"))
+
+
+class InvisibleCharacters(unittest.TestCase):
+    """Invisible glyphs are deleted, and the deletion is always reported."""
+
+    def deleted(self, src: str, expected: str, count: int):
+        out, flagged, removed = fu.transliterate(src)
+        self.assertEqual(out, expected)
+        self.assertEqual(flagged, [], "an invisible char must not need a human")
+        self.assertEqual(len(removed), count)
+
+    def test_zero_width_family_is_deleted(self):
+        # ZWSP, ZWNJ, ZWJ, BOM, SOFT HYPHEN -- all category Cf, so the rule
+        # catches them without a table entry.
+        self.deleted("a\u200b\u200c\u200d\ufeff\u00adb", "ab", 5)
+
+    def test_word_joiner_and_invisible_operators(self):
+        self.deleted("a\u2060b\u2062c\u2064d", "abcd", 3)
+
+    def test_bidi_controls_are_deleted(self):
+        # Trojan Source: RLO/PDF and the isolates reorder rendered source.
+        self.deleted("x\u202ereversed\u202cy", "xreversedy", 2)
+        self.deleted("p\u2066q\u2069r", "pqr", 2)
+
+    def test_tag_block_payload_is_deleted(self):
+        # U+E0000..U+E007F can smuggle a whole ASCII string into a comment.
+        payload = "".join(chr(0xE0000 + ord(c)) for c in "HI")
+        self.deleted(f"hello{payload}world", "helloworld", 2)
+
+    def test_variation_selectors_are_deleted(self):
+        # Category Mn, like COMBINING MACRON -- so these are matched by range,
+        # never by category, or x-bar notation would break.
+        self.deleted("a\ufe00b\ufe0fc\U000e0100d", "abcd", 3)
+
+    def test_combining_macron_still_survives_the_Mn_range(self):
+        # The regression the range-not-category choice exists to prevent.
+        out, flagged, removed = fu.transliterate("x\u0304")
+        self.assertEqual(out, "xbar")
+        self.assertEqual(removed, [])
+        self.assertEqual(flagged, [])
+
+    def test_blank_rendering_fillers_are_deleted(self):
+        self.deleted("a\u2800b\u3164c\u115fd", "abcd", 3)
+
+    def test_deletion_is_reported_with_line_and_column(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sample.py"
+            p.write_text("ok\nbad\u200bhere\n", encoding="utf-8")
+            changed, errors, notices = fu.process(p, check_only=True)
+            self.assertTrue(changed)
+            self.assertEqual(errors, [])
+            self.assertEqual(len(notices), 1)
+            self.assertIn("sample.py:2:4", notices[0])
+            self.assertIn("U+200B", notices[0])
+
+
+class ControlCharacters(unittest.TestCase):
+    """ASCII controls pass a codepoint check; they must not pass this one."""
+
+    def test_escape_sequence_is_flagged_not_deleted(self):
+        src = "a\x1b[31mRED\x1b[0mb"
+        out, flagged, removed = fu.transliterate(src)
+        self.assertEqual(out, src, "controls are left in place for a human")
+        self.assertEqual(flagged, ["\x1b", "\x1b"])
+        self.assertEqual(removed, [])
+
+    def test_nul_and_vertical_tab_are_flagged(self):
+        _out, flagged, _removed = fu.transliterate("a\x00b\x0bc")
+        self.assertEqual(flagged, ["\x00", "\x0b"])
+
+    def test_tab_and_newline_are_allowed(self):
+        src = "a\tb\nc\n"
+        out, flagged, removed = fu.transliterate(src)
+        self.assertEqual(out, src)
+        self.assertEqual(flagged, [])
+        self.assertEqual(removed, [])
+
+    def test_control_char_reaches_the_error_report(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sample.py"
+            p.write_text("ok\nbad\x1bhere\n", encoding="utf-8")
+            _changed, errors, _notices = fu.process(p, check_only=True)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("sample.py:2:4", errors[0])
+            self.assertIn("ESCAPE", errors[0])
+
+    def test_pure_ascii_control_file_is_not_silently_clean(self):
+        # `original.isascii()` is True here; the fast path must not return.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sample.py"
+            p.write_text("plain\x1bascii\n", encoding="utf-8")
+            _changed, errors, _notices = fu.process(p, check_only=True)
+            self.assertTrue(errors)
+
+
+class UndecodableFiles(unittest.TestCase):
+    def test_invalid_utf8_is_an_error_not_a_skip(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sample.py"
+            p.write_bytes(b"valid \xff\xfe invalid\n")
+            changed, errors, notices = fu.process(p, check_only=True)
+            self.assertFalse(changed)
+            self.assertEqual(notices, [])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("not valid UTF-8", errors[0])
+
+
+class PreCommitScope(unittest.TestCase):
+    """The hook's `files:` regex and this module's scope must not drift."""
+
+    def hook_pattern(self):
+        cfg = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        for line in cfg.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("files:"):
+                return re.compile(stripped[len("files:") :].strip())
+        self.fail("no `files:` key found in .pre-commit-config.yaml")
+
+    def test_every_included_suffix_is_matched_by_the_hook(self):
+        pattern = self.hook_pattern()
+        for suffix in fu.INCLUDE_SUFFIXES:
+            sample = f"src/sample{suffix}"
+            self.assertTrue(
+                pattern.search(sample),
+                f"{suffix} is in INCLUDE_SUFFIXES but the pre-commit `files:` "
+                "regex does not match it -- the hook would never see the file",
+            )
+
+    def test_every_included_name_is_matched_by_the_hook(self):
+        pattern = self.hook_pattern()
+        for name in fu.INCLUDE_NAMES:
+            for sample in (name, f"sub/dir/{name}"):
+                self.assertTrue(
+                    pattern.search(sample),
+                    f"{name} is in INCLUDE_NAMES but the pre-commit `files:` "
+                    "regex does not match it",
+                )
 
 
 if __name__ == "__main__":

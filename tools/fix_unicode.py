@@ -7,10 +7,32 @@ banners, maths glyphs) render inconsistently across terminals, diff viewers and
 editors, and are easy to introduce accidentally by copy-paste. This script
 rewrites them to ASCII equivalents so every tracked text file stays 7-bit.
 
-Single exception: U+00A7 SECTION SIGN. Spec citations are mandated in the form
-`// TM-30-20` + U+00A7 + `x.y` and `tools/check_constants.py` matches that
-literal glyph in its citation regexes (CITATION_LINE / CITATION_BLOCK).
-Rewriting it here would silently break the spec-citation gate, so it is kept.
+No exceptions: the tree is 7-bit ASCII, end to end. U+00A7 SECTION SIGN used to
+be exempt because spec citations were written `// TM-30-20` + U+00A7 + `x.y`;
+it now transliterates to `S` (`// TM-30-20 S3.3`), which is the same display
+width, so no citation line rewraps. `tools/check_constants.py` matches `S` in
+its citation regexes (CITATION_LINE / CITATION_BLOCK / TM30_CLAUSES /
+CLAUSE_NUM) and the two must be changed together.
+
+Three classes of character are handled without a table entry:
+
+  * Invisible characters are DELETED, not reported as unmappable -- there is
+    nothing to hand-edit in a zero-width glyph. The rule is derived from the
+    Unicode database rather than a blocklist: category `Cf` covers ZWSP, ZWNJ,
+    ZWJ, BOM, SOFT HYPHEN, WORD JOINER, the invisible operators, LRM/RLM, the
+    bidi overrides and isolates (Trojan Source), and all 128 TAG characters --
+    including glyphs added by future Unicode versions. Variation selectors are
+    category `Mn` and blank-rendering fillers are `Lo`/`So`, so those are named
+    explicitly (INVISIBLE_CHARS / INVISIBLE_RANGES). Every deletion is printed;
+    they are removed, never removed silently.
+
+  * C0 control characters other than tab and newline -- ESC (ANSI colour
+    sequences), NUL, VT, FF, BEL -- and DEL are ASCII, so a codepoint check
+    alone waves them through. They are reported and left in place: deleting
+    them could change meaning, so a human decides.
+
+  * A file that is not valid UTF-8 is reported as an error. It used to be
+    skipped silently, which let a Latin-1 file through the gate untouched.
 
 This file is in its own scope (`.py`, not excluded), so it must never contain a
 literal instance of a glyph it maps -- running the hook over the tree would
@@ -21,6 +43,10 @@ keeps the file a fixed point of its own transformation; `tools/test_fix_unicode.
 asserts it. Note that `re` interprets `\\uXXXX` inside a raw pattern string, so
 the PRE_SUBS patterns stay raw for their regex backslashes.
 
+Scope is duplicated in `.pre-commit-config.yaml`'s `files:` regex; widening one
+without the other means hook mode silently stops seeing the new files.
+`tools/test_fix_unicode.py::PreCommitScope` asserts the two agree.
+
 Usage:
     python3 tools/fix_unicode.py                 # fix every in-scope tracked file
     python3 tools/fix_unicode.py FILE...         # fix the given files
@@ -28,8 +54,9 @@ Usage:
 
 Exit status:
     0  nothing to do
-    1  files were rewritten (--check: would be rewritten), or an unmappable
-       character was found and left in place
+    1  files were rewritten (--check: would be rewritten), or a character was
+       found that needs a human: no ASCII mapping, a stray control character,
+       or a file that is not valid UTF-8
 
 Pre-commit convention: a non-zero exit aborts the commit. Re-stage the rewritten
 files (`git add`) and commit again.
@@ -68,6 +95,22 @@ INCLUDE_SUFFIXES = {
     ".cmake",
     ".toml",
     ".cff",
+    ".sh",
+    ".ps1",
+    ".rst",
+    ".in",
+}
+
+# Hand-authored files git tracks without a suffix, or whose whole name is the
+# suffix. Kept separate from INCLUDE_SUFFIXES so `Path.suffix` logic stays
+# simple (".clang-format" has suffix "-format", which no suffix set can match).
+INCLUDE_NAMES = {
+    "CMakeLists.txt",
+    "Makefile",
+    "Dockerfile",
+    ".clang-format",
+    ".gitattributes",
+    ".gitignore",
 }
 
 # Paths excluded even when the suffix matches.
@@ -80,8 +123,63 @@ EXCLUDE_PATTERNS = (
     re.compile(r"^LICENSE$"),
 )
 
-# The one glyph we keep; see module docstring.
-ALLOWED = {"\u00a7"}  # SECTION SIGN
+# Nothing is exempt any more; the tree is 7-bit ASCII. Kept as an empty set so
+# the concept stays greppable and a future exemption has one obvious home.
+ALLOWED: frozenset[str] = frozenset()
+
+# --------------------------------------------------------------------------
+# Invisible characters -- deleted outright
+# --------------------------------------------------------------------------
+
+# Unicode general category `Cf` (Format) is the load-bearing rule: it covers
+# ZERO WIDTH SPACE / NON-JOINER / JOINER, BOM, SOFT HYPHEN, WORD JOINER, the
+# invisible operators (U+2061..U+2064), LRM/RLM, the bidi embeddings, overrides
+# and isolates that Trojan Source abuses, and the entire TAG block
+# (U+E0000..U+E007F) used to smuggle whole ASCII payloads into a comment.
+# Deriving from the category means a future Unicode addition is covered without
+# touching this file.
+
+# Invisible glyphs that are NOT category Cf, so the rule above misses them.
+INVISIBLE_CHARS = {
+    "\u2800",  # BRAILLE PATTERN BLANK (category So)
+    "\u115f",  # HANGUL CHOSEONG FILLER (category Lo)
+    "\u1160",  # HANGUL JUNGSEONG FILLER (category Lo)
+    "\u3164",  # HANGUL FILLER (category Lo)
+    "\uffa0",  # HALFWIDTH HANGUL FILLER (category Lo)
+    "\u17b4",  # KHMER VOWEL INHERENT AQ (category Mn, renders blank)
+    "\u17b5",  # KHMER VOWEL INHERENT AA (category Mn, renders blank)
+}
+
+# Variation selectors are category Mn -- the same category as COMBINING MACRON
+# (U+0304), which PRE_SUBS relies on for the CMF bar notation. So they are
+# matched by range, never by category.
+INVISIBLE_RANGES = (
+    (0xFE00, 0xFE0F),  # VARIATION SELECTOR-1 .. VARIATION SELECTOR-16
+    (0xE0100, 0xE01EF),  # VARIATION SELECTOR SUPPLEMENT
+)
+
+# C0 controls that carry meaning in a text file. Everything else below U+0020,
+# plus U+007F DELETE, is reported rather than deleted -- removing a NUL or an
+# ESC can change what the file means, so a human decides.
+# Note: Path.read_text() applies universal newlines, so a carriage return never
+# survives to reach this check.
+ALLOWED_CONTROL = {"\t", "\n"}
+
+
+def is_invisible(ch: str) -> bool:
+    """True if `ch` renders as nothing and can be deleted without loss."""
+    if unicodedata.category(ch) == "Cf":
+        return True
+    if ch in INVISIBLE_CHARS:
+        return True
+    cp = ord(ch)
+    return any(lo <= cp <= hi for lo, hi in INVISIBLE_RANGES)
+
+
+def is_stray_control(ch: str) -> bool:
+    """True for an ASCII control character that has no business in source."""
+    cp = ord(ch)
+    return (cp < 0x20 or cp == 0x7F) and ch not in ALLOWED_CONTROL
 
 # --------------------------------------------------------------------------
 # Transliteration
@@ -118,6 +216,10 @@ OVERRIDES = {
     "\u0233": "ybar",  # LATIN SMALL Y WITH MACRON (precomposed CMF bar)
     "\u00b0": "-deg",  # DEGREE SIGN -- reads as the adjective it always is here
     #                    ("2" + DEGREE SIGN + " XYZ" -> "2-deg XYZ")
+    "\u00a7": "S",  # SECTION SIGN -> spec citations read "// TM-30-20 S3.3".
+    #                    One char wide, same as the glyph it replaces, so no
+    #                    citation line crosses the 80-column limit and gets
+    #                    rewrapped. tools/check_constants.py must agree.
 }
 
 GREEK = {
@@ -199,11 +301,10 @@ PUNCTUATION = {
     "\u200a": " ",  # HAIR SPACE
     "\u2002": " ",  # EN SPACE
     "\u2003": " ",  # EM SPACE
-    "\u200b": "",  # ZERO WIDTH SPACE
-    "\u200c": "",  # ZERO WIDTH NON-JOINER
-    "\u200d": "",  # ZERO WIDTH JOINER
-    "\ufeff": "",  # BOM / ZERO WIDTH NO-BREAK SPACE
-    "\u00ad": "",  # SOFT HYPHEN
+    # ZERO WIDTH SPACE / NON-JOINER / JOINER, BOM and SOFT HYPHEN used to be
+    # listed here. They are category Cf and is_invisible() deletes them before
+    # the table is consulted -- entries here would be dead code and a second
+    # place to forget.
 }
 
 MATH = {
@@ -296,7 +397,8 @@ STATUS = {
     "\u2717": "[x]",  # BALLOT X
     "\u2718": "[x]",  # HEAVY BALLOT X
     "\u26a0": "[!]",  # WARNING SIGN
-    "\ufe0f": "",  # VARIATION SELECTOR-16 (emoji presentation)
+    # VARIATION SELECTOR-16 used to be listed here; INVISIBLE_RANGES now covers
+    # the whole U+FE00..U+FE0F block, not just the emoji-presentation one.
 }
 
 SUPERSCRIPTS = {
@@ -347,16 +449,36 @@ for _part in (
     TABLE.update(_part)
 
 
-def transliterate(text: str) -> tuple[str, list[str]]:
-    """Return (ascii_text, unmapped) -- unmapped lists chars left non-ASCII."""
+def transliterate(text: str) -> tuple[str, list[str], list[str]]:
+    """Transliterate `text` to ASCII.
+
+    Returns (ascii_text, flagged, removed):
+      ascii_text  the rewritten text
+      flagged     characters needing a human -- no ASCII mapping, or a stray
+                  control character. Left in place so the file still shows
+                  where the problem is.
+      removed     invisible characters deleted outright. Reported, never
+                  removed silently.
+    """
     for pattern, repl in PRE_SUBS:
         text = pattern.sub(repl, text)
 
     out: list[str] = []
-    unmapped: list[str] = []
+    flagged: list[str] = []
+    removed: list[str] = []
     for ch in text:
-        if ord(ch) < 128 or ch in ALLOWED:
+        if ord(ch) < 128:
+            # ASCII, but a control character can still be an ANSI escape or a
+            # stray NUL. Deleting could change meaning, so flag and keep.
+            if is_stray_control(ch):
+                flagged.append(ch)
             out.append(ch)
+            continue
+        if ch in ALLOWED:
+            out.append(ch)
+            continue
+        if is_invisible(ch):
+            removed.append(ch)
             continue
         mapped = TABLE.get(ch)
         if mapped is None:
@@ -367,10 +489,10 @@ def transliterate(text: str) -> tuple[str, list[str]]:
             mapped = stripped if stripped.isascii() and stripped else None
         if mapped is None:
             out.append(ch)
-            unmapped.append(ch)
+            flagged.append(ch)
             continue
         out.append(mapped)
-    return "".join(out), unmapped
+    return "".join(out), flagged, removed
 
 
 # --------------------------------------------------------------------------
@@ -382,7 +504,7 @@ def in_scope(relpath: str) -> bool:
     """relpath is repo-relative; the exclude patterns are anchored to that."""
     if any(p.search(relpath) for p in EXCLUDE_PATTERNS):
         return False
-    if Path(relpath).name == "CMakeLists.txt":
+    if Path(relpath).name in INCLUDE_NAMES:
         return True
     return Path(relpath).suffix in INCLUDE_SUFFIXES
 
@@ -406,8 +528,24 @@ def tracked_files() -> list[Path]:
     return [REPO_ROOT / p for p in out.split("\0") if p and in_scope(p)]
 
 
+# unicodedata has no name for the C0 controls, and "UNNAMED" tells a reader
+# nothing about the ESC that just broke their terminal.
+CONTROL_NAMES = {
+    0x00: "NUL",
+    0x07: "BEL",
+    0x08: "BACKSPACE",
+    0x0B: "VERTICAL TAB",
+    0x0C: "FORM FEED",
+    0x1A: "SUBSTITUTE",
+    0x1B: "ESCAPE (ANSI sequence)",
+    0x7F: "DELETE",
+}
+
+
 def describe(ch: str) -> str:
-    return f"U+{ord(ch):04X} {unicodedata.name(ch, 'UNNAMED')}"
+    cp = ord(ch)
+    name = CONTROL_NAMES.get(cp) or unicodedata.name(ch, "UNNAMED")
+    return f"U+{cp:04X} {name}"
 
 
 def display(path: Path) -> Path:
@@ -418,32 +556,49 @@ def display(path: Path) -> Path:
         return path
 
 
-def process(path: Path, check_only: bool) -> tuple[bool, list[str]]:
-    """Return (changed, unmapped_report_lines)."""
+def process(path: Path, check_only: bool) -> tuple[bool, list[str], list[str]]:
+    """Return (changed, errors, notices).
+
+    errors   lines a human must act on: no ASCII mapping, a stray control
+             character, or a file that is not decodable as UTF-8.
+    notices  invisible characters that were deleted, one line each.
+
+    Positions are reported against the ORIGINAL text, so `line:col` points at
+    what is actually on disk rather than at the rewritten copy.
+    """
+    rel = display(path)
     try:
         original = path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return False, []
+    except UnicodeDecodeError as exc:
+        # Previously swallowed, which let a Latin-1 file through untouched.
+        return False, [f"  {rel}: not valid UTF-8 -- {exc.reason} at byte {exc.start}"], []
+    except OSError as exc:
+        return False, [f"  {rel}: cannot read -- {exc.strerror}"], []
 
-    if original.isascii():
-        return False, []
+    # Fast path, but a control character is ASCII, so `isascii()` alone is not
+    # enough to declare the file clean.
+    if original.isascii() and not any(is_stray_control(c) for c in original):
+        return False, [], []
 
-    fixed, unmapped = transliterate(original)
+    fixed, flagged, removed = transliterate(original)
 
-    report: list[str] = []
-    if unmapped:
-        rel = display(path)
-        seen: set[str] = set()
-        for lineno, line in enumerate(fixed.splitlines(), start=1):
-            for ch in line:
-                if ch in unmapped and (key := f"{lineno}:{ch}") not in seen:
-                    seen.add(key)
-                    report.append(f"  {rel}:{lineno}  {describe(ch)}  {ch!r}")
+    errors: list[str] = []
+    notices: list[str] = []
+    flagged_set = set(flagged)
+    removed_set = set(removed)
+    if flagged_set or removed_set:
+        for lineno, line in enumerate(original.splitlines(), start=1):
+            for col, ch in enumerate(line, start=1):
+                if ch in flagged_set:
+                    kind = "control character" if ord(ch) < 128 else "no ASCII mapping"
+                    errors.append(f"  {rel}:{lineno}:{col}  {describe(ch)}  {kind}")
+                elif ch in removed_set:
+                    notices.append(f"  {rel}:{lineno}:{col}  {describe(ch)}  deleted")
 
     changed = fixed != original
     if changed and not check_only:
         path.write_text(fixed, encoding="utf-8")
-    return changed, report
+    return changed, errors, notices
 
 
 def main() -> int:
@@ -466,24 +621,39 @@ def main() -> int:
         paths = tracked_files()
 
     changed: list[Path] = []
-    unmapped_report: list[str] = []
+    errors: list[str] = []
+    notices: list[str] = []
     for path in paths:
-        did_change, report = process(path, args.check)
+        did_change, file_errors, file_notices = process(path, args.check)
         if did_change:
             changed.append(path)
-        unmapped_report.extend(report)
+        errors.extend(file_errors)
+        notices.extend(file_notices)
 
     verb = "would rewrite" if args.check else "rewrote"
     for path in changed:
         print(f"{verb}: {display(path)}")
 
-    if unmapped_report:
+    # Invisible characters are deleted, but never quietly: a bidi override or a
+    # TAG-block payload disappearing without a word is exactly the outcome this
+    # tool exists to prevent.
+    if notices:
+        deleted = "would delete" if args.check else "deleted"
         print(
-            f"\nERROR: {len(unmapped_report)} non-ASCII character(s) with no ASCII "
-            f"mapping. Replace by hand, or add a mapping in {Path(__file__).name}:",
+            f"\n{len(notices)} invisible character(s) {deleted}:",
             file=sys.stderr,
         )
-        for line in unmapped_report:
+        for line in notices:
+            print(line, file=sys.stderr)
+
+    if errors:
+        print(
+            f"\nERROR: {len(errors)} character(s) need a human -- no ASCII "
+            f"mapping, a stray control character, or a file that is not valid "
+            f"UTF-8. Fix by hand, or add a mapping in {Path(__file__).name}:",
+            file=sys.stderr,
+        )
+        for line in errors:
             print(line, file=sys.stderr)
 
     if changed and not args.check:
@@ -492,7 +662,7 @@ def main() -> int:
             file=sys.stderr,
         )
 
-    return 1 if (changed or unmapped_report) else 0
+    return 1 if (changed or errors) else 0
 
 
 if __name__ == "__main__":

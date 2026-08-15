@@ -16,7 +16,9 @@ repos:
         pass_filenames: true
         # Hand-authored text only. data/*.csv, tests/fixtures/* and generated
         # benchmark reports are machine-written and excluded in the script too.
-        files: \.(cpp|cc|cxx|hpp|h|py|pyi|md|txt|yaml|yml|cmake|toml|cff)$|(^|/)CMakeLists\.txt$
+        # Kept in lockstep with INCLUDE_SUFFIXES / INCLUDE_NAMES in
+        # tools/fix_unicode.py; tools/test_fix_unicode.py asserts they agree.
+        files: \.(cpp|cc|cxx|hpp|h|py|pyi|md|txt|yaml|yml|cmake|toml|cff|sh|ps1|rst|in)$|(^|/)(CMakeLists\.txt|Makefile|Dockerfile|\.clang-format|\.gitattributes|\.gitignore)$
         exclude: ^(data/|tests/fixtures/|benchmarks/out_|benchmarks/.*report.*\.txt$|LICENSE$)
 
   - repo: https://github.com/pre-commit/mirrors-clang-format
