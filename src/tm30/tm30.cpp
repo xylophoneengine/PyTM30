@@ -19,14 +19,14 @@ namespace tm30 {
 // ==========================================================================
 //  Validity thresholds - pytm30 implementation choice (NOT in TM-30-20 text).
 //
-//  TM-30-20 §2.0 Scope: the method "is best suited to characterize nominally
+//  TM-30-20 S2.0 Scope: the method "is best suited to characterize nominally
 //  white light sources (i.e., those that fall on or near the Planckian
 //  locus)"; sources whose chromaticity "falls outside of the chromaticity
 //  bins defined in ANSI C78.377-2017... should be interpreted with caution."
 //  The standard states the domain qualitatively; it does NOT print numerical
 //  CCT bounds or a Duv threshold anywhere. The constants below are pytm30's
 //  own sanity bounds -- whitelisted in tools/check_constants_whitelist.txt
-//  because no honest "§x.y" citation exists.
+//  because no honest "Sx.y" citation exists.
 // ==========================================================================
 
 namespace {
@@ -37,7 +37,7 @@ constexpr double kCctMax = 25000.0;
 // pytm30 impl choice (NOT in TM-30-20 text). See banner above.
 constexpr double kDuvMaxAbs = 0.05;
 
-// TM-30-20 §3.5: Full CES wavelength range is 380-780 nm.
+// TM-30-20 S3.5: Full CES wavelength range is 380-780 nm.
 // If the test SPD does not cover this range, extrapolation is needed.
 } // namespace
 
@@ -50,20 +50,20 @@ static Validity compute_validity(const CesColorimetryResult &cr,
   Validity v;
 
   // Advisory: CCT far from the range where TM-30 is typically applied.
-  // pytm30 impl choice; TM-30-20 §2.0 gives no numerical bounds.
+  // pytm30 impl choice; TM-30-20 S2.0 gives no numerical bounds.
   v.cct_out_of_range = (cr.cct < kCctMin || cr.cct > kCctMax);
 
   // Advisory: chromaticity far from the Planckian locus. pytm30 impl choice;
-  // TM-30-20 §2.0 states the domain qualitatively (near-locus, ANSI
+  // TM-30-20 S2.0 states the domain qualitatively (near-locus, ANSI
   // C78.377-2017 white bins), no numerical Duv threshold.
   v.duv_out_of_range = (std::abs(cr.duv) > kDuvMaxAbs);
 
   // Test SPD did not cover the full 380-780 nm grid; the missing edge
-  // values were zero-filled at Spd construction per TM-30-20 §3.5, which
+  // values were zero-filled at Spd construction per TM-30-20 S3.5, which
   // requires zeros for missing values and forbids interpolating or
   // extrapolating the test SPD. Flat-extrapolation of CES/CMF reference
   // tables from 400-700 to 380-780 is a separate provision (TM-30-20
-  // §1.3 / Annex A) and is unrelated to this flag.
+  // S1.3 / Annex A) and is unrelated to this flag.
   v.extrapolated = spd.zero_filled();
 
   return v;
@@ -92,7 +92,7 @@ void Tm30::ensure_computed() const {
     return;
 
   // Run the full CES colorimetry pipeline.
-  // TM-30-20 §3.4, §3.6: All steps including CIECAM02, dE', Rf,
+  // TM-30-20 S3.4, S3.6: All steps including CIECAM02, dE', Rf,
   // hue binning, gamut, and per-sample fidelity.
   cached_.colorimetry = compute_ces_colorimetry(
       spd_.wavelengths(), spd_.values(), cmf_2deg_, cmf_10deg_, ces_data_,
@@ -337,7 +337,7 @@ try_evaluate_cached(std::span<const SpdView> spds,
 
         // Run the pipeline using the pre-resampled tables - no CES/CMF
         // resampling happens here.
-        // Guard: the row's §3.5-conformed grid must match the grid the
+        // Guard: the row's S3.5-conformed grid must match the grid the
         // cached tables were resampled to. Rows and the bound grid are
         // conformed by the same Spd recipe, so a mismatch means this
         // row's input grid differs from the bound grid.
@@ -374,7 +374,7 @@ try_evaluate_cached(std::span<const SpdView> spds,
             std::vector<double>(sv.wavelengths.begin(), sv.wavelengths.end()),
             std::vector<double>(sv.values.begin(), sv.values.end()));
 
-        // Guard: the row's §3.5-conformed grid must match the grid the
+        // Guard: the row's S3.5-conformed grid must match the grid the
         // cached tables were resampled to. Rows and the bound grid are
         // conformed by the same Spd recipe, so a mismatch means this
         // row's input grid differs from the bound grid.

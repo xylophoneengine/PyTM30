@@ -45,9 +45,9 @@ inline constexpr double Tol_Rf = 0.15;     // absolute
 inline constexpr double Tol_Rg = 0.15;     // absolute
 
 // -------------------------------------------------------------------------
-// Local chroma/hue shifts. Rcs,hj is a percentage (TM-30-20 §4.6 requires
+// Local chroma/hue shifts. Rcs,hj is a percentage (TM-30-20 S4.6 requires
 // percentage representation of the Eq. (62) ratio); tolerance matches its
-// 1-decimal reporting resolution. Rhs,hj stays a ratio (§4.7 states no
+// 1-decimal reporting resolution. Rhs,hj stays a ratio (S4.7 states no
 // percentage requirement) and is two orders of magnitude smaller in
 // scale, so its tolerance is Tol_LocalShift at ratio scale -- both checks
 // equally tight relative to their units.

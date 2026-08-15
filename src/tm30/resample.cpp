@@ -1,5 +1,5 @@
 // CIE 15:2018 resampling - linear interpolation + flat extrapolation.
-// TM-30-20 §3.5: Interpolation Rules
+// TM-30-20 S3.5: Interpolation Rules
 #include "tm30/resample.hpp"
 
 #include <algorithm>
@@ -16,8 +16,8 @@ namespace {
 /// Linearly interpolate (or flat-extrapolate) a single spectral vector
 /// from source wavelengths/values to target_wavelengths.
 ///
-/// TM-30-20 §3.5 requires linear interpolation.
-/// TM-30-20 §1.3 (Errata): flat extrapolation replaces logarithm-based.
+/// TM-30-20 S3.5 requires linear interpolation.
+/// TM-30-20 S1.3 (Errata): flat extrapolation replaces logarithm-based.
 std::vector<double> lerp_vector(const std::vector<double> &target_wl,
                                 const std::vector<double> &source_wl,
                                 const std::vector<double> &source_vals) {
@@ -35,14 +35,14 @@ std::vector<double> lerp_vector(const std::vector<double> &target_wl,
 
   for (double tw : target_wl) {
     // Flat extrapolation - low side
-    // TM-30-20 §1.3: flat extrapolation for lambda < first CES lambda
+    // TM-30-20 S1.3: flat extrapolation for lambda < first CES lambda
     if (tw <= source_wl.front()) {
       result.push_back(source_vals.front());
       continue;
     }
 
     // Flat extrapolation - high side
-    // TM-30-20 §1.3: flat extrapolation for lambda > last CES lambda
+    // TM-30-20 S1.3: flat extrapolation for lambda > last CES lambda
     if (tw >= source_wl.back()) {
       result.push_back(source_vals.back());
       continue;

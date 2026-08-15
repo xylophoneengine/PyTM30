@@ -354,7 +354,7 @@ struct PyTm30 {
   }
 
   /// Per-CES CAM02-UCS J'a'b' under the test source (99x3) - numpy array.
-  /// TM-30-20 §3.7.1 Eq. (48)-(50).
+  /// TM-30-20 S3.7.1 Eq. (48)-(50).
   nb::object jab_test_ces() const {
     const auto &cr = tm30_->colorimetry_result();
     auto np = nb::module_::import_("numpy");
@@ -371,7 +371,7 @@ struct PyTm30 {
   }
 
   /// Per-CES CAM02-UCS J'a'b' under the reference illuminant (99x3) - numpy
-  /// array. TM-30-20 §3.7.1 Eq. (48)-(50).
+  /// array. TM-30-20 S3.7.1 Eq. (48)-(50).
   nb::object jab_ref_ces() const {
     const auto &cr = tm30_->colorimetry_result();
     auto np = nb::module_::import_("numpy");
@@ -388,7 +388,7 @@ struct PyTm30 {
   }
 
   /// Per-CES hue-angle bin index (0-15), assigned from the reference hue
-  /// angle hr = atan2(b'r, a'r) - TM-30-20 §4.3. Same assignment is used
+  /// angle hr = atan2(b'r, a'r) - TM-30-20 S4.3. Same assignment is used
   /// for both test and reference bin averages (see hue_bins.cpp). Returns
   /// a numpy int array, inverted from the internal per-bin index lists.
   nb::object hue_bin_index() const {
@@ -454,7 +454,7 @@ struct BatchContext {
     }
   };
 
-  // 2-deg CMF resampled to the §3.5-conformed form of the grid, keyed by
+  // 2-deg CMF resampled to the S3.5-conformed form of the grid, keyed by
   // the raw grid (spd_to_cct).
   ResampledCmfCache cct2_cache_;
   // 10-deg CMF resampled to the call grid, unclipped
@@ -571,7 +571,7 @@ struct BatchContext {
     const double *wl_data = static_cast<const double *>(wl.data());
     std::vector<double> wl_vec(wl_data, wl_data + nwl);
 
-    // Conform the bound grid per TM-30-20 §3.5 exactly as Spd conforms
+    // Conform the bound grid per TM-30-20 S3.5 exactly as Spd conforms
     // every row at construction (drop outside 380-780 nm, zero-fill down
     // to 380 / up to 780 nm), by running the grid through Spd itself --
     // one recipe, no duplicate. The cached tables are then resampled to
@@ -729,7 +729,7 @@ struct BatchContext {
         d["jab_ref_ces"] = copy99x3_jab(opt->colorimetry.jab_ref_ces);
 
         // Per-CES hue-angle bin index (0-15), reference-hue-assigned - TM-30-20
-        // §4.3
+        // S4.3
         auto arr_binidx = np.attr("empty")(99, nb::arg("dtype") = "int64");
         auto nd_binidx = nb::cast<nb::ndarray<>>(arr_binidx);
         int64_t *buf_binidx = static_cast<int64_t *>(nd_binidx.data());
@@ -888,7 +888,7 @@ struct BatchContext {
         d["jab_ref_ces"] = copy99x3_jab(opt->colorimetry.jab_ref_ces);
 
         // Per-CES hue-angle bin index (0-15), reference-hue-assigned - TM-30-20
-        // §4.3
+        // S4.3
         auto arr_binidx = np.attr("empty")(99, nb::arg("dtype") = "int64");
         auto nd_binidx = nb::cast<nb::ndarray<>>(arr_binidx);
         int64_t *buf_binidx = static_cast<int64_t *>(nd_binidx.data());
@@ -1219,7 +1219,7 @@ struct BatchContext {
   /// Compute CCT and Duv for all SPDs in the batch (N_spds x N_wl).
   /// Returns a numpy array of shape (2, N_spds): row 0 = cct (K), row 1 =
   /// duv. Uses the pre-loaded CIE 1931 2-deg CMFs by default (TM-30-20
-  /// §3.1 exception - CCT determination is the one calculation that uses
+  /// S3.1 exception - CCT determination is the one calculation that uses
   /// the 2-deg, not 10-deg, observer). cmf_path=None: use this context's
   /// bound cmf_2deg. cmf_path=str: load+resample a different 2-deg CMF for
   /// this call only.
@@ -1258,13 +1258,13 @@ struct BatchContext {
 
     std::vector<tm30::CctDuvResult> results;
     if (cmf_path_arg.is_none()) {
-      // Per-grid cache: the §3.5 grid probe and the 2-deg CMF resample
+      // Per-grid cache: the S3.5 grid probe and the 2-deg CMF resample
       // depend only on the grid, so repeated calls on one grid (the
       // common case: the calculator's own fixed grid) skip both. The
       // cache is keyed on the raw grid and bypassed for per-call custom
       // CMFs.
       if (!cct2_cache_.hit(wl)) {
-        // TM-30-20 §3.5: unit-value probe conforms the grid once.
+        // TM-30-20 S3.5: unit-value probe conforms the grid once.
         const tm30::Spd probe(wl, std::vector<double>(wl.size(), 1.0));
         cct2_cache_.store(wl,
                           tm30::resample_cmf(probe.wavelengths(), cmf_2deg));
@@ -1320,15 +1320,15 @@ NB_MODULE(tm30_core, m) {
       .def(nb::init<>())
       .def_rw("duv_out_of_range", &tm30::Validity::duv_out_of_range,
               "Duv far from the Planckian locus (pytm30 advisory; TM-30-20 "
-              "§2.0 prints no numerical Duv bound).")
+              "S2.0 prints no numerical Duv bound).")
       .def_rw("cct_out_of_range", &tm30::Validity::cct_out_of_range,
               "CCT far from the range where TM-30 is typically applied "
-              "(pytm30 advisory; TM-30-20 §2.0 prints no numerical CCT "
+              "(pytm30 advisory; TM-30-20 S2.0 prints no numerical CCT "
               "bounds).")
       .def_rw("extrapolated", &tm30::Validity::extrapolated,
               "Test SPD did not cover 380-780 nm; missing edge values "
-              "were zero-filled at construction per TM-30-20 §3.5. "
-              "CES/CMF tables are flat-extrapolated per §1.3 / Annex A "
+              "were zero-filled at construction per TM-30-20 S3.5. "
+              "CES/CMF tables are flat-extrapolated per S1.3 / Annex A "
               "-- unrelated to this flag.");
 
   // -- Tm30 class --------------------------------------------------
@@ -1357,77 +1357,77 @@ NB_MODULE(tm30_core, m) {
            "Create a Tm30 evaluator from a numpy array of SPD values.\n"
            "spd_wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def_prop_ro("rf", &PyTm30::rf,
-                   "Fidelity index Rf [0, 100].  TM-30-20 §4.1.")
-      .def_prop_ro("rg", &PyTm30::rg, "Gamut area index Rg.  TM-30-20 §4.4.")
+                   "Fidelity index Rf [0, 100].  TM-30-20 S4.1.")
+      .def_prop_ro("rg", &PyTm30::rg, "Gamut area index Rg.  TM-30-20 S4.4.")
       .def_prop_ro("cct", &PyTm30::cct,
-                   "Correlated Color Temperature (K).  TM-30-20 §3.3.")
+                   "Correlated Color Temperature (K).  TM-30-20 S3.3.")
       .def_prop_ro(
           "duv", &PyTm30::duv,
-          "Distance from Planckian locus in CIE 1960 UCS.  TM-30-20 §3.3.")
+          "Distance from Planckian locus in CIE 1960 UCS.  TM-30-20 S3.3.")
       .def_prop_ro("delta_e_avg", &PyTm30::delta_e_avg,
-                   "Average dE' across 99 CES.  TM-30-20 §4.1.")
+                   "Average dE' across 99 CES.  TM-30-20 S4.1.")
       .def_prop_ro("rf_skin", &PyTm30::rf_skin,
                    "Skin fidelity Rf,skin (average of CES15 + CES18).  PyTM30 "
-                   "research extension informed by TM-30-20 §4.2; not a "
-                   "standardised TM-30 measure (§1.2, §4.0).")
+                   "research extension informed by TM-30-20 S4.2; not a "
+                   "standardised TM-30 measure (S1.2, S4.0).")
       .def_prop_ro("rf_cesi", &PyTm30::rf_cesi,
                    "Per-sample fidelity Rf,CESi - numpy array of 99 values.  "
-                   "TM-30-20 §4.2.")
+                   "TM-30-20 S4.2.")
       .def_prop_ro("rcs_hj", &PyTm30::rcs_hj,
                    "Per-bin chroma shift Rcs,hj, in percent - numpy array of "
-                   "16 values.  TM-30-20 §4.6 (percentage representation).")
+                   "16 values.  TM-30-20 S4.6 (percentage representation).")
       .def_prop_ro("rhs_hj", &PyTm30::rhs_hj,
                    "Per-bin hue shift Rhs,hj, dimensionless ratio - numpy "
-                   "array of 16 values.  TM-30-20 §4.7.")
+                   "array of 16 values.  TM-30-20 S4.7.")
       .def_prop_ro("rf_hj", &PyTm30::rf_hj,
                    "Per-bin local fidelity Rf,hj - numpy array of 16 values.  "
-                   "TM-30-20 §4.8.")
+                   "TM-30-20 S4.8.")
       .def_prop_ro(
           "de_hj", &PyTm30::de_hj,
-          "Per-bin mean dE', DE_hj - numpy array of 16 values.  TM-30-20 §4.8.")
+          "Per-bin mean dE', DE_hj - numpy array of 16 values.  TM-30-20 S4.8.")
       .def_prop_ro(
           "cvg_j_test", &PyTm30::cvg_j_test,
-          "CVG test-vector J' - numpy array of 16 values.  TM-30-20 §4.5.")
+          "CVG test-vector J' - numpy array of 16 values.  TM-30-20 S4.5.")
       .def_prop_ro("cvg_x_test", &PyTm30::cvg_x_test,
                    "CVG test-vector x - numpy array of 16 values.  TM-30-20 "
-                   "§4.5 Eq. (60).")
+                   "S4.5 Eq. (60).")
       .def_prop_ro("cvg_y_test", &PyTm30::cvg_y_test,
                    "CVG test-vector y - numpy array of 16 values.  TM-30-20 "
-                   "§4.5 Eq. (61).")
+                   "S4.5 Eq. (61).")
       .def_prop_ro(
           "cvg_j_ref", &PyTm30::cvg_j_ref,
-          "CVG reference-circle J' - numpy array of 16 values.  TM-30-20 §4.5.")
+          "CVG reference-circle J' - numpy array of 16 values.  TM-30-20 S4.5.")
       .def_prop_ro("cvg_x_ref", &PyTm30::cvg_x_ref,
                    "CVG reference-circle x - numpy array of 16 values.  "
-                   "TM-30-20 §4.5 Eq. (58).")
+                   "TM-30-20 S4.5 Eq. (58).")
       .def_prop_ro("cvg_y_ref", &PyTm30::cvg_y_ref,
                    "CVG reference-circle y - numpy array of 16 values.  "
-                   "TM-30-20 §4.5 Eq. (59).")
+                   "TM-30-20 S4.5 Eq. (59).")
       .def_prop_ro(
           "reference_spd", &PyTm30::reference_spd,
           "Reference-illuminant SPD, resampled to the input wavelength grid - "
-          "numpy array.  TM-30-20 §3.3 Eq. (13)-(16).")
+          "numpy array.  TM-30-20 S3.3 Eq. (13)-(16).")
       .def_prop_ro(
           "xyz_test_ces", &PyTm30::xyz_test_ces,
           "Per-CES XYZ under the test source - numpy array of shape (99, 3).  "
-          "TM-30-20 §3.6 Eq. (21)-(23).")
+          "TM-30-20 S3.6 Eq. (21)-(23).")
       .def_prop_ro(
           "xyz_ref_ces", &PyTm30::xyz_ref_ces,
           "Per-CES XYZ under the reference illuminant - numpy array of shape "
-          "(99, 3).  TM-30-20 §3.6 Eq. (25)-(27).")
+          "(99, 3).  TM-30-20 S3.6 Eq. (25)-(27).")
       .def_prop_ro(
           "jab_test_ces", &PyTm30::jab_test_ces,
           "Per-CES CAM02-UCS [J', a', b'] under the test source - numpy array "
-          "of shape (99, 3).  TM-30-20 §3.7.1 Eq. (48)-(50).")
+          "of shape (99, 3).  TM-30-20 S3.7.1 Eq. (48)-(50).")
       .def_prop_ro(
           "jab_ref_ces", &PyTm30::jab_ref_ces,
           "Per-CES CAM02-UCS [J', a', b'] under the reference illuminant - "
-          "numpy array of shape (99, 3).  TM-30-20 §3.7.1 Eq. (48)-(50).")
+          "numpy array of shape (99, 3).  TM-30-20 S3.7.1 Eq. (48)-(50).")
       .def_prop_ro(
           "hue_bin_index", &PyTm30::hue_bin_index,
           "Per-CES hue-angle bin index (0-15), assigned from the reference "
           "hue angle hr = atan2(b'r, a'r) - numpy int array of 99 values.  "
-          "TM-30-20 §4.3.")
+          "TM-30-20 S4.3.")
       .def_prop_ro("validity", &PyTm30::validity,
                    "Domain validity flags (Validity named tuple).");
 
@@ -1492,7 +1492,7 @@ NB_MODULE(tm30_core, m) {
            "Returns numpy array (N_spds, 3) with [X, Y, Z]. "
            "Uses CIE 1964 10 degree CMFs by default, or the CMF at "
            "cmf= (a CSV path) for this call only. "
-           "K=None (default): auto-normalise Y=100 (TM-30-20 §3.2). "
+           "K=None (default): auto-normalise Y=100 (TM-30-20 S3.2). "
            "K=float: use as multiplier for raw integrals (1.0 = raw, 683 = "
            "photometric). "
            "lambda_min, lambda_max=None: clip integration range (nm).")
@@ -1532,7 +1532,7 @@ NB_MODULE(tm30_core, m) {
            nb::arg("wavelengths") = nb::none(), nb::arg("cmf") = nb::none(),
            "Compute CCT and Duv for all SPDs (N_spds x N_wl). Returns "
            "numpy array shape (2, N_spds): row 0 = cct (K), row 1 = duv. "
-           "Uses CIE 1931 2-deg CMFs by default (TM-30-20 §3.1 exception), "
+           "Uses CIE 1931 2-deg CMFs by default (TM-30-20 S3.1 exception), "
            "or the CMF at cmf= (a CSV path) for this call only.");
 
   // -- Exception translation ----------------------------------------

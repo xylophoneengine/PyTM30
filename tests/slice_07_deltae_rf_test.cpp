@@ -2,8 +2,8 @@
 // Validates compute_delta_e and compute_rf against golden fixtures,
 // self-consistency, and range constraints.
 //
-// TM-30-20 §3.8: Color Difference Formula
-// TM-30-20 §4.1: Fidelity Index (Rf)
+// TM-30-20 S3.8: Color Difference Formula
+// TM-30-20 S4.1: Fidelity Index (Rf)
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -237,8 +237,8 @@ private:
 // -------------------------------------------------------------------------
 // Self-consistency: Planckian at 3000K -> Rf ~= 100, all dE' ~= 0
 //
-// TM-30-20 §3.8: When test = reference illuminant, all dE' = 0
-// TM-30-20 §4.1: Rf = 100 for perfect fidelity
+// TM-30-20 S3.8: When test = reference illuminant, all dE' = 0
+// TM-30-20 S4.1: Rf = 100 for perfect fidelity
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - planckian 3000K self-consistency: dE'~=0, Rf~=100",
@@ -279,7 +279,7 @@ TEST_CASE("dE' & Rf - planckian 3000K self-consistency: dE'~=0, Rf~=100",
 
 // -------------------------------------------------------------------------
 // Self-consistency at multiple CCTs
-// TM-30-20 §3.8: Valid across the full CCT range
+// TM-30-20 S3.8: Valid across the full CCT range
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - planckian 2700K self-consistency: Rf ~= 100",
@@ -293,7 +293,7 @@ TEST_CASE("dE' & Rf - planckian 2700K self-consistency: Rf ~= 100",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // TM-30-20 §4.1: Self-consistency -> Rf ~= 100
+  // TM-30-20 S4.1: Self-consistency -> Rf ~= 100
   INFO("Planckian 2700K: Rf = " << result.Rf);
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
@@ -319,7 +319,7 @@ TEST_CASE("dE' & Rf - planckian 3500K self-consistency: Rf ~= 100",
       compute_ces_colorimetry(wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // TM-30-20 §4.1: Self-consistency -> Rf ~= 100
+  // TM-30-20 S4.1: Self-consistency -> Rf ~= 100
   INFO("Planckian 3500K: Rf = " << result.Rf);
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
@@ -344,7 +344,7 @@ TEST_CASE("dE' & Rf - D65 self-consistency: Rf ~= 100",
       compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg, G.ces,
                               G.daylight_basis, G.planckian_lut);
 
-  // TM-30-20 §4.1: D65 is a daylight -> reference is also D65-like
+  // TM-30-20 S4.1: D65 is a daylight -> reference is also D65-like
   INFO("D65: Rf = " << result.Rf);
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 
@@ -456,7 +456,7 @@ TEST_CASE("dE' & Rf - HP1 Rf matches golden fixture",
 
 // -------------------------------------------------------------------------
 // Rf range: verify 0 <= Rf <= 100 for various SPDs
-// TM-30-20 §4.1: Eq. (54) ensures Rf >= 0
+// TM-30-20 S4.1: Eq. (54) ensures Rf >= 0
 // -------------------------------------------------------------------------
 
 TEST_CASE("dE' & Rf - Rf in [0, 100] for various SPDs",
@@ -515,10 +515,10 @@ TEST_CASE("dE' & Rf - compute_rf: Rf = 100 when all dE' = 0",
 
   auto result = compute_rf(delta_e);
 
-  // TM-30-20 §4.1 Eq. (53): Rf' = 100 - 6.73 * 0 = 100
+  // TM-30-20 S4.1 Eq. (53): Rf' = 100 - 6.73 * 0 = 100
   CHECK(result.Rf_prime == 100.0);
 
-  // TM-30-20 §4.1 Eq. (54): Rf = 10 * ln(exp(10) + 1) ~= 100.00045
+  // TM-30-20 S4.1 Eq. (54): Rf = 10 * ln(exp(10) + 1) ~= 100.00045
   // (not exactly 100 due to the exp/ln rounding; within Tol_Rf)
   CHECK_THAT(result.Rf, WithinTolerance(Tol_Rf, 100.0));
 

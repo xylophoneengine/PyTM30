@@ -1,5 +1,5 @@
 // Slice 10 - Per-sample fidelity Rf,CESi, Rf,skin, Annex E.
-// TM-30-20 §4.2, Annex E.
+// TM-30-20 S4.2, Annex E.
 
 #include <catch2/catch_test_macros.hpp>
 

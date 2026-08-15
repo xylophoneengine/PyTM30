@@ -6,7 +6,7 @@
 /// Used for computing tristimulus integrals (XYZ) from spectral data.
 /// Handles non-uniform wavelength grids correctly.
 ///
-/// TM-30-20 §3.6: Calculation of Tristimulus Values
+/// TM-30-20 S3.6: Calculation of Tristimulus Values
 
 #include <cstddef>
 #include <vector>

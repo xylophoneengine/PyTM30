@@ -1,4 +1,4 @@
-// SPD container - construction-time validation per TM-30-20 §3.5.
+// SPD container - construction-time validation per TM-30-20 S3.5.
 #include "tm30/spd.hpp"
 
 #include <cstddef>
@@ -9,13 +9,13 @@
 
 namespace tm30 {
 
-// TM-30-20 §3.5: calculations run over 380-780 nm; the minimum input
+// TM-30-20 S3.5: calculations run over 380-780 nm; the minimum input
 // range is 400-700 nm; increments above 5 nm are not permitted.
-static constexpr double kMinFullRange = 380.0;  // TM-30-20 §3.5
-static constexpr double kMaxFullRange = 780.0;  // TM-30-20 §3.5
-static constexpr double kMinRequiredLo = 400.0; // TM-30-20 §3.5
-static constexpr double kMinRequiredHi = 700.0; // TM-30-20 §3.5
-static constexpr double kMaxStepNm = 5.0;       // TM-30-20 §3.5
+static constexpr double kMinFullRange = 380.0;  // TM-30-20 S3.5
+static constexpr double kMaxFullRange = 780.0;  // TM-30-20 S3.5
+static constexpr double kMinRequiredLo = 400.0; // TM-30-20 S3.5
+static constexpr double kMinRequiredHi = 700.0; // TM-30-20 S3.5
+static constexpr double kMaxStepNm = 5.0;       // TM-30-20 S3.5
 
 Spd::Spd(std::vector<double> wavelengths, std::vector<double> values)
     : wavelengths_(std::move(wavelengths)), values_(std::move(values)) {
@@ -35,7 +35,7 @@ void Spd::validate() {
     throw InvalidSpd("Wavelength and value arrays must have the same size");
   }
 
-  // 2. Non-negative values - TM-30-20 §3.2 (spectral power is never negative)
+  // 2. Non-negative values - TM-30-20 S3.2 (spectral power is never negative)
   for (std::size_t i = 0; i < values_.size(); ++i) {
     if (values_[i] < 0) {
       std::ostringstream oss;
@@ -46,7 +46,7 @@ void Spd::validate() {
   }
 
   // 3. Strictly monotonic increasing wavelengths, with no step above
-  //    5 nm (TM-30-20 §3.5: larger increments are not permitted).
+  //    5 nm (TM-30-20 S3.5: larger increments are not permitted).
   for (std::size_t i = 1; i < wavelengths_.size(); ++i) {
     if (wavelengths_[i] <= wavelengths_[i - 1]) {
       std::ostringstream oss;
@@ -61,12 +61,12 @@ void Spd::validate() {
       oss << "Wavelength step of " << gap << " nm between "
           << wavelengths_[i - 1] << " nm and " << wavelengths_[i]
           << " nm exceeds the 5 nm maximum increment permitted by "
-          << "TM-30-20 §3.5";
+          << "TM-30-20 S3.5";
       throw InvalidSpd(oss.str());
     }
   }
 
-  // 4. Minimum required range: at least 400-700 nm - TM-30-20 §3.5
+  // 4. Minimum required range: at least 400-700 nm - TM-30-20 S3.5
   const double lo = wavelengths_.front();
   const double hi = wavelengths_.back();
   if (lo > kMinRequiredLo || hi < kMinRequiredHi) {
@@ -82,7 +82,7 @@ void Spd::normalize() {
   input_min_wavelength_ = wavelengths_.front();
   input_max_wavelength_ = wavelengths_.back();
 
-  // TM-30-20 §3.5: samples outside the 380-780 nm calculation range are
+  // TM-30-20 S3.5: samples outside the 380-780 nm calculation range are
   // dropped.
   if (input_min_wavelength_ < kMinFullRange ||
       input_max_wavelength_ > kMaxFullRange) {
@@ -99,7 +99,7 @@ void Spd::normalize() {
     values_.assign(values_.begin() + first, values_.begin() + last);
   }
 
-  // TM-30-20 §3.5: missing values within 380-780 nm are replaced by
+  // TM-30-20 S3.5: missing values within 380-780 nm are replaced by
   // zeros. The grid is extended outward at the input's native edge step;
   // the final point is clamped to exactly 380/780 nm (grid alignment of
   // the fill is an implementation choice the standard does not specify),
@@ -113,9 +113,9 @@ void Spd::normalize() {
       w -= step;
       fill.push_back(w);
     }
-    fill.push_back(kMinFullRange); // TM-30-20 §3.5 lower calculation bound
+    fill.push_back(kMinFullRange); // TM-30-20 S3.5 lower calculation bound
     wavelengths_.insert(wavelengths_.begin(), fill.rbegin(), fill.rend());
-    values_.insert(values_.begin(), fill.size(), 0.0); // TM-30-20 §3.5 zeros
+    values_.insert(values_.begin(), fill.size(), 0.0); // TM-30-20 S3.5 zeros
     zero_filled_ = true;
   }
   if (wavelengths_.back() < kMaxFullRange) {
@@ -125,10 +125,10 @@ void Spd::normalize() {
     while (w + step < kMaxFullRange) {
       w += step;
       wavelengths_.push_back(w);
-      values_.push_back(0.0); // TM-30-20 §3.5 zeros
+      values_.push_back(0.0); // TM-30-20 S3.5 zeros
     }
-    wavelengths_.push_back(kMaxFullRange); // TM-30-20 §3.5 upper bound
-    values_.push_back(0.0);                // TM-30-20 §3.5 zeros
+    wavelengths_.push_back(kMaxFullRange); // TM-30-20 S3.5 upper bound
+    values_.push_back(0.0);                // TM-30-20 S3.5 zeros
     zero_filled_ = true;
   }
 }

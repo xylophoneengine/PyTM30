@@ -7,7 +7,7 @@
 /// viewing conditions, producing CAM02-UCS coordinates for color
 /// difference computation.
 ///
-/// TM-30-20 §3.7: Color Space and Chromatic Adaptation Transformation
+/// TM-30-20 S3.7: Color Space and Chromatic Adaptation Transformation
 
 #include <array>
 #include <cstddef>
@@ -18,43 +18,43 @@ namespace tm30 {
 
 /// Fixed viewing condition parameters for all TM-30-20 calculations.
 ///
-/// TM-30-20 §3.7
+/// TM-30-20 S3.7
 struct ViewingConditions {
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double Yb = 20.0; // Background luminance (cd/m^2)
 
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double F = 1.0; // Surround parameter
 
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double Nc = 1.0; // Surround parameter
 
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double c = 0.69; // Surround parameter
 
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double LA = 100.0; // Luminance of adapting field (cd/m^2)
 
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double D = 1.0; // Degree of adaptation
 
-  // TM-30-20 §3.7
+  // TM-30-20 S3.7
   double Yw = 100.0; // Luminous reflectance of white
 };
 
 /// CAM02-UCS coordinates: J' (lightness), a' (red-green), b' (yellow-blue).
 ///
-/// TM-30-20 §3.7.1 Eq. (48)-(50)
+/// TM-30-20 S3.7.1 Eq. (48)-(50)
 struct Cam02Ucs {
-  double J_prime; // TM-30-20 §3.7.1 Eq. (48)
-  double a_prime; // TM-30-20 §3.7.1 Eq. (49)
-  double b_prime; // TM-30-20 §3.7.1 Eq. (50)
+  double J_prime; // TM-30-20 S3.7.1 Eq. (48)
+  double a_prime; // TM-30-20 S3.7.1 Eq. (49)
+  double b_prime; // TM-30-20 S3.7.1 Eq. (50)
 };
 
 /// Run the CIECAM02 forward transform for a set of sample XYZ values
 /// under a given adapting white point.
 ///
-/// Computes the full 12-step CIECAM02 pipeline (TM-30-20 §3.7.1):
+/// Computes the full 12-step CIECAM02 pipeline (TM-30-20 S3.7.1):
 ///   1. XYZ -> RGB via MCAT02
 ///   2. Chromatic adaptation (D=1)
 ///   3. Convert to HPE cone space
@@ -73,7 +73,7 @@ struct Cam02Ucs {
 ///
 /// @return Array of 99 Cam02Ucs values.
 ///
-/// TM-30-20 §3.7.1
+/// TM-30-20 S3.7.1
 std::array<Cam02Ucs, 99>
 ciecam02_forward(const XyzTriple &xyz_white,
                  const std::array<XyzTriple, 99> &xyz_samples);
@@ -86,7 +86,7 @@ ciecam02_forward(const XyzTriple &xyz_white,
 /// @param xyz_white  Adapting white point XYZ.
 /// @return Achromatic response Aw.
 ///
-/// TM-30-20 §3.7.1 Eq. (41), (44)
+/// TM-30-20 S3.7.1 Eq. (41), (44)
 double ciecam02_compute_aw(const XyzTriple &xyz_white);
 
 } // namespace tm30

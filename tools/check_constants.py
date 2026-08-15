@@ -2,10 +2,10 @@
 """check_constants.py - CI gate: every float literal in src/ and include/ must cite a spec section.
 
 Fails on any float literal in the monitored directories that lacks a
-`// TM-30-20 §x.y` (or `/* TM-30-20 §x.y */`) citation on or above its line.
+`// TM-30-20 Sx.y` (or `/* TM-30-20 Sx.y */`) citation on or above its line.
 
 Also validates the citation tags themselves against
-tools/tm30_clause_equations.txt: a `TM-30-20 §x.y` tag must name a known
+tools/tm30_clause_equations.txt: a `TM-30-20 Sx.y` tag must name a known
 clause, and any `Eq. (nn)` on the same line must fall inside a clause
 cited on that line. Clause entries marked 'unverified' in the map file
 produce warnings rather than failures until the maintainer confirms them
@@ -49,19 +49,19 @@ FLOAT_PATTERN = re.compile(
 )
 
 # Citation patterns
-CITATION_LINE = re.compile(r"//\s*TM-30-20\s+§\s*[\d.]+[a-z]?")
-CITATION_BLOCK = re.compile(r"/\*\s*TM-30-20\s+§\s*[\d.]+[a-z]?\s*\*/")
+CITATION_LINE = re.compile(r"//\s*TM-30-20\s+S\s*[\d.]+[a-z]?")
+CITATION_BLOCK = re.compile(r"/\*\s*TM-30-20\s+S\s*[\d.]+[a-z]?\s*\*/")
 
 # Lines to ignore (comments, preprocessor, string literals - though we skip those separately)
 IGNORE_LINE = re.compile(r"^\s*//|^\s*#|^\s*\*")
 
 # --- Clause-reference validation ---
 CLAUSE_MAP_FILE = Path(__file__).resolve().parent / "tm30_clause_equations.txt"
-# Clause list attached to a TM-30-20 token ("TM-30-20 §4.6, §4.7" or
-# "§4.6-§4.8"); a "§" belonging to another document (e.g. "CIE 15:2004
-# §8.2.1" on the same line) is not captured.
-TM30_CLAUSES = re.compile(r"TM-30-20\s*(§\s*[\d.]+\d(?:\s*[-,/]\s*§\s*[\d.]+\d)*)")
-CLAUSE_NUM = re.compile(r"§\s*([\d.]+\d)")
+# Clause list attached to a TM-30-20 token ("TM-30-20 S4.6, S4.7" or
+# "S4.6-S4.8"); a "S" belonging to another document (e.g. "CIE 15:2004
+# S8.2.1" on the same line) is not captured.
+TM30_CLAUSES = re.compile(r"TM-30-20\s*(S\s*[\d.]+\d(?:\s*[-,/]\s*S\s*[\d.]+\d)*)")
+CLAUSE_NUM = re.compile(r"S\s*([\d.]+\d)")
 EQ_REF = re.compile(r"Eqs?\.?\s*\(?(\d+)\)?(?:\s*[-,]\s*\(?(\d+)\)?)?")
 
 
@@ -96,7 +96,7 @@ def load_clause_map():
 
 
 def check_clause_refs(filepath, clause_map):
-    """Validate every 'TM-30-20 §x.y' tag (and Eq. numbers on its line).
+    """Validate every 'TM-30-20 Sx.y' tag (and Eq. numbers on its line).
 
     Returns (violations, warnings): lists of (relpath, lineno, message).
     A violation is an unknown clause, or an equation number outside the
@@ -127,7 +127,7 @@ def check_clause_refs(filepath, clause_map):
         for clause in clauses:
             if clause not in clause_map:
                 violations.append(
-                    (relpath, lineno, f"unknown clause §{clause}")
+                    (relpath, lineno, f"unknown clause S{clause}")
                 )
                 continue
             known_clauses.append(clause)
@@ -150,7 +150,7 @@ def check_clause_refs(filepath, clause_map):
                 if not in_range:
                     msg = (
                         f"Eq. ({eq}) is outside every clause cited on this "
-                        f"line ({', '.join('§' + c for c in known_clauses)})"
+                        f"line ({', '.join('S' + c for c in known_clauses)})"
                     )
                     if line_verified:
                         violations.append((relpath, lineno, msg))
@@ -335,7 +335,7 @@ def main():
 
         print("\nEach float literal in src/ or include/ must have a citation")
         print("in a comment on or above its line, e.g.:")
-        print("  // TM-30-20 §3.7.1")
+        print("  // TM-30-20 S3.7.1")
         print("  double surround_f = 0.69;")
         print("\nAdd the citation, or if the constant genuinely doesn't need one,")
         print(f"the maintainer can whitelist it in {WHITELIST_FILE}")

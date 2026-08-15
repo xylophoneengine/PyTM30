@@ -410,7 +410,7 @@ rewrites anything, re-stage and commit again. Run it over the whole tree with
 - **No magic numbers** - every constant cites its TM-30-20 section
 - **Domain validity != errors** - out-of-range CCT/Duv are result flags, not exceptions
 - **SPD is never interpolated** - resample CES and CMFs to the test SPD's grid
-- **Linear interpolation** per TM-30-20 §3.5
+- **Linear interpolation** per TM-30-20 S3.5
 
 ---
 

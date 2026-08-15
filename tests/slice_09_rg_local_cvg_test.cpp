@@ -2,11 +2,11 @@
 // Validates compute_gamut, compute_rg, compute_local_bin_metrics, and
 // compute_cvg_coordinates against golden fixtures.
 //
-// TM-30-20 §4.4: Gamut Index (Rg)
-// TM-30-20 §4.5: Color Vector Graphic (CVG)
-// TM-30-20 §4.6: Local Chroma Shift (Rcs,hj)
-// TM-30-20 §4.7: Local Hue Shift (Rhs,hj)
-// TM-30-20 §4.8: Local Color Fidelity (Rf,hj)
+// TM-30-20 S4.4: Gamut Index (Rg)
+// TM-30-20 S4.5: Color Vector Graphic (CVG)
+// TM-30-20 S4.6: Local Chroma Shift (Rcs,hj)
+// TM-30-20 S4.7: Local Hue Shift (Rhs,hj)
+// TM-30-20 S4.8: Local Color Fidelity (Rf,hj)
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -487,7 +487,7 @@ void verify_gamut_for_spd(const std::string &fixture_subdir,
       max_jabtn_delta = dy;
   }
   INFO(fixture_subdir << ": max cvg_test delta = " << max_jabtn_delta);
-  // CVG x/y sit on the unit circle (TM-30-20 §4.5 Eq. 58-61, no display
+  // CVG x/y sit on the unit circle (TM-30-20 S4.5 Eq. 58-61, no display
   // scaling); the J' column is a bin-averaged pass-through and dominates
   // the delta, so the bin-average tolerance (0.002, see jab_ref_bin_avg
   // above) applies.
@@ -529,12 +529,12 @@ TEST_CASE(
   const auto &gamut = gfs.gamut;
 
   // Rg ~= 100
-  // TM-30-20 §4.4: Self-consistency -> Rg ~= 100
+  // TM-30-20 S4.4: Self-consistency -> Rg ~= 100
   INFO("Planckian 3000K: Rg = " << gamut.Rg);
   CHECK_THAT(gamut.Rg, WithinTolerance(Tol_Rg, 100.0));
 
   // All Rcs,hj ~= 0
-  // TM-30-20 §4.6: Self-consistency -> shifts near zero
+  // TM-30-20 S4.6: Self-consistency -> shifts near zero
   double max_rcs = 0.0;
   for (int j = 0; j < 16; ++j) {
     double v = std::abs(gamut.local.Rcs_hj_percent[j]);
@@ -545,7 +545,7 @@ TEST_CASE(
   CHECK(max_rcs <= Tol_LocalShift);
 
   // All Rhs,hj ~= 0
-  // TM-30-20 §4.7: Self-consistency -> shifts near zero
+  // TM-30-20 S4.7: Self-consistency -> shifts near zero
   double max_rhs = 0.0;
   for (int j = 0; j < 16; ++j) {
     double v = std::abs(gamut.local.Rhs_hj[j]);
@@ -556,7 +556,7 @@ TEST_CASE(
   CHECK(max_rhs <= Tol_LocalShift);
 
   // All Rf,hj ~= 100
-  // TM-30-20 §4.8: Self-consistency -> per-bin fidelity ~= 100
+  // TM-30-20 S4.8: Self-consistency -> per-bin fidelity ~= 100
   double min_rfhj = 100.0;
   for (int j = 0; j < 16; ++j) {
     if (gamut.local.Rf_hj[j] < min_rfhj)

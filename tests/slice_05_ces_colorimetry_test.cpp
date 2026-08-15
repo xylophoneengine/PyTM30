@@ -1,8 +1,8 @@
 // Slice 5 - CES colorimetry pipeline integration tests.
 // Validates the full end-to-end pipeline against golden fixture data.
 //
-// TM-30-20 §3.4: Color Evaluation Samples
-// TM-30-20 §3.6: Calculation of Tristimulus Values
+// TM-30-20 S3.4: Color Evaluation Samples
+// TM-30-20 S3.6: Calculation of Tristimulus Values
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -350,7 +350,7 @@ TEST_CASE("CES colorimetry - HP1 matches golden fixtures",
                               G.daylight_basis, G.planckian_lut);
 
   // HP1: cct ~= 1959.24, duv ~= 0.00078
-  // TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
+  // TM-30-20 S3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 1959.2357303373917));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.0007823644283656693));
 
@@ -400,7 +400,7 @@ TEST_CASE("CES colorimetry - planckian 3000K matches golden fixtures",
 // doi:10.1080/15502724.2023.2248397, bound the max CCT error at ~0.4 K
 // for a 0.25% LUT). A tolerance of 1e-3 is appropriate for this
 // self-consistency check, reflecting the inherent CCT algorithm imprecision
-// rather than an implementation error. TM-30-20 §3.3: CCT of a perfect
+// rather than an implementation error. TM-30-20 S3.3: CCT of a perfect
 // Planckian is not identity.
 // -------------------------------------------------------------------------
 
@@ -419,7 +419,7 @@ TEST_CASE("CES colorimetry - planckian self-consistency: test ~= reference",
   // Planckian at the computed CCT.  Due to Ohno 2014 CCT solver imprecision,
   // the recovered CCT differs from the input temperature by ~0.03 K, causing
   // small CES XYZ differences.
-  // TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
+  // TM-30-20 S3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   constexpr double self_consistency_tol = 1.0e-3;
 
   for (std::size_t i = 0; i < 99; ++i) {

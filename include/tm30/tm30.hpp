@@ -73,19 +73,19 @@ struct Tm30Request {
 /// regardless. Callers decide how to act on them.
 struct Validity {
   /// Duv is far from the Planckian locus. Advisory only; pytm30 impl
-  /// choice (TM-30-20 §2.0 states the near-locus domain qualitatively and
+  /// choice (TM-30-20 S2.0 states the near-locus domain qualitatively and
   /// prints no numerical Duv bound).
   bool duv_out_of_range = false;
 
   /// CCT is far from the range where TM-30 is typically applied. Advisory
-  /// only; pytm30 impl choice (TM-30-20 §2.0 prints no numerical CCT
+  /// only; pytm30 impl choice (TM-30-20 S2.0 prints no numerical CCT
   /// bounds).
   bool cct_out_of_range = false;
 
   /// The test SPD did not cover the full 380-780 nm grid; the missing
-  /// edge values were zero-filled at Spd construction per TM-30-20 §3.5
+  /// edge values were zero-filled at Spd construction per TM-30-20 S3.5
   /// (which forbids interpolating or extrapolating the test SPD). Not
-  /// the same as CES/CMF flat extrapolation (TM-30-20 §1.3 / Annex A).
+  /// the same as CES/CMF flat extrapolation (TM-30-20 S1.3 / Annex A).
   bool extrapolated = false;
 };
 
@@ -142,36 +142,36 @@ public:
   // All accessors are const but mutate the internal cache.
   // NOT thread-safe. First call triggers full pipeline computation.
 
-  /// Correlated Color Temperature (K).                    TM-30-20 §3.3
+  /// Correlated Color Temperature (K).                    TM-30-20 S3.3
   double cct() const;
 
-  /// Distance from Planckian locus in CIE 1960 UCS.       TM-30-20 §3.3
+  /// Distance from Planckian locus in CIE 1960 UCS.       TM-30-20 S3.3
   double duv() const;
 
-  /// Fidelity index Rf [0, 100].                          TM-30-20 §4.1
+  /// Fidelity index Rf [0, 100].                          TM-30-20 S4.1
   double rf() const;
 
-  /// Gamut area index Rg.                                 TM-30-20 §4.4
+  /// Gamut area index Rg.                                 TM-30-20 S4.4
   double rg() const;
 
-  /// Average color difference dE' across 99 CES.          TM-30-20 §4.1
+  /// Average color difference dE' across 99 CES.          TM-30-20 S4.1
   double delta_e_avg() const;
 
-  /// Per-sample fidelity Rf,CESi (99 values).             TM-30-20 §4.2
+  /// Per-sample fidelity Rf,CESi (99 values).             TM-30-20 S4.2
   const std::array<double, 99> &rf_cesi() const;
 
   /// Skin fidelity Rf,skin (average of CES15 + CES18). PyTM30 research
-  /// extension informed by TM-30-20 §4.2; not a standardised measure
-  /// (§1.2, §4.0).
+  /// extension informed by TM-30-20 S4.2; not a standardised measure
+  /// (S1.2, S4.0).
   double rf_skin() const;
 
-  /// Full gamut result: Rg, per-bin metrics, CVG.         TM-30-20 §4.4-§4.8
+  /// Full gamut result: Rg, per-bin metrics, CVG.         TM-30-20 S4.4-S4.8
   const GamutResult &gamut() const;
 
-  /// Per-bin local metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj). TM-30-20 §4.6-§4.8
+  /// Per-bin local metrics (Rf,hj, Rcs,hj, Rhs,hj, DE_hj). TM-30-20 S4.6-S4.8
   const LocalBinMetrics &local_chroma_shift() const;
 
-  /// CVG-normalized bin-average coordinates.              TM-30-20 §4.5
+  /// CVG-normalized bin-average coordinates.              TM-30-20 S4.5
   const CvgCoordinates &cvg() const;
 
   /// Domain validity flags.

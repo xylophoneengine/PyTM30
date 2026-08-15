@@ -2,7 +2,7 @@
 // Validates bin_by_hue against golden fixtures, self-consistency,
 // complete coverage (all 99 CES assigned), and boundary handling.
 //
-// TM-30-20 §4.3 + Figure 3: Hue-Angle Bins
+// TM-30-20 S4.3 + Figure 3: Hue-Angle Bins
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -548,8 +548,8 @@ TEST_CASE("Hue binning - per-bin sample count in [2, 11] for D65",
   for (int bin = 0; bin < 16; ++bin) {
     int count = static_cast<int>(result.hue_bins[bin].size());
     INFO("Bin " << bin << " has " << count << " CES");
-    CHECK(count >= 2);  // TM-30-20 §4.3: range 2-11
-    CHECK(count <= 11); // TM-30-20 §4.3: range 2-11
+    CHECK(count >= 2);  // TM-30-20 S4.3: range 2-11
+    CHECK(count <= 11); // TM-30-20 S4.3: range 2-11
   }
 }
 

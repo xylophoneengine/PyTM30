@@ -1,10 +1,10 @@
 // Slice 2 - CMF integration -> XYZ tristimulus values (CIE 1964 10-deg
 // observer).
 //
-// TM-30-20 §3.1: Colorimetric Observer
-// TM-30-20 §3.2: Test Source Tristimulus Values
-// TM-30-20 §3.6: Calculation of Tristimulus Values
-// TM-30-20 §3.5: Range and Interpolation of Data
+// TM-30-20 S3.1: Colorimetric Observer
+// TM-30-20 S3.2: Test Source Tristimulus Values
+// TM-30-20 S3.6: Calculation of Tristimulus Values
+// TM-30-20 S3.5: Range and Interpolation of Data
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -96,7 +96,7 @@ load_spd_csv(const std::string &path) {
 }
 
 /// Build a 401-point wavelength grid from 380 to 780 nm at 1 nm step.
-/// TM-30-20 §3.5: 380-780 nm range.
+/// TM-30-20 S3.5: 380-780 nm range.
 std::vector<double> full_1nm_grid() {
   std::vector<double> wl(401);
   for (int i = 0; i < 401; ++i) {
@@ -644,11 +644,11 @@ TEST_CASE("XYZ - D65 source tristimulus (1 nm)", "[xyz][slice02]") {
 
   CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), spd_wl);
 
-  // TM-30-20 §3.2: compute source XYZ with CIE 1964 10-deg observer
+  // TM-30-20 S3.2: compute source XYZ with CIE 1964 10-deg observer
   SourceXyz src =
       compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
 
-  // TM-30-20 §3.2 Eq. (2): Y must equal 100.0 after normalisation
+  // TM-30-20 S3.2 Eq. (2): Y must equal 100.0 after normalisation
   REQUIRE_THAT(src.Y, WithinTolerance(Tol_Xyz, 100.0));
 
   // Golden values computed from the current (colour-science-sourced)
@@ -660,7 +660,7 @@ TEST_CASE("XYZ - D65 source tristimulus (1 nm)", "[xyz][slice02]") {
   REQUIRE_THAT(src.Z, WithinTolerance(Tol_Xyz, 107.3036929917));
 
   // k must be positive and finite
-  // TM-30-20 §3.2 Eq. (4): k = 100 / integral St(lambda) * ybar10(lambda)
+  // TM-30-20 S3.2 Eq. (4): k = 100 / integral St(lambda) * ybar10(lambda)
   // dlambda
   REQUIRE(src.k > 0.0);
   REQUIRE(std::isfinite(src.k));
@@ -679,7 +679,7 @@ TEST_CASE("XYZ - Illuminant A source tristimulus (1 nm)", "[xyz][slice02]") {
   SourceXyz src =
       compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
 
-  // Y = 100.0 - TM-30-20 §3.2 Eq. (2)
+  // Y = 100.0 - TM-30-20 S3.2 Eq. (2)
   REQUIRE_THAT(src.Y, WithinTolerance(Tol_Xyz, 100.0));
 
   // Golden values: X = 111.1432899325, Z = 35.1999196709
@@ -695,7 +695,7 @@ TEST_CASE("XYZ - Illuminant A source tristimulus (1 nm)", "[xyz][slice02]") {
 // -------------------------------------------------------------------------
 
 TEST_CASE("XYZ - normalisation produces Y=100 for source", "[xyz][slice02]") {
-  // TM-30-20 §3.2: Y should be exactly 100 for any valid source SPD.
+  // TM-30-20 S3.2: Y should be exactly 100 for any valid source SPD.
   // Test with D65 and Illuminant A.
 
   auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
@@ -764,7 +764,7 @@ std::array<XyzTriple, 99> compute_ces_xyz_reference(
 }
 
 TEST_CASE("XYZ - CES output shape is 99", "[xyz][slice02]") {
-  // TM-30-20 §3.6: compute tristimulus values for all 99 CES under D65.
+  // TM-30-20 S3.6: compute tristimulus values for all 99 CES under D65.
 
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
   CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), spd_wl);
@@ -897,7 +897,7 @@ TEST_CASE("XYZ - scale invariance: doubled SPD gives same XYZ",
       compute_source_xyz(wl, spd2_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
 
   // XYZ should be identical (normalisation absorbs the scale factor)
-  // TM-30-20 §3.2: normalisation constant includes the integral
+  // TM-30-20 S3.2: normalisation constant includes the integral
   REQUIRE_THAT(src1.X, WithinTolerance(Tol_Xyz, src2.X));
   REQUIRE_THAT(src1.Y, WithinTolerance(Tol_Xyz, src2.Y));
   REQUIRE_THAT(src1.Z, WithinTolerance(Tol_Xyz, src2.Z));
@@ -912,7 +912,7 @@ TEST_CASE("XYZ - scale invariance: doubled SPD gives same XYZ",
 
 TEST_CASE("XYZ - source XYZ from 5nm resampled data agrees with 1nm",
           "[xyz][slice02]") {
-  // TM-30-20 §3.5: results from 5 nm data should agree with 1 nm within
+  // TM-30-20 S3.5: results from 5 nm data should agree with 1 nm within
   // tolerance.
 
   auto [spd_wl_1nm, spd_vals_1nm] = load_spd_csv(data_path("d65_1nm.csv"));
@@ -938,7 +938,7 @@ TEST_CASE("XYZ - source XYZ from 5nm resampled data agrees with 1nm",
                                          cmf_5nm.y_bar, cmf_5nm.z_bar);
 
   // 1 nm and 5 nm results should agree within a reasonable tolerance.
-  // TM-30-20 §3.5: increments not greater than 5 nm.
+  // TM-30-20 S3.5: increments not greater than 5 nm.
   // Grid invariance has higher expected error than oracle comparison;
   // subsampling from 1nm to 5nm loses spectral detail.
   constexpr double kGridInvarianceRelTol = 1e-3; // 0.1% relative

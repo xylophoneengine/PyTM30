@@ -353,53 +353,53 @@ class Tm30Result:
 
     @property
     def rf_hj(self) -> np.ndarray:
-        """Per-bin local fidelity Rf,hj - 16 values.  TM-30-20 §4.8."""
+        """Per-bin local fidelity Rf,hj - 16 values.  TM-30-20 S4.8."""
         return np.asarray(self._d["rf_hj"])
 
     @property
     def de_hj(self) -> np.ndarray:
-        """Per-bin mean dE', DE_hj - 16 values.  TM-30-20 §4.8."""
+        """Per-bin mean dE', DE_hj - 16 values.  TM-30-20 S4.8."""
         return np.asarray(self._d["de_hj"])
 
     @property
     def cvg_j_test(self) -> np.ndarray:
-        """Test-vector J' - 16 values.  pytm30 extension of the §4.4 bin
-        averages (§4.4 explicitly discards J'; §4.5 CVG geometry is 2-D in
+        """Test-vector J' - 16 values.  pytm30 extension of the S4.4 bin
+        averages (S4.4 explicitly discards J'; S4.5 CVG geometry is 2-D in
         (a',b') only, per Eqs. 58-61)."""
         return np.asarray(self._d["cvg_j_test"])
 
     @property
     def cvg_x_test(self) -> np.ndarray:
-        """CVG test-vector x - 16 values.  TM-30-20 §4.5 Eq. (60)."""
+        """CVG test-vector x - 16 values.  TM-30-20 S4.5 Eq. (60)."""
         return np.asarray(self._d["cvg_x_test"])
 
     @property
     def cvg_y_test(self) -> np.ndarray:
-        """CVG test-vector y - 16 values.  TM-30-20 §4.5 Eq. (61)."""
+        """CVG test-vector y - 16 values.  TM-30-20 S4.5 Eq. (61)."""
         return np.asarray(self._d["cvg_y_test"])
 
     @property
     def cvg_j_ref(self) -> np.ndarray:
-        """Reference-circle J' - 16 values.  pytm30 extension of the §4.4
-        bin averages (§4.4 discards J'; §4.5 CVG geometry is 2-D in (a',b')
+        """Reference-circle J' - 16 values.  pytm30 extension of the S4.4
+        bin averages (S4.4 discards J'; S4.5 CVG geometry is 2-D in (a',b')
         only, per Eqs. 58-61)."""
         return np.asarray(self._d["cvg_j_ref"])
 
     @property
     def cvg_x_ref(self) -> np.ndarray:
-        """CVG reference-circle x - 16 values.  TM-30-20 §4.5 Eq. (58)."""
+        """CVG reference-circle x - 16 values.  TM-30-20 S4.5 Eq. (58)."""
         return np.asarray(self._d["cvg_x_ref"])
 
     @property
     def cvg_y_ref(self) -> np.ndarray:
-        """CVG reference-circle y - 16 values.  TM-30-20 §4.5 Eq. (59)."""
+        """CVG reference-circle y - 16 values.  TM-30-20 S4.5 Eq. (59)."""
         return np.asarray(self._d["cvg_y_ref"])
 
     @property
     def reference_spd(self) -> np.ndarray:
         """Reference-illuminant SPD, resampled to the input wavelength grid.
 
-        TM-30-20 §3.3 Eq. (13)-(16).
+        TM-30-20 S3.3 Eq. (13)-(16).
         """
         return np.asarray(self._d["reference_spd"])
 
@@ -407,7 +407,7 @@ class Tm30Result:
     def xyz_test_ces(self) -> np.ndarray:
         """Per-CES XYZ under the test source - shape (99, 3).
 
-        TM-30-20 §3.6 Eq. (21)-(23).
+        TM-30-20 S3.6 Eq. (21)-(23).
         """
         return np.asarray(self._d["xyz_test_ces"])
 
@@ -415,7 +415,7 @@ class Tm30Result:
     def xyz_ref_ces(self) -> np.ndarray:
         """Per-CES XYZ under the reference illuminant - shape (99, 3).
 
-        TM-30-20 §3.6 Eq. (25)-(27).
+        TM-30-20 S3.6 Eq. (25)-(27).
         """
         return np.asarray(self._d["xyz_ref_ces"])
 
@@ -423,7 +423,7 @@ class Tm30Result:
     def jab_test_ces(self) -> np.ndarray:
         """Per-CES CAM02-UCS [J', a', b'] under the test source - shape (99, 3).
 
-        TM-30-20 §3.7.1 Eq. (48)-(50).
+        TM-30-20 S3.7.1 Eq. (48)-(50).
         """
         return np.asarray(self._d["jab_test_ces"])
 
@@ -431,7 +431,7 @@ class Tm30Result:
     def jab_ref_ces(self) -> np.ndarray:
         """Per-CES CAM02-UCS [J', a', b'] under the reference illuminant - shape (99, 3).
 
-        TM-30-20 §3.7.1 Eq. (48)-(50).
+        TM-30-20 S3.7.1 Eq. (48)-(50).
         """
         return np.asarray(self._d["jab_ref_ces"])
 
@@ -441,7 +441,7 @@ class Tm30Result:
 
         Assigned from the reference hue angle hr = atan2(b'r, a'r); the same
         assignment is reused for both the test and reference bin averages.
-        TM-30-20 §4.3.
+        TM-30-20 S4.3.
         """
         return np.asarray(self._d["hue_bin_index"])
 
@@ -594,42 +594,42 @@ class Tm30BatchResult:
 
     @property
     def rf(self) -> np.ndarray:
-        """Fidelity index Rf - shape (N,).  TM-30-20 §4.1."""
+        """Fidelity index Rf - shape (N,).  TM-30-20 S4.1."""
         return self._d["rf"]
 
     @property
     def rg(self) -> np.ndarray:
-        """Gamut index Rg - shape (N,).  TM-30-20 §4.4."""
+        """Gamut index Rg - shape (N,).  TM-30-20 S4.4."""
         return self._d["rg"]
 
     @property
     def cct(self) -> np.ndarray:
-        """Correlated Color Temperature (K) - shape (N,).  TM-30-20 §3.3."""
+        """Correlated Color Temperature (K) - shape (N,).  TM-30-20 S3.3."""
         return self._d["cct"]
 
     @property
     def duv(self) -> np.ndarray:
-        """Distance from Planckian locus - shape (N,).  TM-30-20 §3.3."""
+        """Distance from Planckian locus - shape (N,).  TM-30-20 S3.3."""
         return self._d["duv"]
 
     @property
     def delta_e_avg(self) -> np.ndarray:
-        """Average dE' across 99 CES - shape (N,).  TM-30-20 §4.1."""
+        """Average dE' across 99 CES - shape (N,).  TM-30-20 S4.1."""
         return self._d["delta_e_avg"]
 
     @property
     def rf_skin(self) -> np.ndarray:
         """Skin fidelity Rf,skin - shape (N,).
 
-        PyTM30 research extension informed by TM-30-20 §4.2 (mean of the
+        PyTM30 research extension informed by TM-30-20 S4.2 (mean of the
         CES15 and CES18 fidelity values); not a standardised TM-30
-        measure (§1.2, §4.0).
+        measure (S1.2, S4.0).
         """
         return self._d["rf_skin"]
 
     @property
     def rf_cesi(self) -> np.ndarray:
-        """Per-sample fidelity Rf,CESi - shape (N, 99).  TM-30-20 §4.2."""
+        """Per-sample fidelity Rf,CESi - shape (N, 99).  TM-30-20 S4.2."""
         if "rf_cesi" not in self._d:
             raise AttributeError(
                 "rf_cesi is not available on this result -- call "
@@ -642,7 +642,7 @@ class Tm30BatchResult:
     def rcs_hj(self) -> np.ndarray:
         """Per-bin chroma shift Rcs,hj, in percent - shape (N, 16).
 
-        TM-30-20 §4.6: Eq. (62) computes a ratio; §4.6 requires percentage
+        TM-30-20 S4.6: Eq. (62) computes a ratio; S4.6 requires percentage
         representation, applied once in the core library.
         """
         if "rcs_hj" not in self._d:
@@ -657,7 +657,7 @@ class Tm30BatchResult:
     def rhs_hj(self) -> np.ndarray:
         """Per-bin hue shift Rhs,hj, dimensionless ratio - shape (N, 16).
 
-        TM-30-20 §4.7: Eq. (63) is ratio-valued and §4.7 states no
+        TM-30-20 S4.7: Eq. (63) is ratio-valued and S4.7 states no
         percentage requirement; reported unscaled.
         """
         if "rhs_hj" not in self._d:
@@ -672,53 +672,53 @@ class Tm30BatchResult:
 
     @property
     def rf_hj(self) -> np.ndarray:
-        """Per-bin local fidelity Rf,hj - shape (N, 16).  TM-30-20 §4.8."""
+        """Per-bin local fidelity Rf,hj - shape (N, 16).  TM-30-20 S4.8."""
         return self._d["rf_hj"]
 
     @property
     def de_hj(self) -> np.ndarray:
-        """Per-bin mean dE', DE_hj - shape (N, 16).  TM-30-20 §4.8."""
+        """Per-bin mean dE', DE_hj - shape (N, 16).  TM-30-20 S4.8."""
         return self._d["de_hj"]
 
     @property
     def cvg_j_test(self) -> np.ndarray:
-        """Test-vector J' - shape (N, 16).  pytm30 extension of the §4.4
-        bin averages (§4.4 discards J'; §4.5 CVG geometry is 2-D in (a',b')
+        """Test-vector J' - shape (N, 16).  pytm30 extension of the S4.4
+        bin averages (S4.4 discards J'; S4.5 CVG geometry is 2-D in (a',b')
         only, per Eqs. 58-61)."""
         return self._d["cvg_j_test"]
 
     @property
     def cvg_x_test(self) -> np.ndarray:
-        """CVG test-vector x - shape (N, 16).  TM-30-20 §4.5 Eq. (60)."""
+        """CVG test-vector x - shape (N, 16).  TM-30-20 S4.5 Eq. (60)."""
         return self._d["cvg_x_test"]
 
     @property
     def cvg_y_test(self) -> np.ndarray:
-        """CVG test-vector y - shape (N, 16).  TM-30-20 §4.5 Eq. (61)."""
+        """CVG test-vector y - shape (N, 16).  TM-30-20 S4.5 Eq. (61)."""
         return self._d["cvg_y_test"]
 
     @property
     def cvg_j_ref(self) -> np.ndarray:
         """Reference-circle J' - shape (N, 16).  pytm30 extension of the
-        §4.4 bin averages (§4.4 discards J'; §4.5 CVG geometry is 2-D in
+        S4.4 bin averages (S4.4 discards J'; S4.5 CVG geometry is 2-D in
         (a',b') only, per Eqs. 58-61)."""
         return self._d["cvg_j_ref"]
 
     @property
     def cvg_x_ref(self) -> np.ndarray:
-        """CVG reference-circle x - shape (N, 16).  TM-30-20 §4.5 Eq. (58)."""
+        """CVG reference-circle x - shape (N, 16).  TM-30-20 S4.5 Eq. (58)."""
         return self._d["cvg_x_ref"]
 
     @property
     def cvg_y_ref(self) -> np.ndarray:
-        """CVG reference-circle y - shape (N, 16).  TM-30-20 §4.5 Eq. (59)."""
+        """CVG reference-circle y - shape (N, 16).  TM-30-20 S4.5 Eq. (59)."""
         return self._d["cvg_y_ref"]
 
     @property
     def reference_spd(self) -> np.ndarray:
         """Reference-illuminant SPD, resampled to the input wavelength grid.
 
-        Shape (N, N_wl).  TM-30-20 §3.3 Eq. (13)-(16).
+        Shape (N, N_wl).  TM-30-20 S3.3 Eq. (13)-(16).
         """
         return self._d["reference_spd"]
 
@@ -726,7 +726,7 @@ class Tm30BatchResult:
     def xyz_test_ces(self) -> np.ndarray:
         """Per-CES XYZ under the test source - shape (N, 99, 3).
 
-        TM-30-20 §3.6 Eq. (21)-(23).
+        TM-30-20 S3.6 Eq. (21)-(23).
         """
         return self._d["xyz_test_ces"]
 
@@ -734,7 +734,7 @@ class Tm30BatchResult:
     def xyz_ref_ces(self) -> np.ndarray:
         """Per-CES XYZ under the reference illuminant - shape (N, 99, 3).
 
-        TM-30-20 §3.6 Eq. (25)-(27).
+        TM-30-20 S3.6 Eq. (25)-(27).
         """
         return self._d["xyz_ref_ces"]
 
@@ -742,7 +742,7 @@ class Tm30BatchResult:
     def jab_test_ces(self) -> np.ndarray:
         """Per-CES CAM02-UCS [J', a', b'] under the test source - shape (N, 99, 3).
 
-        TM-30-20 §3.7.1 Eq. (48)-(50).
+        TM-30-20 S3.7.1 Eq. (48)-(50).
         """
         return self._d["jab_test_ces"]
 
@@ -750,7 +750,7 @@ class Tm30BatchResult:
     def jab_ref_ces(self) -> np.ndarray:
         """Per-CES CAM02-UCS [J', a', b'] under the reference illuminant - shape (N, 99, 3).
 
-        TM-30-20 §3.7.1 Eq. (48)-(50).
+        TM-30-20 S3.7.1 Eq. (48)-(50).
         """
         return self._d["jab_ref_ces"]
 
@@ -758,7 +758,7 @@ class Tm30BatchResult:
     def hue_bin_index(self) -> np.ndarray:
         """Per-CES hue-angle bin index (0-15) - shape (N, 99).
 
-        TM-30-20 §4.3.
+        TM-30-20 S4.3.
         """
         return self._d["hue_bin_index"]
 
@@ -1157,7 +1157,7 @@ class TM30Calc:
             one-off different grid for this call only.
         K : float or None
             Normalisation constant.  None (default): auto-compute
-            k = 100/integral St*ybar dlambda -> Y = 100 (TM-30-20 §3.2 Eq. 4).
+            k = 100/integral St*ybar dlambda -> Y = 100 (TM-30-20 S3.2 Eq. 4).
             K = 1.0: raw tristimulus integrals.
             K = 683.0: photometric absolute -- Km, the maximum luminous
             efficacy of radiation at 555 nm (CIE/SI definition of the
@@ -1208,7 +1208,7 @@ class TM30Calc:
     ) -> np.ndarray:
         """Compute CIE 1976 Y,u',v' for one or many SPDs.
 
-        Chains spd_to_xyz -> xyz_to_Yuv (CIE 15:2004 §8.2.1).
+        Chains spd_to_xyz -> xyz_to_Yuv (CIE 15:2004 S8.2.1).
 
         Parameters
         ----------
@@ -1400,7 +1400,7 @@ class TM30Calc:
         """Compute CCT and Duv for one or many SPDs.
 
         Uses the CIE 1931 2-deg CMFs and the Ohno 2014 method (TM-30-20
-        §3.1 exception, §3.3) -- this is the one calculation in TM-30-20
+        S3.1 exception, S3.3) -- this is the one calculation in TM-30-20
         that uses the 2-deg, not 10-deg, observer.
 
         Parameters

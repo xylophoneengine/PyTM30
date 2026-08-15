@@ -3,11 +3,11 @@
 /// @file chromaticity.hpp
 /// CIE 1960 UCS (u, v) and CIE 1976 Y,u',v' chromaticity coordinates.
 ///
-/// TM-30-20 §3.3: CCT determination uses CIE 1960 UCS (u, v) diagram.
+/// TM-30-20 S3.3: CCT determination uses CIE 1960 UCS (u, v) diagram.
 /// The CIE 1960 UCS is also referred to as the Judd 1960 UCS.
 ///
 /// CIE 1976 UCS (u', v') is the chromaticity space of CIELUV,
-/// defined in CIE 15:2004 §8.2.1.
+/// defined in CIE 15:2004 S8.2.1.
 
 namespace tm30 {
 
@@ -29,7 +29,7 @@ struct YuvTriple {
 
 /// Convert CIE XYZ tristimulus values to CIE 1960 UCS (u, v).
 ///
-/// TM-30-20 §3.3:
+/// TM-30-20 S3.3:
 ///   u = 4X / (X + 15Y + 3Z)
 ///   v = 6Y / (X + 15Y + 3Z)
 ///
@@ -41,7 +41,7 @@ UvCoord xyz_to_uv(double X, double Y, double Z);
 
 /// Convert CIE XYZ tristimulus values to CIE 1976 Y,u',v'.
 ///
-/// CIE 15:2004 §8.2.1:
+/// CIE 15:2004 S8.2.1:
 ///   u' = 4X / (X + 15Y + 3Z)
 ///   v' = 9Y / (X + 15Y + 3Z)
 ///

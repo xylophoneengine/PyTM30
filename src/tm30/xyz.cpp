@@ -1,7 +1,7 @@
 // CIE 1964 10-deg tristimulus value computation.
-// TM-30-20 §3.1: Colorimetric Observer
-// TM-30-20 §3.2: Test Source - tristimulus values
-// TM-30-20 §3.6: Calculation of Tristimulus Values
+// TM-30-20 S3.1: Colorimetric Observer
+// TM-30-20 S3.2: Test Source - tristimulus values
+// TM-30-20 S3.6: Calculation of Tristimulus Values
 #include "tm30/xyz.hpp"
 #include "tm30/integrate.hpp"
 #include "tm30/spd.hpp"
@@ -30,7 +30,7 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
   }
 
   // Build integrand for numerator of k: St(lambda) * ybar10(lambda)
-  // TM-30-20 §3.2 Eq. (4): k = 100 / integral St(lambda) * ybar10(lambda)
+  // TM-30-20 S3.2 Eq. (4): k = 100 / integral St(lambda) * ybar10(lambda)
   // dlambda
   std::vector<double> st_times_ybar(n);
   for (std::size_t i = 0; i < n; ++i) {
@@ -40,13 +40,13 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
   const double integral_st_ybar =
       trapezoidal_integrate(spd_wavelengths, st_times_ybar);
 
-  // TM-30-20 §3.2 Eq. (4)
+  // TM-30-20 S3.2 Eq. (4)
   const double k = 100.0 / integral_st_ybar;
 
   // Build integrands and integrate
-  // TM-30-20 §3.2 Eq. (1): X = k * integral St(lambda) * xbar10(lambda) dlambda
-  // TM-30-20 §3.2 Eq. (2): Y = k * integral St(lambda) * ybar10(lambda) dlambda
-  // TM-30-20 §3.2 Eq. (3): Z = k * integral St(lambda) * zbar10(lambda) dlambda
+  // TM-30-20 S3.2 Eq. (1): X = k * integral St(lambda) * xbar10(lambda) dlambda
+  // TM-30-20 S3.2 Eq. (2): Y = k * integral St(lambda) * ybar10(lambda) dlambda
+  // TM-30-20 S3.2 Eq. (3): Z = k * integral St(lambda) * zbar10(lambda) dlambda
 
   std::vector<double> st_times_xbar(n);
   std::vector<double> st_times_zbar(n);
@@ -62,10 +62,10 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
       trapezoidal_integrate(spd_wavelengths, st_times_zbar);
 
   SourceXyz result;
-  result.X = k * integral_st_xbar; // TM-30-20 §3.2 Eq. (1)
-  result.Y = k * integral_st_ybar; // TM-30-20 §3.2 Eq. (2)
-  result.Z = k * integral_st_zbar; // TM-30-20 §3.2 Eq. (3)
-  result.k = k;                    // TM-30-20 §3.2 Eq. (4)
+  result.X = k * integral_st_xbar; // TM-30-20 S3.2 Eq. (1)
+  result.Y = k * integral_st_ybar; // TM-30-20 S3.2 Eq. (2)
+  result.Z = k * integral_st_zbar; // TM-30-20 S3.2 Eq. (3)
+  result.k = k;                    // TM-30-20 S3.2 Eq. (4)
 
   return result;
 }
@@ -90,7 +90,7 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
   // Trapezoidal weights for this wavelength grid depend only on the grid
   // itself, not on any CES sample - compute once per call (not once per
   // CES) and reuse for all 99 samples.
-  // TM-30-20 §3.6: sum_i w[i]*f[i] == trapezoidal integration of f over
+  // TM-30-20 S3.6: sum_i w[i]*f[i] == trapezoidal integration of f over
   // spd_wavelengths.
   const std::vector<double> w = trapezoidal_weights(spd_wavelengths);
 
@@ -109,7 +109,7 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
   for (std::size_t ces_idx = 0; ces_idx < 99; ++ces_idx) {
     const auto &reflectance = ces_data.samples[ces_idx];
 
-    // TM-30-20 §3.6 Eq. (21)-(23): fused dot-product accumulators.
+    // TM-30-20 S3.6 Eq. (21)-(23): fused dot-product accumulators.
     double X = 0.0, Y = 0.0, Z = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
       X += reflectance[i] * swx[i];
@@ -117,7 +117,7 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
       Z += reflectance[i] * swz[i];
     }
 
-    // TM-30-20 §3.6 Eq. (21)-(23):
+    // TM-30-20 S3.6 Eq. (21)-(23):
     //   X_i = k * integral St(lambda) * R_i(lambda) * xbar10(lambda) dlambda
     //   Y_i = k * integral St(lambda) * R_i(lambda) * ybar10(lambda) dlambda
     //   Z_i = k * integral St(lambda) * R_i(lambda) * zbar10(lambda) dlambda
@@ -236,14 +236,14 @@ XyzTriple spd_to_xyz(const std::vector<double> &spd_wavelengths,
                                      cmf_resampled.y_bar, cmf_resampled.z_bar);
   // src.X = k*integral St*xbar, src.Y = k*integral St*ybar,
   // src.Z = k*integral St*zbar, where k = 100/integral St*ybar
-  // TM-30-20 §3.2 Eq. (1)-(4)
+  // TM-30-20 S3.2 Eq. (1)-(4)
   if (K.has_value()) {
     // Use caller-supplied multiplier: undo auto-k, apply K
-    // TM-30-20 §3.2 Eq. (4): k auto-computed; user K replaces it
-    double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+    // TM-30-20 S3.2 Eq. (4): k auto-computed; user K replaces it
+    double scale = K.value() / src.k; // TM-30-20 S3.2 Eq. (4)
     return XyzTriple{src.X * scale, src.Y * scale, src.Z * scale};
   } else {
-    // Auto: Y = 100 (TM-30-20 §3.2 Eq. (2))
+    // Auto: Y = 100 (TM-30-20 S3.2 Eq. (2))
     return XyzTriple{src.X, src.Y, src.Z};
   }
 }
@@ -266,7 +266,7 @@ spd_to_xyz_batch_prepared(const std::vector<double> &spd_wavelengths,
         compute_source_xyz(spd_wavelengths, vals, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);
     if (K.has_value()) {
-      double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+      double scale = K.value() / src.k; // TM-30-20 S3.2 Eq. (4)
       results.push_back(XyzTriple{src.X * scale, src.Y * scale, src.Z * scale});
     } else {
       results.push_back(XyzTriple{src.X, src.Y, src.Z});
@@ -304,7 +304,7 @@ spd_to_xyz_batch(const std::vector<double> &spd_wavelengths,
         compute_source_xyz(clip_wl, clip_vals, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);
     if (K.has_value()) {
-      double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+      double scale = K.value() / src.k; // TM-30-20 S3.2 Eq. (4)
       results.push_back(XyzTriple{src.X * scale, src.Y * scale, src.Z * scale});
     } else {
       results.push_back(XyzTriple{src.X, src.Y, src.Z});
@@ -365,7 +365,7 @@ XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
   SourceXyz src = compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
                                      cmf_resampled.y_bar, cmf_resampled.z_bar);
   if (K.has_value()) {
-    double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+    double scale = K.value() / src.k; // TM-30-20 S3.2 Eq. (4)
     return XyzTriple{src.X * scale, src.Y * scale, src.Z * scale};
   }
   return XyzTriple{src.X, src.Y, src.Z};
@@ -390,7 +390,7 @@ std::vector<XyzTriple> cct_to_xyz_batch_prepared(
         compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);
     if (K.has_value()) {
-      double scale = K.value() / src.k; // TM-30-20 §3.2 Eq. (4)
+      double scale = K.value() / src.k; // TM-30-20 S3.2 Eq. (4)
       results.push_back(XyzTriple{src.X * scale, src.Y * scale, src.Z * scale});
     } else {
       results.push_back(XyzTriple{src.X, src.Y, src.Z});
@@ -412,7 +412,7 @@ CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
                         const std::vector<double> &spd_values,
                         const CmfData &cmf_data,
                         const PlanckianLut &planckian_lut) {
-  // TM-30-20 §3.5: conform the SPD (drop samples outside 380-780 nm,
+  // TM-30-20 S3.5: conform the SPD (drop samples outside 380-780 nm,
   // zero-fill to cover the range, reject steps > 5 nm) before any
   // integration -- the same conformance the full pipeline applies, so
   // this entry point cannot yield a different CCT for the same source.
@@ -429,7 +429,7 @@ spd_to_cct_batch_prepared(const std::vector<double> &raw_wavelengths,
                           const std::vector<std::vector<double>> &spd_matrix,
                           const CmfData &cmf_resampled,
                           const PlanckianLut &planckian_lut) {
-  // Per-row §3.5 conformance. Spd is the single owner of the §3.5
+  // Per-row S3.5 conformance. Spd is the single owner of the S3.5
   // recipe -- do not inline a copy of it here for speed (that is the
   // drift the remediation removed); the planned ValidatedGrid refactor
   // removes the per-row grid cost instead
@@ -457,7 +457,7 @@ std::vector<CctDuvResult>
 spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
                  const std::vector<std::vector<double>> &spd_matrix,
                  const CmfData &cmf_data, const PlanckianLut &planckian_lut) {
-  // TM-30-20 §3.5 conformance, same as spd_to_cct. The shared grid is
+  // TM-30-20 S3.5 conformance, same as spd_to_cct. The shared grid is
   // conformed once via a unit-value probe so the CMF is resampled once;
   // rows are then handled by the prepared variant above.
   const Spd grid_probe(spd_wavelengths,

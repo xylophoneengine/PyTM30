@@ -1,7 +1,7 @@
 // Slice 3 - CCT and Duv via Ohno 2014 method (CIE 1931 2-deg observer).
 //
-// TM-30-20 §3.1: CCT uses CIE 1931 2-deg observer (exception).
-// TM-30-20 §3.3: CCT determination - Ohno 2013 method.
+// TM-30-20 S3.1: CCT uses CIE 1931 2-deg observer (exception).
+// TM-30-20 S3.3: CCT determination - Ohno 2013 method.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -65,7 +65,7 @@ XyzTriple compute_xyz_2deg(const std::vector<double> &spd_wl,
                            const CmfData &cmf_2deg) {
   // Resample CMFs to the SPD wavelength grid.
   // The SPD may be at 1nm or 5nm; CMFs are at 1nm.
-  // TM-30-20 §3.5: CMFs should be interpolated to the test source increment.
+  // TM-30-20 S3.5: CMFs should be interpolated to the test source increment.
   CmfData cmf_resampled = resample_cmf(spd_wl, cmf_2deg);
   SourceXyz src = compute_source_xyz(spd_wl, spd_vals, cmf_resampled.x_bar,
                                      cmf_resampled.y_bar, cmf_resampled.z_bar);
@@ -158,7 +158,7 @@ TEST_CASE("CCT - D65 (2-deg observer)", "[cct][slice03]") {
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult result = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
 
-  // TM-30-20 §3.3: D65 should be near 6500 K
+  // TM-30-20 S3.3: D65 should be near 6500 K
   // tools/oracle_recompute_12.py: CCT=6501.8485, Duv=0.00321508
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 6501.8485));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00321508));
@@ -172,7 +172,7 @@ TEST_CASE("CCT - Illuminant A (2-deg observer)", "[cct][slice03]") {
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult result = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
 
-  // TM-30-20 §3.3: Illuminant A should be near 2856 K
+  // TM-30-20 S3.3: Illuminant A should be near 2856 K
   // tools/oracle_recompute_12.py: CCT=2855.5796, Duv=0.00000332
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 2855.5796));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.00000332));
@@ -568,7 +568,7 @@ TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
 }
 
 // -------------------------------------------------------------------------
-// spd_to_cct §3.5 conformance (grid handling identical to the pipeline)
+// spd_to_cct S3.5 conformance (grid handling identical to the pipeline)
 // -------------------------------------------------------------------------
 
 TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per TM-30-20 3.5",
@@ -577,7 +577,7 @@ TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per TM-30-20 3.5",
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
-  // Slice the bundled D65 down to the §3.5 minimum range 400-700 nm.
+  // Slice the bundled D65 down to the S3.5 minimum range 400-700 nm.
   std::vector<double> wl_narrow, vals_narrow;
   for (std::size_t i = 0; i < wl_full.size(); ++i) {
     if (wl_full[i] >= 400.0 && wl_full[i] <= 700.0) {
@@ -587,7 +587,7 @@ TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per TM-30-20 3.5",
   }
   REQUIRE(wl_narrow.size() == 301);
 
-  // Hand-build the §3.5-conformed equivalent: full 380-780 grid, zeros
+  // Hand-build the S3.5-conformed equivalent: full 380-780 grid, zeros
   // outside 400-700.
   std::vector<double> vals_padded(wl_full.size(), 0.0);
   for (std::size_t i = 0; i < wl_full.size(); ++i) {
@@ -657,7 +657,7 @@ TEST_CASE("CCT - spd_to_cct_batch_prepared matches spd_to_cct_batch "
   CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
-  // Narrow grid so the §3.5 conform is not the identity.
+  // Narrow grid so the S3.5 conform is not the identity.
   std::vector<double> wl_narrow, d65_narrow, a_narrow;
   for (std::size_t i = 0; i < wl_full.size(); ++i) {
     if (wl_full[i] >= 400.0 && wl_full[i] <= 700.0) {

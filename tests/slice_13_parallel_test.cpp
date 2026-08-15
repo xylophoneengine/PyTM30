@@ -675,13 +675,13 @@ TEST_CASE("Parallel - persistent workers: plain path bit-identical, and "
 }
 
 // ======================================================================
-//  Cached path vs TM-30-20 §3.5 grid conformance
+//  Cached path vs TM-30-20 S3.5 grid conformance
 // ======================================================================
 
 TEST_CASE("Cached path - narrow bound grid conforms like Spd",
           "[parallel][slice13][cached][spd]") {
   // A 400-700 nm @ 5 nm input grid is zero-filled to 380-780 nm inside
-  // Spd (TM-30-20 §3.5). The cached tables must be resampled to that
+  // Spd (TM-30-20 S3.5). The cached tables must be resampled to that
   // SAME conformed grid, or per-row values and tables misalign. Binding
   // through an Spd probe (as the Python layer does) and comparing the
   // cached result against the plain per-row path must be bit-identical.

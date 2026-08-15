@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # -- MSVC source encoding -------------------------------------------------
-# 40 tracked sources carry U+00A7 in spec citations ("TM-30-20 §4.5") -- the
+# 40 tracked sources carry U+00A7 in spec citations ("TM-30-20 S4.5") -- the
 # one non-ASCII glyph tools/fix_unicode.py preserves, because
 # tools/check_constants.py matches the literal glyph. Without /utf-8, MSVC
 # decodes source in the active code page and emits C4819 for every one of

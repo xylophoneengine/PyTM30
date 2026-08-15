@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file reference.hpp
-/// Reference illuminant generation per TM-30-20 §3.3.
+/// Reference illuminant generation per TM-30-20 S3.3.
 ///
 /// Provides Planckian radiation (Tt <= 4000 K), CIE D-series daylight
 /// (Tt >= 5000 K), and the proportional blend (4000 K < Tt < 5000 K).
@@ -15,7 +15,7 @@ namespace tm30 {
 /// CIE 15:2004 Table T.2.
 ///
 /// Values are at 5 nm intervals from 380 to 780 nm.
-/// TM-30-20 §3.3: CIE Daylight D Series
+/// TM-30-20 S3.3: CIE Daylight D Series
 struct DaylightBasis {
   std::vector<double> wavelengths; // 380, 385, ..., 780 nm
   std::vector<double> S0;
@@ -37,7 +37,7 @@ DaylightBasis load_daylight_basis(const std::string &filepath);
 /// @param wavelengths Wavelength grid (nm), monotonically increasing.
 /// @return            SPD values at each wavelength, normalized at 560 nm.
 ///
-/// TM-30-20 §3.3 Eq. (5)-(6)
+/// TM-30-20 S3.3 Eq. (5)-(6)
 std::vector<double> generate_planckian(double cct,
                                        const std::vector<double> &wavelengths);
 
@@ -50,7 +50,7 @@ std::vector<double> generate_planckian(double cct,
 /// generate_reference_spd() with already_resampled=true, instead of
 /// re-interpolating it on every call.
 ///
-/// TM-30-20 §3.5 requires linear interpolation.
+/// TM-30-20 S3.5 requires linear interpolation.
 DaylightBasis
 resample_daylight_basis(const std::vector<double> &target_wavelengths,
                         const DaylightBasis &basis);
@@ -75,7 +75,7 @@ resample_daylight_basis(const std::vector<double> &target_wavelengths,
 ///                    existing behavior for all current callers.
 /// @return            SPD values at each wavelength, normalized at 560 nm.
 ///
-/// TM-30-20 §3.3 Eq. (7)-(12)
+/// TM-30-20 S3.3 Eq. (7)-(12)
 std::vector<double> generate_cie_d(double cct,
                                    const std::vector<double> &wavelengths,
                                    const DaylightBasis &basis,
@@ -83,13 +83,13 @@ std::vector<double> generate_cie_d(double cct,
 
 /// Generate the reference illuminant SPD for a test source with the given CCT.
 ///
-/// Selection rules (TM-30-20 §3.3):
+/// Selection rules (TM-30-20 S3.3):
 ///   - Tt <= 4000 K  -> pure Planckian               // Eq. (14)
 ///   - 4000 K < Tt < 5000 K -> proportional blend    // Eq. (15)
 ///   - Tt >= 5000 K  -> pure CIE D-series             // Eq. (16)
 ///
 /// For the blend, each component is Y-normalized to 100 (CIE 1964 10-deg)
-/// before blending per the normative requirement in §3.3.
+/// before blending per the normative requirement in S3.3.
 /// The returned SPD is re-normalized at 560 nm (value = 1.0).
 ///
 /// @param cct         Correlated color temperature of the test source (K).
@@ -102,7 +102,7 @@ std::vector<double> generate_cie_d(double cct,
 ///                    Defaults to false, preserving existing behavior.
 /// @return            Reference illuminant SPD, normalized at 560 nm.
 ///
-/// TM-30-20 §3.3 Eq. (13)-(16)
+/// TM-30-20 S3.3 Eq. (13)-(16)
 std::vector<double>
 generate_reference_spd(double cct, const std::vector<double> &wavelengths,
                        const DaylightBasis &basis,

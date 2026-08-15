@@ -7,10 +7,10 @@
 /// under a given source SPD, using the CIE 1964 10-deg standard colorimetric
 /// observer.
 ///
-/// TM-30-20 §3.1: Colorimetric Observer - all color rendition calculations
+/// TM-30-20 S3.1: Colorimetric Observer - all color rendition calculations
 ///                use the CIE 1964 10-deg standard colorimetric observer.
-/// TM-30-20 §3.2: Test Source - tristimulus values for the source itself.
-/// TM-30-20 §3.6: Calculation of Tristimulus Values - CES tristimulus values.
+/// TM-30-20 S3.2: Test Source - tristimulus values for the source itself.
+/// TM-30-20 S3.6: Calculation of Tristimulus Values - CES tristimulus values.
 
 #include <array>
 #include <cstddef>
@@ -38,16 +38,16 @@ struct XyzTriple {
 /// Y should equal 100.0 exactly (within floating-point precision)
 /// due to the normalisation.
 ///
-/// TM-30-20 §3.2: Eq. (1)-(4)
+/// TM-30-20 S3.2: Eq. (1)-(4)
 struct SourceXyz {
-  // TM-30-20 §3.2: Eq. (1)-(3) - source tristimulus values
-  double X; // TM-30-20 §3.2 Eq. (1)
-  double Y; // TM-30-20 §3.2 Eq. (2)
-  double Z; // TM-30-20 §3.2 Eq. (3)
+  // TM-30-20 S3.2: Eq. (1)-(3) - source tristimulus values
+  double X; // TM-30-20 S3.2 Eq. (1)
+  double Y; // TM-30-20 S3.2 Eq. (2)
+  double Z; // TM-30-20 S3.2 Eq. (3)
 
-  // TM-30-20 §3.2 Eq. (4): kt = 100 / integral St(lambda) * ybar10(lambda)
+  // TM-30-20 S3.2 Eq. (4): kt = 100 / integral St(lambda) * ybar10(lambda)
   // dlambda
-  double k; // TM-30-20 §3.2 Eq. (4)
+  double k; // TM-30-20 S3.2 Eq. (4)
 };
 
 /// Compute the source's own tristimulus values and normalisation constant.
@@ -64,7 +64,7 @@ struct SourceXyz {
 ///
 /// @return SourceXyz with X, Y, Z (Y = 100.0) and normalisation constant k.
 ///
-/// TM-30-20 §3.2: Eq. (1)-(4)
+/// TM-30-20 S3.2: Eq. (1)-(4)
 SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
                              const std::vector<double> &spd_values,
                              const std::vector<double> &cmf_x_bar,
@@ -89,7 +89,7 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
 ///
 /// @return Array of 99 XyzTriple values.
 ///
-/// TM-30-20 §3.6: Eq. (21)-(24)
+/// TM-30-20 S3.6: Eq. (21)-(24)
 std::array<XyzTriple, 99>
 compute_ces_xyz(const std::vector<double> &spd_wavelengths,
                 const std::vector<double> &spd_values, const CesData &ces_data,
@@ -111,7 +111,7 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
 /// @param K                Normalisation constant.
 ///                         If std::nullopt (default): auto-compute k =
 ///                         100/integral St*ybar dlambda
-///                           -> Y = 100 (TM-30-20 §3.2 Eq. 4).
+///                           -> Y = 100 (TM-30-20 S3.2 Eq. 4).
 ///                         If a value is provided, it is used directly as the
 ///                           multiplier for the raw tristimulus integrals.
 ///                           K = 1.0 returns raw integrals.
@@ -212,10 +212,10 @@ spd_to_Yuv_batch_prepared(const std::vector<double> &spd_wavelengths,
 /// @return      Vector of YuvTriple (one per input triple).
 std::vector<YuvTriple> xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs);
 
-/// Compute XYZ tristimulus values for the TM-30-20 §3.3 reference
+/// Compute XYZ tristimulus values for the TM-30-20 S3.3 reference
 /// illuminant at a given CCT.
 ///
-/// Chains generate_reference_spd() (TM-30-20 §3.3 Eq. (13)-(16):
+/// Chains generate_reference_spd() (TM-30-20 S3.3 Eq. (13)-(16):
 /// Planckian for Tt<=4000K, CIE D-series for Tt>=5000K, proportional blend
 /// between) with the same tristimulus-integration logic spd_to_xyz() uses.
 /// The same cmf_data is used both for the reference SPD's internal
@@ -264,16 +264,16 @@ std::vector<XyzTriple> cct_to_xyz_batch_prepared(
 
 /// Compute CCT and Duv from an SPD, with automatic CMF resampling.
 ///
-/// TM-30-20 §3.1 exception: CCT determination uses the CIE 1931 2-deg
+/// TM-30-20 S3.1 exception: CCT determination uses the CIE 1931 2-deg
 /// observer, not the 1964 10-deg observer used everywhere else in this
 /// library - `cmf_data` here must be 2-deg. Chains compute_source_xyz
-/// (2-deg XYZ) -> compute_cct_duv_from_xyz (Ohno 2014, TM-30-20 §3.3).
+/// (2-deg XYZ) -> compute_cct_duv_from_xyz (Ohno 2014, TM-30-20 S3.3).
 ///
 /// No K/lambda_min/lambda_max: CCT/Duv come from (u,v) chromaticity, which
 /// is scale-invariant, so K has no effect; lambda_min/max have no
 /// motivating truncation use case (same reasoning as cct_to_xyz above).
 ///
-/// The SPD is §3.5-conformed before integration (Spd construction:
+/// The SPD is S3.5-conformed before integration (Spd construction:
 /// samples outside 380-780 nm dropped, missing edges zero-filled, steps
 /// > 5 nm rejected) -- identical treatment to the full pipeline.
 ///
@@ -282,7 +282,7 @@ std::vector<XyzTriple> cct_to_xyz_batch_prepared(
 /// @param cmf_data        CIE 1931 2-deg CMF data (resampled internally).
 /// @param planckian_lut   Pre-computed Planckian locus LUT.
 /// @return                CctDuvResult with cct (K) and duv.
-/// @throws InvalidSpd     if the SPD fails §3.5 validation.
+/// @throws InvalidSpd     if the SPD fails S3.5 validation.
 CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
                         const std::vector<double> &spd_values,
                         const CmfData &cmf_data,
@@ -290,17 +290,17 @@ CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,
 
 /// Compute spd_to_cct() for multiple SPDs sharing one wavelength grid.
 ///
-/// Resamples the 2-deg CMF once (against the §3.5-conformed shared
+/// Resamples the 2-deg CMF once (against the S3.5-conformed shared
 /// grid), reused for every SPD in the batch - same
 /// resample-once-loop-many pattern as spd_to_xyz_batch. Each row is
-/// §3.5-conformed exactly like the single-SPD overload.
+/// S3.5-conformed exactly like the single-SPD overload.
 ///
 /// @param spd_wavelengths SPD wavelength grid (nm), shared by all SPDs.
 /// @param spd_matrix      Vector of SPD value vectors (one per SPD).
 /// @param cmf_data        CIE 1931 2-deg CMF data.
 /// @param planckian_lut   Pre-computed Planckian locus LUT.
 /// @return                Vector of CctDuvResult (one per SPD).
-/// @throws InvalidSpd     if the grid or any row fails §3.5 validation.
+/// @throws InvalidSpd     if the grid or any row fails S3.5 validation.
 std::vector<CctDuvResult>
 spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
                  const std::vector<std::vector<double>> &spd_matrix,
@@ -309,12 +309,12 @@ spd_to_cct_batch(const std::vector<double> &spd_wavelengths,
 /// spd_to_cct_batch() with the per-grid work already done, for callers
 /// that evaluate many batches on one grid (e.g. the Python bindings'
 /// per-grid cache): `cmf_resampled` must be the 2-deg CMF resampled to
-/// the §3.5-conformed form of `raw_wavelengths` (i.e. to
+/// the S3.5-conformed form of `raw_wavelengths` (i.e. to
 /// `Spd(raw_wavelengths, ...).wavelengths()`). Each row is still
-/// §3.5-validated and conformed via Spd; a size mismatch between the
+/// S3.5-validated and conformed via Spd; a size mismatch between the
 /// conformed grid and `cmf_resampled` throws std::invalid_argument.
 ///
-/// @throws InvalidSpd if the grid or any row fails §3.5 validation.
+/// @throws InvalidSpd if the grid or any row fails S3.5 validation.
 std::vector<CctDuvResult>
 spd_to_cct_batch_prepared(const std::vector<double> &raw_wavelengths,
                           const std::vector<std::vector<double>> &spd_matrix,

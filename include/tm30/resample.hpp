@@ -6,7 +6,7 @@
 /// Resamples CES reflectance functions and CIE 1964 10-deg CMFs to match
 /// the test SPD's wavelength grid. The test SPD itself is never interpolated.
 ///
-/// TM-30-20 §3.5: Interpolation Rules
+/// TM-30-20 S3.5: Interpolation Rules
 
 #include <cstddef>
 #include <vector>
@@ -20,7 +20,7 @@ struct CesData {
 };
 
 /// CIE 1964 10-deg CMF data: wavelength + xbar10, ybar10, zbar10.
-/// TM-30-20 §3.1: CIE 1964 10-deg standard colorimetric observer.
+/// TM-30-20 S3.1: CIE 1964 10-deg standard colorimetric observer.
 struct CmfData {
   std::vector<double> wavelengths; // N source wavelengths
   std::vector<double> x_bar;       // xbar10(lambda)
@@ -34,7 +34,7 @@ struct CmfData {
 ///   lambda < first CES lambda  -> first CES value
 ///   lambda > last CES lambda   -> last CES value
 ///
-/// TM-30-20 §3.5 requires linear interpolation.
+/// TM-30-20 S3.5 requires linear interpolation.
 CesData resample_ces(const std::vector<double> &target_wavelengths,
                      const CesData &source);
 

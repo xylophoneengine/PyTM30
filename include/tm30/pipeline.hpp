@@ -12,8 +12,8 @@
 ///   6. Compute source XYZ for reference -> normalisation kr
 ///   7. Compute CES XYZ under reference illuminant
 ///
-/// TM-30-20 §3.4: Color Evaluation Samples
-/// TM-30-20 §3.6: Calculation of Tristimulus Values
+/// TM-30-20 S3.4: Color Evaluation Samples
+/// TM-30-20 S3.6: Calculation of Tristimulus Values
 
 #include <array>
 #include <vector>
@@ -31,32 +31,32 @@ namespace tm30 {
 
 /// Complete result of the CES colorimetry pipeline for a single test SPD.
 ///
-/// TM-30-20 §3.3: CCT, Duv
-/// TM-30-20 §3.3: Reference illuminant SPD
-/// TM-30-20 §3.6: Eq. (21)-(23) - CES tristimulus values under test source
-/// TM-30-20 §3.6: Eq. (25)-(27) - CES tristimulus values under reference
+/// TM-30-20 S3.3: CCT, Duv
+/// TM-30-20 S3.3: Reference illuminant SPD
+/// TM-30-20 S3.6: Eq. (21)-(23) - CES tristimulus values under test source
+/// TM-30-20 S3.6: Eq. (25)-(27) - CES tristimulus values under reference
 struct CesColorimetryResult {
-  double cct;                               // TM-30-20 §3.3
-  double duv;                               // TM-30-20 §3.3
+  double cct;                               // TM-30-20 S3.3
+  double duv;                               // TM-30-20 S3.3
   std::vector<double> reference_spd_values; // Reference illuminant SPD values
-                                            // TM-30-20 §3.3 Eq. (13)-(16)
-  std::array<XyzTriple, 99> xyz_test_ces;   // TM-30-20 §3.6 Eq. (21)-(23)
-  std::array<XyzTriple, 99> xyz_ref_ces;    // TM-30-20 §3.6 Eq. (25)-(27)
-  std::array<Cam02Ucs, 99> jab_test_ces;    // TM-30-20 §3.7.1 (test adaptation)
+                                            // TM-30-20 S3.3 Eq. (13)-(16)
+  std::array<XyzTriple, 99> xyz_test_ces;   // TM-30-20 S3.6 Eq. (21)-(23)
+  std::array<XyzTriple, 99> xyz_ref_ces;    // TM-30-20 S3.6 Eq. (25)-(27)
+  std::array<Cam02Ucs, 99> jab_test_ces;    // TM-30-20 S3.7.1 (test adaptation)
   std::array<Cam02Ucs, 99>
-      jab_ref_ces;    // TM-30-20 §3.7.1 (reference adaptation)
-  HueBins hue_bins;   // TM-30-20 §4.3 (16 hue-angle bins)
-  double delta_e_avg; // TM-30-20 §4.1 - mean of 99 dE' values
-  double Rf;          // TM-30-20 §4.1 Eq. (54) - fidelity index
-  GamutResult gamut;  // TM-30-20 §4.4-§4.8 - gamut, local metrics, CVG
+      jab_ref_ces;    // TM-30-20 S3.7.1 (reference adaptation)
+  HueBins hue_bins;   // TM-30-20 S4.3 (16 hue-angle bins)
+  double delta_e_avg; // TM-30-20 S4.1 - mean of 99 dE' values
+  double Rf;          // TM-30-20 S4.1 Eq. (54) - fidelity index
+  GamutResult gamut;  // TM-30-20 S4.4-S4.8 - gamut, local metrics, CVG
   std::array<double, 99>
-      rf_cesi;    // TM-30-20 §4.2 Eq. (56) - per-sample fidelity
-  double rf_skin; // TM-30-20 §4.2 - skin fidelity (CES15+18 avg)
+      rf_cesi;    // TM-30-20 S4.2 Eq. (56) - per-sample fidelity
+  double rf_skin; // TM-30-20 S4.2 - skin fidelity (CES15+18 avg)
 };
 
 /// Run the full CES colorimetry pipeline for a test SPD.
 ///
-/// Steps (TM-30-20 §3.4, §3.6):
+/// Steps (TM-30-20 S3.4, S3.6):
 ///   1. Resample CES reflectance data to the SPD wavelength grid.
 ///   2. Resample both 2-deg and 10-deg CMF data to the SPD wavelength grid.
 ///   3. Compute the test source's own 2-deg XYZ -> CCT and Duv.
@@ -82,7 +82,7 @@ struct CesColorimetryResult {
 /// @return CesColorimetryResult with CCT, Duv, reference SPD, and all CES XYZ
 /// values.
 ///
-/// TM-30-20 §3.4, §3.6
+/// TM-30-20 S3.4, S3.6
 CesColorimetryResult compute_ces_colorimetry(
     const std::vector<double> &spd_wavelengths,
     const std::vector<double> &spd_values, const CmfData &cmf_2deg,

@@ -1,7 +1,7 @@
 // Tests for spd_to_xyz, spd_to_Yuv, and xyz_to_Yuv convenience functions.
 //
-// CIE 15:2004 §8.2.1: CIE 1976 Y,u',v'
-// TM-30-20 §3.2: Test Source Tristimulus Values
+// CIE 15:2004 S8.2.1: CIE 1976 Y,u',v'
+// TM-30-20 S3.2: Test Source Tristimulus Values
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -70,7 +70,7 @@ std::vector<double> full_1nm_grid() {
 // -------------------------------------------------------------------------
 
 TEST_CASE("xyz_to_Yuv - known XYZ values", "[xyz][Yuv]") {
-  // CIE 15:2004 §8.2.1: u' = 4X/(X+15Y+3Z), v' = 9Y/(X+15Y+3Z)
+  // CIE 15:2004 S8.2.1: u' = 4X/(X+15Y+3Z), v' = 9Y/(X+15Y+3Z)
 
   // Equal-energy white: X=Y=Z=100
   YuvTriple eew = xyz_to_Yuv(100.0, 100.0, 100.0);
@@ -161,7 +161,7 @@ TEST_CASE("spd_to_xyz - D65 agrees with compute_source_xyz",
   REQUIRE_THAT(xyz.Y, Catch::Matchers::WithinAbs(src.Y, 1e-14));
   REQUIRE_THAT(xyz.Z, Catch::Matchers::WithinAbs(src.Z, 1e-14));
 
-  // Y must be 100 - TM-30-20 §3.2 Eq. (2)
+  // Y must be 100 - TM-30-20 S3.2 Eq. (2)
   REQUIRE_THAT(xyz.Y, WithinTolerance(Tol_Xyz, 100.0));
 }
 
@@ -171,7 +171,7 @@ TEST_CASE("spd_to_xyz - Illuminant A", "[xyz][spd_to_xyz]") {
 
   XyzTriple xyz = spd_to_xyz(spd_wl, spd_vals, cmf);
 
-  // Y = 100 - TM-30-20 §3.2 Eq. (2)
+  // Y = 100 - TM-30-20 S3.2 Eq. (2)
   REQUIRE_THAT(xyz.Y, WithinTolerance(Tol_Xyz, 100.0));
 
   // Golden values from compute_source_xyz (verified in slice_02_xyz_test)
@@ -324,7 +324,7 @@ TEST_CASE("spd_to_xyz - K=nullopt returns Y=100", "[xyz][K]") {
   std::vector<double> vals(wl.size(), 1.0); // flat SPD
 
   XyzTriple xyz = spd_to_xyz(wl, vals, cmf); // K = std::nullopt
-  // TM-30-20 §3.2 Eq. (2): Y = 100
+  // TM-30-20 S3.2 Eq. (2): Y = 100
   REQUIRE_THAT(xyz.Y, WithinTolerance(Tol_Xyz, 100.0));
 }
 
@@ -501,7 +501,7 @@ TEST_CASE("cct_to_xyz - matches manual generate_reference_spd + spd_to_xyz "
   auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
   CmfData cmf = load_cmf(data_path("cmf_1964_10.csv"));
 
-  // Covers all three TM-30-20 §3.3 branches: pure Planckian (<=4000K),
+  // Covers all three TM-30-20 S3.3 branches: pure Planckian (<=4000K),
   // blend (4000-5000K), pure CIE D-series (>=5000K).
   for (double cct : {2700.0, 3500.0, 4000.0, 4500.0, 5000.0, 6500.0, 9000.0}) {
     XyzTriple actual = cct_to_xyz(cct, wl, basis, cmf);

@@ -4,7 +4,7 @@
 /// Simple runtime CSV loader for spectral data tables.
 /// Reads data/ces.csv and data/cmf_1964_10.csv at 1 nm or 5 nm resolution.
 ///
-/// TM-30-20 §3.5: CES reflectance functions provided in 1-nm increments.
+/// TM-30-20 S3.5: CES reflectance functions provided in 1-nm increments.
 
 #include <string>
 #include <vector>

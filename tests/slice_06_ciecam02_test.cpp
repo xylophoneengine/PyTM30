@@ -2,7 +2,7 @@
 // Validates CAM02-UCS J'a'b' coordinates against golden fixtures,
 // self-consistency, known-value, and matrix spot-checks.
 //
-// TM-30-20 §3.7: Color Space and Chromatic Adaptation Transformation
+// TM-30-20 S3.7: Color Space and Chromatic Adaptation Transformation
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -493,7 +493,7 @@ TEST_CASE("CIECAM02 - D65_1nm ref CES J'a'b' matches golden fixtures",
 // Planckian at the computed CCT. Due to Ohno 2014 CCT solver imprecision,
 // the test and reference white points differ slightly (dCCT ~= 0.03 K),
 // causing small J'a'b' differences. The test verifies these are bounded.
-// TM-30-20 §3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
+// TM-30-20 S3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
 // -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ~= reference",
@@ -510,7 +510,7 @@ TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ~= reference",
   // The CCT solver does not recover exactly 3000.0 K for a Planckian
   // source (~= 3000.03 K), so test and reference white points differ
   // slightly. A tolerance of 1e-3 absorbs this CCT solver imprecision.
-  // TM-30-20 §3.3
+  // TM-30-20 S3.3
   constexpr double self_consistency_tol = 1.0e-3;
 
   double max_J = 0.0, max_a = 0.0, max_b = 0.0;
@@ -547,13 +547,13 @@ TEST_CASE("CIECAM02 - planckian 3000K self-consistency: test ~= reference",
 // The CAT02 matrix was developed for the CIE 1931 2-deg observer; using it
 // with 10-deg observer XYZ introduces a small systematic error that makes
 // the white point not perfectly achromatic. This is a known spec behavior
-// (TM-30-20 §3.7.1 footnote). The test verifies that a' and b' are small.
+// (TM-30-20 S3.7.1 footnote). The test verifies that a' and b' are small.
 // -------------------------------------------------------------------------
 
 TEST_CASE("CIECAM02 - D65 white point is approximately achromatic",
           "[ciecam02][slice06]") {
   // D65 test white (10-deg observer)
-  // TM-30-20 §3.7.1
+  // TM-30-20 S3.7.1
   const XyzTriple d65_white{94.81073156061144, 100.0, 107.30398114475764};
 
   // Feed the white point as its own sample
@@ -563,11 +563,11 @@ TEST_CASE("CIECAM02 - D65 white point is approximately achromatic",
   auto result = ciecam02_forward(d65_white, samples);
 
   // White point adapting to itself: J' ~= 100
-  // TM-30-20 §3.7.1 Eq. (48): with J=100, J' = (1+0.7)*100/(1+0.007*100) = 100
+  // TM-30-20 S3.7.1 Eq. (48): with J=100, J' = (1+0.7)*100/(1+0.007*100) = 100
   CHECK_THAT(result[0].J_prime, WithinTolerance(Tol_Jab, 100.0));
 
   // a' and b' should be near zero.
-  // Due to 2-deg/10-deg observer mismatch (TM-30-20 §3.7.1 footnote),
+  // Due to 2-deg/10-deg observer mismatch (TM-30-20 S3.7.1 footnote),
   // |a'| is typically ~6e-3 and |b'| ~7e-4.
   // We use a generous tolerance appropriate for this known behavior.
   constexpr double white_achromatic_tol = 1.0e-2;
@@ -585,7 +585,7 @@ TEST_CASE("CIECAM02 - D65 white point is approximately achromatic",
 TEST_CASE("CIECAM02 - D65 reference white point is approximately achromatic",
           "[ciecam02][slice06]") {
   // D65 reference white (10-deg observer)
-  // TM-30-20 §3.7.1
+  // TM-30-20 S3.7.1
   const XyzTriple d65_ref_white{94.81132408844627, 100.0, 107.2894523722905};
 
   std::array<XyzTriple, 99> samples;
@@ -611,7 +611,7 @@ TEST_CASE("CIECAM02 - D65 reference white point is approximately achromatic",
 
 TEST_CASE("CIECAM02 - MCAT02 matrix spot-check", "[ciecam02][slice06]") {
   // Test: D65 test white XYZ -> RGB via MCAT02
-  // TM-30-20 §3.7.1 Eq. (29)-(30)
+  // TM-30-20 S3.7.1 Eq. (29)-(30)
   // Hand-computed (Python numpy):
   //   MCAT02 @ [94.81073156, 100.0, 107.30398114]
   //   = [95.01113755, 103.69572356, 107.16716725]

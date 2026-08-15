@@ -1,5 +1,5 @@
 // Trapezoidal integration over wavelength grids.
-// TM-30-20 §3.6: Calculation of Tristimulus Values
+// TM-30-20 S3.6: Calculation of Tristimulus Values
 #include "tm30/integrate.hpp"
 
 #include <cstddef>
@@ -24,11 +24,11 @@ double trapezoidal_integrate(const std::vector<double> &wavelengths,
                                 "integrand must have the same size");
   }
 
-  // TM-30-20 §3.6: trapezoidal integration for tristimulus values
+  // TM-30-20 S3.6: trapezoidal integration for tristimulus values
   double integral = 0.0;
 
   for (std::size_t i = 0; i < n - 1; ++i) {
-    // TM-30-20 §3.6: dlambda per segment
+    // TM-30-20 S3.6: dlambda per segment
     const double dw = wavelengths[i + 1] - wavelengths[i];
     const double avg = 0.5 * (integrand[i] + integrand[i + 1]);
     integral += avg * dw;
@@ -50,21 +50,21 @@ trapezoidal_weights(const std::vector<double> &wavelengths) {
   std::vector<double> weights(n);
 
   // First point: w[0] = 0.5 * (lambda[1] - lambda[0])
-  weights[0] = 0.5 * (wavelengths[1] - wavelengths[0]); // TM-30-20 §3.6
+  weights[0] = 0.5 * (wavelengths[1] - wavelengths[0]); // TM-30-20 S3.6
 
   // Interior points:
   //   w[i] = 0.5 * ((lambda[i] - lambda[i-1]) + (lambda[i+1] - lambda[i]))
   for (std::size_t i = 1; i < n - 1; ++i) {
     const double left_width =
-        wavelengths[i] - wavelengths[i - 1]; // TM-30-20 §3.6
+        wavelengths[i] - wavelengths[i - 1]; // TM-30-20 S3.6
     const double right_width =
-        wavelengths[i + 1] - wavelengths[i];       // TM-30-20 §3.6
-    weights[i] = 0.5 * (left_width + right_width); // TM-30-20 §3.6
+        wavelengths[i + 1] - wavelengths[i];       // TM-30-20 S3.6
+    weights[i] = 0.5 * (left_width + right_width); // TM-30-20 S3.6
   }
 
   // Last point: w[n-1] = 0.5 * (lambda[n-1] - lambda[n-2])
   weights[n - 1] =
-      0.5 * (wavelengths[n - 1] - wavelengths[n - 2]); // TM-30-20 §3.6
+      0.5 * (wavelengths[n - 1] - wavelengths[n - 2]); // TM-30-20 S3.6
 
   return weights;
 }

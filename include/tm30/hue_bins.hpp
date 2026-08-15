@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file hue_bins.hpp
-/// TM-30-20 §4.3: Hue-Angle Bin assignment for 99 CES.
+/// TM-30-20 S4.3: Hue-Angle Bin assignment for 99 CES.
 ///
 /// Divides the a'-b' plane into 16 equal hue-angle bins of 22.5-deg each,
 /// starting at 0-deg (positive a' axis). Each CES is assigned to a bin
@@ -19,7 +19,7 @@ namespace tm30 {
 /// Bin j (0-indexed, j = 0...15) spans [(j x 22.5-deg), ((j+1) x 22.5-deg)) in
 /// the a'-b' plane. Bin 15 spans [337.5-deg, 360.0-deg] inclusive.
 ///
-/// TM-30-20 §4.3, Figure 3
+/// TM-30-20 S4.3, Figure 3
 using HueBins = std::array<std::vector<int>, 16>;
 
 /// Assign 99 CES to 16 hue-angle bins based on reference hue angle.
@@ -29,7 +29,7 @@ using HueBins = std::array<std::vector<int>, 16>;
 ///   bin = floor(hr / (pi/8))     // 22.5-deg = pi/8 rad per bin
 ///   Clamp to 15 to handle hr -> 2pi (== 0-deg)
 ///
-/// Boundary tie-break per TM-30-20 §4.3:
+/// Boundary tie-break per TM-30-20 S4.3:
 ///   Half-open intervals [start, end) - the boundary value belongs to
 ///   the bin starting at that angle (higher bin index).
 ///   Bin 16 (0-indexed: 15) spans [337.5-deg, 360.0-deg] inclusive.
@@ -38,7 +38,7 @@ using HueBins = std::array<std::vector<int>, 16>;
 /// CES).
 /// @return 16 vectors of 0-based CES indices, one per hue-angle bin.
 ///
-/// TM-30-20 §4.3 + Figure 3
+/// TM-30-20 S4.3 + Figure 3
 HueBins bin_by_hue(const std::array<Cam02Ucs, 99> &jab_ref);
 
 } // namespace tm30

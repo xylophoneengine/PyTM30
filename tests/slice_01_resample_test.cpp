@@ -1,7 +1,7 @@
 // Slice 1 - SPD container + CIE 15:2018 resampling tests.
 //
-// TM-30-20 §3.5: Range and Interpolation of Data
-// TM-30-20 §3.2: Test Source Integration
+// TM-30-20 S3.5: Range and Interpolation of Data
+// TM-30-20 S3.2: Test Source Integration
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -71,7 +71,7 @@ CmfData load_cmf(const std::string &path) {
 /// resampling.
 Spd make_test_spd(const std::vector<double> &wavelengths) {
   std::vector<double> values(wavelengths.size(),
-                             1.0); // TM-30-20 §3.2: St(lambda)
+                             1.0); // TM-30-20 S3.2: St(lambda)
   return Spd(wavelengths, values);
 }
 
@@ -92,7 +92,7 @@ TEST_CASE("SPD construction - valid 1nm grid", "[spd][slice01]") {
   std::vector<double> wl(401);
   std::vector<double> vals(401, 1.0);
   for (int i = 0; i < 401; ++i) {
-    wl[i] = 380.0 + static_cast<double>(i); // TM-30-20 §3.5: 380-780 nm
+    wl[i] = 380.0 + static_cast<double>(i); // TM-30-20 S3.5: 380-780 nm
   }
 
   Spd spd(wl, vals);
@@ -107,7 +107,7 @@ TEST_CASE("SPD construction - valid 5nm grid", "[spd][slice01]") {
   std::vector<double> wl(81);
   std::vector<double> vals(81, 1.0);
   for (int i = 0; i < 81; ++i) {
-    wl[i] = 380.0 + static_cast<double>(i) * 5.0; // TM-30-20 §3.5
+    wl[i] = 380.0 + static_cast<double>(i) * 5.0; // TM-30-20 S3.5
   }
 
   Spd spd(wl, vals);
@@ -120,7 +120,7 @@ TEST_CASE("SPD construction - valid 5nm grid", "[spd][slice01]") {
 
 TEST_CASE("SPD construction - non-uniform grid returns step 0",
           "[spd][slice01]") {
-  // TM-30-20 §3.5: Minimum required range is 400-700 nm.
+  // TM-30-20 S3.5: Minimum required range is 400-700 nm.
   // Grid covers the range but with non-uniform spacing (5 nm then 2 nm,
   // both within the 5 nm maximum increment).
   std::vector<double> wl;
@@ -152,7 +152,7 @@ TEST_CASE("SPD validation - mismatched sizes throw", "[spd][slice01]") {
 
 TEST_CASE("SPD validation - non-monotonic wavelengths throw",
           "[spd][slice01]") {
-  // Wavelengths must be strictly increasing - TM-30-20 §3.5
+  // Wavelengths must be strictly increasing - TM-30-20 S3.5
   std::vector<double> wl = {380.0, 390.0, 385.0, 780.0};
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
@@ -167,7 +167,7 @@ TEST_CASE("SPD validation - duplicate wavelengths throw", "[spd][slice01]") {
 // -- Validation: negative values -----------------------------------------
 
 TEST_CASE("SPD validation - negative values throw", "[spd][slice01]") {
-  // TM-30-20 §3.2: spectral power is non-negative
+  // TM-30-20 S3.2: spectral power is non-negative
   std::vector<double> wl = {380.0, 500.0, 780.0};
   std::vector<double> vals = {1.0, -0.1, 1.0};
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
@@ -176,7 +176,7 @@ TEST_CASE("SPD validation - negative values throw", "[spd][slice01]") {
 // -- Validation: insufficient wavelength range ---------------------------
 
 TEST_CASE("SPD validation - range < 400-700 throws", "[spd][slice01]") {
-  // TM-30-20 §3.5: the minimum range an SPD must cover is 400-700 nm.
+  // TM-30-20 S3.5: the minimum range an SPD must cover is 400-700 nm.
   std::vector<double> wl = {420.0, 600.0}; // starts above 400
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
@@ -190,7 +190,7 @@ TEST_CASE("SPD validation - range starts at 400 but ends before 700 throws",
 }
 
 TEST_CASE("SPD validation - range exactly 400-700 passes", "[spd][slice01]") {
-  // 400-700 nm at 5 nm (the largest permitted increment, TM-30-20 §3.5)
+  // 400-700 nm at 5 nm (the largest permitted increment, TM-30-20 S3.5)
   std::vector<double> wl;
   for (double w = 400.0; w <= 700.0; w += 5.0)
     wl.push_back(w);
@@ -212,7 +212,7 @@ TEST_CASE("SPD validation - range wider than 400-700 passes",
 // -------------------------------------------------------------------------
 
 TEST_CASE("SPD - test SPD values pass through unchanged", "[spd][slice01]") {
-  // TM-30-20 §3.5 forbids interpolating or extrapolating the test SPD.
+  // TM-30-20 S3.5 forbids interpolating or extrapolating the test SPD.
   // Full-range input at 5 nm: no drop, no zero-fill, stored exactly.
   std::vector<double> wl;
   std::vector<double> vals;
@@ -234,12 +234,12 @@ TEST_CASE("SPD - test SPD values pass through unchanged", "[spd][slice01]") {
 }
 
 // -------------------------------------------------------------------------
-// TM-30-20 §3.5 range handling: step limit, drop, zero-fill
+// TM-30-20 S3.5 range handling: step limit, drop, zero-fill
 // -------------------------------------------------------------------------
 
 TEST_CASE("SPD validation - wavelength step above 5 nm throws",
           "[spd][slice01]") {
-  // TM-30-20 §3.5: increments above 5 nm are not permitted.
+  // TM-30-20 S3.5: increments above 5 nm are not permitted.
   std::vector<double> wl = {400.0, 500.0, 700.0};
   std::vector<double> vals(wl.size(), 1.0);
   REQUIRE_THROWS_AS(Spd(wl, vals), InvalidSpd);
@@ -255,7 +255,7 @@ TEST_CASE("SPD validation - wavelength step above 5 nm throws",
 }
 
 TEST_CASE("SPD - samples outside 380-780 nm are dropped", "[spd][slice01]") {
-  // TM-30-20 §3.5: values outside the calculation range are dropped.
+  // TM-30-20 S3.5: values outside the calculation range are dropped.
   std::vector<double> wl;
   std::vector<double> vals;
   for (double w = 360.0; w <= 800.0; w += 5.0) {
@@ -273,7 +273,7 @@ TEST_CASE("SPD - samples outside 380-780 nm are dropped", "[spd][slice01]") {
 
 TEST_CASE("SPD - missing edge values are zero-filled to 380-780 nm",
           "[spd][slice01]") {
-  // TM-30-20 §3.5: missing values within 380-780 nm are replaced by
+  // TM-30-20 S3.5: missing values within 380-780 nm are replaced by
   // zeros (input must still cover at least 400-700 nm).
   std::vector<double> wl;
   std::vector<double> vals;
@@ -306,7 +306,7 @@ TEST_CASE("SPD - missing edge values are zero-filled to 380-780 nm",
 // -------------------------------------------------------------------------
 
 TEST_CASE("Resample - linear interpolation accuracy", "[resample][slice01]") {
-  // TM-30-20 §3.5 mandates linear interpolation.
+  // TM-30-20 S3.5 mandates linear interpolation.
   //
   // Construct CesData with two wavelengths and one CES sample.
   // Interpolate at midpoint - should give exact average.
@@ -360,7 +360,7 @@ TEST_CASE("Resample - linear interpolation at grid points returns exact values",
 
 TEST_CASE("Resample - flat extrapolation below source range",
           "[resample][slice01]") {
-  // TM-30-20 §1.3 (Errata): flat extrapolation for CES outside 400-700 nm.
+  // TM-30-20 S1.3 (Errata): flat extrapolation for CES outside 400-700 nm.
   //
   // CES data starts at 400 nm. Request at 380 nm -> return 400 nm value.
 
@@ -429,7 +429,7 @@ TEST_CASE("Resample - CMF linear interpolation", "[resample][slice01]") {
 TEST_CASE("Grid invariance - CES resampled at 1nm and 5nm agree at shared "
           "wavelengths",
           "[resample][slice01][grid-invariance]") {
-  // TM-30-20 §3.5: interpolation should preserve accuracy across grid sizes.
+  // TM-30-20 S3.5: interpolation should preserve accuracy across grid sizes.
   //
   // Load 1nm CES data, resample to 1nm (identity) and to 5nm target,
   // then compare at wavelengths shared by both grids.

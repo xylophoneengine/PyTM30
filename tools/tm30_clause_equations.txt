@@ -1,5 +1,5 @@
 # TM-30-20 clause -> printed-equation map, used by check_constants.py to
-# validate `TM-30-20 §x.y ... Eq. (nn)` citation tags in src/ and include/.
+# validate `TM-30-20 Sx.y ... Eq. (nn)` citation tags in src/ and include/.
 #
 # Document identity (the exact edition these equation numbers refer to):
 #   ANSI/IES TM-30-20, "IES Method for Evaluating Light Source Color

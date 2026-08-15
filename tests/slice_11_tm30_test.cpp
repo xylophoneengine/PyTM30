@@ -301,7 +301,7 @@ TEST_CASE("Validity - extrapolated flag for truncated SPD",
 
   // Construct an SPD covering only 400-700 nm (valid per Spd rules,
   // but requires extrapolation for the full 380-780 nm CES range).
-  // TM-30-20 §3.5: Missing edges are zero-filled.
+  // TM-30-20 S3.5: Missing edges are zero-filled.
   std::vector<double> wl, vals;
   for (int lam = 400; lam <= 700; lam += 5) {
     wl.push_back(static_cast<double>(lam));

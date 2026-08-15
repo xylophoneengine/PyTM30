@@ -1,5 +1,5 @@
 // Slice 4 - Reference illuminant generation tests.
-// TM-30-20 §3.3: Planckian, CIE D-series, 4000-5000 K blend.
+// TM-30-20 S3.3: Planckian, CIE D-series, 4000-5000 K blend.
 
 #include <catch2/catch_test_macros.hpp>
 

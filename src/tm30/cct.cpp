@@ -1,11 +1,11 @@
 // CCT and Duv via the Ohno triangular + parabolic search.
 //
-// TM-30-20 §3.3 prints no CCT algorithm; it incorporates one by normative
+// TM-30-20 S3.3 prints no CCT algorithm; it incorporates one by normative
 // reference: Ohno, Y. "Practical Use and Calculation of CCT and Duv."
 // Leukos 10(1):47-55, doi:10.1080/15502724.2014.839020. (TM-30-20's
 // reference list dates the article 2013, online-first; Smet et al. 2023
 // cite it as 2014 -- same article, so the DOI is the stable citation.)
-// Per TM-30-20 §3.1, CCT determination uses the CIE 1931 2-deg observer,
+// Per TM-30-20 S3.1, CCT determination uses the CIE 1931 2-deg observer,
 // unlike the 1964 10-deg observer used everywhere else.
 
 #include "tm30/cct.hpp"
@@ -129,7 +129,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
       std::sqrt((up1 - um1) * (up1 - um1) + (vp1 - vm1) * (vp1 - vm1));
 
   // Projected distance along segment: x = (dm1^2 - dp1^2 + l^2) / (2*l)
-  // TM-30-20 §3.3 incorporation: Ohno (2014) triangular geometry. The
+  // TM-30-20 S3.3 incorporation: Ohno (2014) triangular geometry. The
   // [0, l] clamp below is an implementation robustness extension, not
   // part of the published method.
   double x = (dm1 * dm1 - dp1 * dp1 + l * l) / (2.0 * l);
@@ -156,7 +156,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // (In CIE 1960 UCS, the Planckian locus generally has negative slope,
   //  so being "above" means higher v at the same approximate u.)
   // Duv sign convention per Ohno (2014); method incorporated by
-  // TM-30-20 §3.3 by normative reference.
+  // TM-30-20 S3.3 by normative reference.
   const double sign = (v_test >= vch) ? 1.0 : -1.0;
   const double duv_tri = duv_mag * sign;
 
@@ -167,7 +167,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // Using the formula from Ohno 2014 (equivalent to Lagrange interpolation)
 
   // Denominator for the quadratic coefficients
-  // TM-30-20 §3.3 incorporation: Ohno (2014) parabolic fit. The zero
+  // TM-30-20 S3.3 incorporation: Ohno (2014) parabolic fit. The zero
   // guard below is an implementation robustness extension, not part of
   // the published method.
   double denom = (Tp1 - T0) * (Tm1 - Tp1) * (T0 - Tm1);
@@ -192,7 +192,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
 
   // Vertex of parabola: T_par = -b / (2a)
   // Ohno (2014) parabolic vertex formula; method incorporated by
-  // TM-30-20 §3.3 by normative reference. The [Tm1, Tp1] clamp and the
+  // TM-30-20 S3.3 by normative reference. The [Tm1, Tp1] clamp and the
   // triangular fallback below are implementation robustness extensions.
   double T_par;
   if (std::abs(a) > 1e-30) {
@@ -228,7 +228,7 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // spacings (~16x) and worsen accuracy, so it is omitted. Smet et al.
   // 2023 (doi:10.1080/15502724.2023.2248397) bound the uncorrected
   // method's maximum CCT error at ~0.4 K for a 0.25% LUT.
-  // TM-30-20 §3.3 incorporation; threshold value from Ohno (2014).
+  // TM-30-20 S3.3 incorporation; threshold value from Ohno (2014).
   constexpr double duv_threshold = 0.002;
 
   // Ohno (2014), as published: below the threshold the triangular
