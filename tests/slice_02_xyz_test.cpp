@@ -872,6 +872,110 @@ TEST_CASE("XYZ - CES weights-based rewrite agrees with reference algorithm",
   }
 }
 
+/// Blocking-factor invariant oracle: the same weights-based dot product the
+/// shipped compute_ces_xyz performs, but with the 99-CES loop blocked by an
+/// arbitrary compile-time factor B. Blocking only decides WHICH accumulator
+/// holds a given partial sum - for a fixed (ces_idx, channel) the terms are
+/// still summed in the order i = 0, 1, ..., n-1 - so every B must produce the
+/// same answer, and B is a pure performance knob.
+///
+/// Only factors that divide 99 are meaningful. A factor that does not tile 99
+/// leaves a remainder loop, and whether that remainder loop gets its
+/// multiply-add contracted is a compiler decision independent of this code;
+/// instantiating such a factor here would be testing the optimizer, not the
+/// algorithm.
+template <std::size_t B>
+std::array<XyzTriple, 99> compute_ces_xyz_blocked(
+    const std::vector<double> &spd_wavelengths,
+    const std::vector<double> &spd_values, const CesData &ces_data,
+    const std::vector<double> &cmf_x_bar, const std::vector<double> &cmf_y_bar,
+    const std::vector<double> &cmf_z_bar, double k) {
+  static_assert(99 % B == 0, "B must tile 99 exactly (3, 9, 11 or 33)");
+
+  const std::size_t n = spd_wavelengths.size();
+  const std::vector<double> w = trapezoidal_weights(spd_wavelengths);
+
+  std::vector<double> swx(n), swy(n), swz(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    const double sw = w[i] * spd_values[i];
+    swx[i] = sw * cmf_x_bar[i];
+    swy[i] = sw * cmf_y_bar[i];
+    swz[i] = sw * cmf_z_bar[i];
+  }
+
+  std::array<XyzTriple, 99> result;
+  for (std::size_t base = 0; base < 99; base += B) {
+    std::array<double, B> X{}, Y{}, Z{};
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t b = 0; b < B; ++b) {
+        const double rv = ces_data.samples[base + b][i];
+        X[b] += rv * swx[i];
+        Y[b] += rv * swy[i];
+        Z[b] += rv * swz[i];
+      }
+    }
+    for (std::size_t b = 0; b < B; ++b) {
+      result[base + b] = XyzTriple{k * X[b], k * Y[b], k * Z[b]};
+    }
+  }
+  return result;
+}
+
+TEST_CASE("XYZ - CES tristimulus is independent of the CES blocking factor",
+          "[xyz][slice02]") {
+  // TM-30-20 S3.6 Eq. (21)-(23). compute_ces_xyz blocks its 99-CES loop so
+  // that several samples accumulate together; that is an instruction-level
+  // parallelism change only (3*B independent FMA chains instead of 3), and
+  // the block factor is selected per architecture by register budget. This
+  // test pins the property that makes such a per-architecture constant safe:
+  // the result does not depend on it. Recomputed at every divisor of 99 and
+  // required to agree with the shipped function.
+  //
+  // Tolerance, not bit-identity, and deliberately so: whether a given loop
+  // shape has its multiply-add contracted is a per-compiler, per-loop
+  // optimizer decision, so a bit-identity assertion here could red-line a CI
+  // leg with no code change at all. A contraction difference is worth 1-3
+  // ULP; the 1e-9 used by the old-vs-new test above absorbs that by five
+  // orders of magnitude while still catching any real indexing or
+  // accumulation bug.
+
+  CesData ces_1nm = load_ces(data_path("ces.csv"));
+
+  for (const char *spd_name : {"d65_1nm.csv", "illuminant_a_1nm.csv"}) {
+    INFO("SPD: " << spd_name);
+    auto [spd_wl, spd_vals] = load_spd_csv(data_path(spd_name));
+    CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), spd_wl);
+    SourceXyz src =
+        compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
+
+    const auto shipped = compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                         cmf.y_bar, cmf.z_bar, src.k);
+
+    const std::array<std::array<XyzTriple, 99>, 4> blocked{
+        compute_ces_xyz_blocked<3>(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                   cmf.y_bar, cmf.z_bar, src.k),
+        compute_ces_xyz_blocked<9>(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                   cmf.y_bar, cmf.z_bar, src.k),
+        compute_ces_xyz_blocked<11>(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                    cmf.y_bar, cmf.z_bar, src.k),
+        compute_ces_xyz_blocked<33>(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                    cmf.y_bar, cmf.z_bar, src.k)};
+
+    for (std::size_t v = 0; v < blocked.size(); ++v) {
+      INFO("blocking variant index: " << v);
+      for (std::size_t i = 0; i < 99; ++i) {
+        INFO("CES index: " << i);
+        REQUIRE_THAT(blocked[v][i].X,
+                     Catch::Matchers::WithinAbs(shipped[i].X, 1e-9));
+        REQUIRE_THAT(blocked[v][i].Y,
+                     Catch::Matchers::WithinAbs(shipped[i].Y, 1e-9));
+        REQUIRE_THAT(blocked[v][i].Z,
+                     Catch::Matchers::WithinAbs(shipped[i].Z, 1e-9));
+      }
+    }
+  }
+}
+
 // -------------------------------------------------------------------------
 // Scale invariance - doubling SPD should double XYZ (pre-normalisation)
 // -------------------------------------------------------------------------

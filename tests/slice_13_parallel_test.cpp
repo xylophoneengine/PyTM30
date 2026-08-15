@@ -549,6 +549,56 @@ TEST_CASE("Parallel - grid matrix: custom 5 nm grid via per-call path",
   REQUIRE(vectors_equal(seq, par));
 }
 
+TEST_CASE("Parallel - grid matrix: batch of N equals N single-SPD calls and "
+          "cached equals per-call on the same 1 nm grid",
+          "[parallel][slice13][gridmatrix][determinism]") {
+  // Two invariants the per-SPD core must satisfy no matter how its inner
+  // loops are structured:
+  //
+  //   1. A row's result cannot depend on how many rows share the call, nor
+  //      on its position among them. Batch-of-19 must equal 19 batches of
+  //      one, exactly. This is the guard against any per-call scratch,
+  //      table reuse or loop blocking that accidentally lets one row see
+  //      another's state.
+  //   2. The cached path (tables resampled once for the grid) and the
+  //      per-call path (tables resampled per call) must agree on a grid
+  //      they share. The narrow-grid case is covered below; this is the
+  //      default 401-point 1 nm production grid over the whole corpus.
+  //
+  // Exact ==, not tolerance: both sides run the identical arithmetic on the
+  // identical inputs in the same binary, so any difference is a bug.
+  auto &t = tables();
+  auto &c = corpus();
+  ResampledTables rtab =
+      prepare_resampled_tables(c.wl, t.cmf_2deg, t.cmf_10deg, t.ces, t.basis);
+  Tm30Request req{/*bins=*/true, /*samples=*/true};
+
+  auto batch_cached =
+      try_evaluate_cached(c.views, rtab, t.lut, req, /*n_workers=*/1);
+  auto batch_plain = try_evaluate(c.views, t.cmf_2deg, t.cmf_10deg, t.ces,
+                                  t.basis, t.lut, req, /*n_workers=*/1);
+  REQUIRE(batch_cached.size() == c.views.size());
+  REQUIRE(batch_plain.size() == c.views.size());
+
+  for (std::size_t i = 0; i < c.views.size(); ++i) {
+    INFO("corpus row " << i);
+    const std::vector<SpdView> one{c.views[i]};
+
+    auto single_cached =
+        try_evaluate_cached(one, rtab, t.lut, req, /*n_workers=*/1);
+    REQUIRE(single_cached.size() == 1);
+    REQUIRE(results_equal(batch_cached[i], single_cached[0]));
+
+    auto single_plain = try_evaluate(one, t.cmf_2deg, t.cmf_10deg, t.ces,
+                                     t.basis, t.lut, req, /*n_workers=*/1);
+    REQUIRE(single_plain.size() == 1);
+    REQUIRE(results_equal(batch_plain[i], single_plain[0]));
+
+    // Cached vs per-call resampling on the shared grid.
+    REQUIRE(results_equal(batch_cached[i], batch_plain[i]));
+  }
+}
+
 // ======================================================================
 //  Phase 2 - persistent workers (TaskPool)
 // ======================================================================

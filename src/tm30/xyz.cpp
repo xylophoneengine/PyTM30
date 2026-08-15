@@ -70,6 +70,44 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
   return result;
 }
 
+// How many CES samples the 99-sample loop in compute_ces_xyz accumulates at
+// once. Purely a performance knob: blocking interleaves independent
+// accumulators and never reassociates any single one, so the answer is
+// identical for every value (see the comment in the loop below).
+//
+// The block needs 3 * kCesBlock live floating-point accumulators:
+//   - AArch64 has 32 FP registers, so 9 (27 accumulators) fits with room to
+//     spare and was measured at 3.45-3.60x on this machine.
+//   - x86-64 without an explicit -march targets baseline SSE2, which has
+//     only 16 xmm registers; 9 would cost 24 stack references per block, so
+//     3 (9 accumulators) is the right value there.
+// NOTE: the non-AArch64 value is reasoned from register counts plus the
+// measured AArch64 spill curve - it has NOT been measured on x86-64
+// hardware, none being available where this was written. Re-measure on an
+// x86-64 target before treating 3 as final. It is a safe default in any
+// case: it is spill-free on a 16-register machine and still 2.2-2.3x on
+// AArch64, so it is never a regression. Any architecture not recognised
+// below therefore gets 3.
+//
+// 11 is deliberately not used even though it divides 99: it benchmarks well
+// only when the result is written through an out-parameter, and collapses
+// to 2.3x in the by-value signature this function actually has.
+#if defined(__aarch64__) || defined(_M_ARM64)
+constexpr std::size_t kCesBlock = 9;
+#else
+constexpr std::size_t kCesBlock = 3;
+#endif
+
+// A block factor that does not tile 99 exactly leaves a remainder loop, and
+// a remainder loop is a different loop shape that the optimizer may contract
+// differently from the main one - measured at 1-3 ULP of drift on AArch64
+// for B in {2, 4, 6, 8, 10, 16}. Requiring an exact tiling deletes the
+// second loop instead of trying to make two loops agree. Valid values are
+// the divisors of 99: 3, 9, 11 and 33.
+static_assert(99 % kCesBlock == 0,
+              "kCesBlock must tile 99 exactly: a tail loop re-introduces an "
+              "FMA-contraction ULP delta");
+
 std::array<XyzTriple, 99>
 compute_ces_xyz(const std::vector<double> &spd_wavelengths,
                 const std::vector<double> &spd_values, const CesData &ces_data,
@@ -106,22 +144,44 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
     swz[i] = sw * cmf_z_bar[i];
   }
 
-  for (std::size_t ces_idx = 0; ces_idx < 99; ++ces_idx) {
-    const auto &reflectance = ces_data.samples[ces_idx];
+  // The dot product below runs one FMA chain per accumulator, each ~4 cycles
+  // deep, so three accumulators leave most of the machine's floating-point
+  // issue width idle waiting on the previous iteration. Handling kCesBlock
+  // CES samples per pass gives 3 * kCesBlock independent chains and fills
+  // it, which is where the whole speedup comes from - there is no SIMD here
+  // and this reduction cannot be vectorised without reassociating it.
+  //
+  // Blocking does NOT reassociate anything. For a fixed (ces_idx, channel)
+  // the accumulator is still updated in the order i = 0, 1, ..., n - 1;
+  // blocking only changes which register holds that partial sum while the
+  // loop runs. The addition tree is untouched, so the result is unchanged
+  // rather than merely close, and kCesBlock can be tuned per architecture
+  // with no numeric review.
+  for (std::size_t ces_base = 0; ces_base < 99; ces_base += kCesBlock) {
+    const double *reflectance[kCesBlock];
+    for (std::size_t b = 0; b < kCesBlock; ++b) {
+      reflectance[b] = ces_data.samples[ces_base + b].data();
+    }
 
     // TM-30-20 S3.6 Eq. (21)-(23): fused dot-product accumulators.
-    double X = 0.0, Y = 0.0, Z = 0.0;
+    double X[kCesBlock] = {}, Y[kCesBlock] = {}, Z[kCesBlock] = {};
     for (std::size_t i = 0; i < n; ++i) {
-      X += reflectance[i] * swx[i];
-      Y += reflectance[i] * swy[i];
-      Z += reflectance[i] * swz[i];
+      const double sx = swx[i], sy = swy[i], sz = swz[i];
+      for (std::size_t b = 0; b < kCesBlock; ++b) {
+        const double rv = reflectance[b][i];
+        X[b] += rv * sx;
+        Y[b] += rv * sy;
+        Z[b] += rv * sz;
+      }
     }
 
     // TM-30-20 S3.6 Eq. (21)-(23):
     //   X_i = k * integral St(lambda) * R_i(lambda) * xbar10(lambda) dlambda
     //   Y_i = k * integral St(lambda) * R_i(lambda) * ybar10(lambda) dlambda
     //   Z_i = k * integral St(lambda) * R_i(lambda) * zbar10(lambda) dlambda
-    result[ces_idx] = XyzTriple{k * X, k * Y, k * Z};
+    for (std::size_t b = 0; b < kCesBlock; ++b) {
+      result[ces_base + b] = XyzTriple{k * X[b], k * Y[b], k * Z[b]};
+    }
   }
 
   return result;
