@@ -563,6 +563,42 @@ TEST_CASE("cct_to_xyz_batch - matches scalar calls one-for-one",
   }
 }
 
+// Bucket-3 invariant: cct_to_xyz_batch_prepared() runs one wavelength
+// grid against many CCTs, so it builds the grid-fixed lambda^(-5) factor
+// of TM-30-20 S3.3 Eq. (6) once and hands it to every
+// generate_reference_spd() call, instead of letting each rebuild it. The
+// per-CCT entry point cct_to_xyz() has no such table and computes the
+// factor inline. Both must land on the same doubles, because the table
+// holds the value of the identical std::pow expression.
+//
+// == and not a tolerance: the whole claim is that hoisting the factor is a
+// scheduling change and nothing else. A tolerance would let a genuine
+// reassociation of Eq. (6) through unnoticed.
+TEST_CASE("cct_to_xyz_batch_prepared - bit-identical to the untabulated "
+          "per-CCT path",
+          "[xyz][cct][batch][invariant]") {
+  auto wl = full_1nm_grid();
+  auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  CmfData cmf = load_cmf(data_path("cmf_1964_10.csv"));
+  CmfData cmf_resampled = resample_cmf(wl, cmf);
+
+  // Pure Planckian (<= 4000 K), blend (4000-5000 K) and pure D-series
+  // (>= 5000 K, which never reads the table at all).
+  std::vector<double> ccts{2000.0, 2700.0, 4000.0, 4200.0,
+                           4500.0, 4800.0, 6500.0, 9000.0};
+
+  const auto batch = cct_to_xyz_batch_prepared(ccts, wl, basis, cmf_resampled);
+  REQUIRE(batch.size() == ccts.size());
+
+  for (std::size_t i = 0; i < ccts.size(); ++i) {
+    INFO("CCT = " << ccts[i]);
+    const XyzTriple single = cct_to_xyz(ccts[i], wl, basis, cmf);
+    REQUIRE(batch[i].X == single.X);
+    REQUIRE(batch[i].Y == single.Y);
+    REQUIRE(batch[i].Z == single.Z);
+  }
+}
+
 TEST_CASE("cct_to_xyz - chromaticity moves bluer as CCT increases, matching "
           "the Planckian locus direction",
           "[xyz][cct]") {

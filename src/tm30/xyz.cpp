@@ -450,12 +450,21 @@ std::vector<XyzTriple> cct_to_xyz_batch_prepared(
         std::to_string(wavelengths.size()) + " samples, got " +
         std::to_string(cmf_resampled.y_bar.size()));
   }
+  // Every CCT in the batch shares one wavelength grid, so the grid-fixed
+  // lambda^(-5) factor of Planck's law is built once here instead of once
+  // per CCT inside generate_planckian(). Bit-identical either way - the
+  // table holds the value of the same std::pow expression the untabulated
+  // loop evaluates (see planckian_lambda_pow_table()).
+  // TM-30-20 S3.3 Eq. (6)
+  const std::vector<double> lambda_pow_m5 =
+      planckian_lambda_pow_table(wavelengths);
+
   std::vector<XyzTriple> results;
   results.reserve(ccts.size());
   for (double cct : ccts) {
     std::vector<double> ref_spd =
         generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar,
-                               /*already_resampled=*/false);
+                               /*already_resampled=*/false, &lambda_pow_m5);
     SourceXyz src =
         compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);
