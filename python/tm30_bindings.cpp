@@ -548,12 +548,28 @@ struct BatchContext {
     owned_spds.reserve(N);
     views.reserve(N);
 
-    for (size_t i = 0; i < N; ++i) {
-      std::vector<double> vals(data + i * nwl, data + (i + 1) * nwl);
-      std::vector<double> wl_copy = wl; // each Spd owns its wavelengths
-      owned_spds.emplace_back(std::move(wl_copy), std::move(vals));
-      const auto &spd = owned_spds.back();
-      views.push_back({spd.wavelengths(), spd.values()});
+    // GIL released for the fill loop: every value crossing into this
+    // scope is POD (the raw `data`/`wl` buffers, N, nwl) or a plain C++
+    // object (`std::vector<double>`, `tm30::Spd`, `tm30::SpdView`) with no
+    // nanobind/Python type or Python C-API call anywhere in its
+    // construction path (Spd's ctor and SpdView are pure C++ -- see
+    // src/tm30/spd.cpp, include/tm30/tm30.hpp -- neither includes
+    // nanobind). `Spd`'s ctor can throw `tm30::InvalidSpd` (a plain
+    // std::exception) on bad input; that is a C++-only throw that never
+    // touches the Python C-API, and unwinds through `release`'s destructor
+    // (which reacquires the GIL) before nanobind's own exception
+    // translation runs, same pattern as the release scope in evaluate()
+    // above. No refcounting, no exception raising via the Python API, no
+    // dtype lookup, and no numpy object access happens inside this scope.
+    {
+      nb::gil_scoped_release release;
+      for (size_t i = 0; i < N; ++i) {
+        std::vector<double> vals(data + i * nwl, data + (i + 1) * nwl);
+        std::vector<double> wl_copy = wl; // each Spd owns its wavelengths
+        owned_spds.emplace_back(std::move(wl_copy), std::move(vals));
+        const auto &spd = owned_spds.back();
+        views.push_back({spd.wavelengths(), spd.values()});
+      }
     }
   }
 
