@@ -146,13 +146,25 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 /// @param ref_avg   Bin-averaged reference coordinates.
 /// @param jab_ref   CAM02-UCS for reference illuminant (for mean hue angles).
 /// @param bins      Hue-angle bin assignments.
+/// @param hue_angles
+///                  Optional: the normalized hue angles bin_by_hue()
+///                  already computed for the very same `jab_ref` (see its
+///                  out_hue_angles parameter). When supplied, they are
+///                  read instead of recomputing reference_hue_angle() for
+///                  all 99 CES - a pure performance optimization, exact
+///                  because both paths evaluate one shared expression.
+///                  Must belong to this `jab_ref`; there is no way to
+///                  check that, so pass null unless it does. Defaults to
+///                  null, preserving existing behavior for all current
+///                  callers.
 /// @return          CVG coordinates for test and reference.
 ///
 /// TM-30-20 S4.5 Eq. (58)-(61)
 CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
                                        const BinAverages &ref_avg,
                                        const std::array<Cam02Ucs, 99> &jab_ref,
-                                       const HueBins &bins);
+                                       const HueBins &bins,
+                                       const HueAngles *hue_angles = nullptr);
 
 /// Compute all gamut metrics: Rg, per-bin local metrics, and CVG.
 ///
@@ -162,12 +174,16 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
 /// @param jab_ref     CAM02-UCS J'a'b' for reference illuminant (99 CES).
 /// @param delta_e     Per-CES dE' values (99).
 /// @param bins        Hue-angle bin assignments (16 bins).
+/// @param hue_angles  Forwarded to compute_cvg_coordinates() - see its
+///                    docs. Defaults to null, preserving existing
+///                    behavior.
 /// @return            Complete GamutResult.
 ///
 /// TM-30-20 S4.3-S4.8
 GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
                           const std::array<Cam02Ucs, 99> &jab_ref,
                           const std::array<double, 99> &delta_e,
-                          const HueBins &bins);
+                          const HueBins &bins,
+                          const HueAngles *hue_angles = nullptr);
 
 } // namespace tm30

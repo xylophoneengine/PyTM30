@@ -115,13 +115,18 @@ CesColorimetryResult compute_ces_colorimetry(
   result.Rf = rf_result.Rf;                   // TM-30-20 S4.1 Eq. (54)
 
   // -- Step 12: Hue-angle binning -----------------------------------------
-  // TM-30-20 S4.3: Assign 99 CES to 16 hue-angle bins based on reference hr
-  result.hue_bins = bin_by_hue(result.jab_ref_ces);
+  // TM-30-20 S4.3: Assign 99 CES to 16 hue-angle bins based on reference hr.
+  // The normalised hue angles are kept rather than discarded - step 13's
+  // CVG sub-step needs the identical 99 values.
+  HueAngles hue_angles{};
+  result.hue_bins = bin_by_hue(result.jab_ref_ces, &hue_angles);
 
   // -- Step 13: Gamut metrics (Rg, local per-bin, CVG) --------------------
-  // TM-30-20 S4.4-S4.8
+  // TM-30-20 S4.4-S4.8. Handing step 12's hue angles to S4.5 Eqs.
+  // (58)-(59) saves recomputing all 99 atan2 calls; the result is
+  // bit-identical either way (see compute_cvg_coordinates()).
   result.gamut = compute_gamut(result.jab_test_ces, result.jab_ref_ces,
-                               delta_e_array, result.hue_bins);
+                               delta_e_array, result.hue_bins, &hue_angles);
 
   // -- Step 14: Per-sample fidelity and skin fidelity -----------------
   // TM-30-20 S4.2 Eq. (55)-(56): Rf,CESi for each CES
@@ -153,6 +158,9 @@ prepare_resampled_tables(const std::vector<double> &target_wavelengths,
   // TM-30-20 S3.3 Eq. (6): grid-fixed lambda^(-5), so generate_planckian()
   // does not repeat 401 std::pow calls per SPD.
   tables.lambda_pow_m5 = planckian_lambda_pow_table(target_wavelengths);
+  // TM-30-20 S3.6 Eq. (21)-(23): grid-fixed trapezoidal weights, so
+  // compute_ces_xyz() does not rebuild them twice per SPD.
+  tables.trapezoidal_w = trapezoidal_weights(target_wavelengths);
   return tables;
 }
 
@@ -194,10 +202,11 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   // TM-30-20 S3.2 Eq. (1)-(4) with 10-deg observer
 
   // -- Step 6: Compute CES XYZ under test source -------------------------
-  // TM-30-20 S3.6 Eq. (21)-(23)
-  const auto xyz_test =
-      compute_ces_xyz(spd_wavelengths, spd_values, ces_resampled, cmf10.x_bar,
-                      cmf10.y_bar, cmf10.z_bar, test_10deg.k);
+  // TM-30-20 S3.6 Eq. (21)-(23). The trapezoidal weights are grid-fixed,
+  // so they come off the tables instead of being rebuilt per SPD.
+  const auto xyz_test = compute_ces_xyz(
+      spd_wavelengths, spd_values, ces_resampled, cmf10.x_bar, cmf10.y_bar,
+      cmf10.z_bar, test_10deg.k, &tables.trapezoidal_w);
   // TM-30-20 S3.6
 
   // -- Step 7: Compute reference source 10-deg XYZ -> normalisation kr -------
@@ -208,9 +217,9 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
 
   // -- Step 8: Compute CES XYZ under reference illuminant ----------------
   // TM-30-20 S3.6 Eq. (25)-(27)
-  const auto xyz_ref =
-      compute_ces_xyz(spd_wavelengths, ref_spd, ces_resampled, cmf10.x_bar,
-                      cmf10.y_bar, cmf10.z_bar, ref_10deg.k);
+  const auto xyz_ref = compute_ces_xyz(spd_wavelengths, ref_spd, ces_resampled,
+                                       cmf10.x_bar, cmf10.y_bar, cmf10.z_bar,
+                                       ref_10deg.k, &tables.trapezoidal_w);
   // TM-30-20 S3.6
 
   // -- Assemble result ---------------------------------------------------
@@ -249,13 +258,18 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   result.Rf = rf_result.Rf;                   // TM-30-20 S4.1 Eq. (54)
 
   // -- Step 12: Hue-angle binning -----------------------------------------
-  // TM-30-20 S4.3: Assign 99 CES to 16 hue-angle bins based on reference hr
-  result.hue_bins = bin_by_hue(result.jab_ref_ces);
+  // TM-30-20 S4.3: Assign 99 CES to 16 hue-angle bins based on reference hr.
+  // The normalised hue angles are kept rather than discarded - step 13's
+  // CVG sub-step needs the identical 99 values.
+  HueAngles hue_angles{};
+  result.hue_bins = bin_by_hue(result.jab_ref_ces, &hue_angles);
 
   // -- Step 13: Gamut metrics (Rg, local per-bin, CVG) --------------------
-  // TM-30-20 S4.4-S4.8
+  // TM-30-20 S4.4-S4.8. Handing step 12's hue angles to S4.5 Eqs.
+  // (58)-(59) saves recomputing all 99 atan2 calls; the result is
+  // bit-identical either way (see compute_cvg_coordinates()).
   result.gamut = compute_gamut(result.jab_test_ces, result.jab_ref_ces,
-                               delta_e_array, result.hue_bins);
+                               delta_e_array, result.hue_bins, &hue_angles);
 
   // -- Step 14: Per-sample fidelity and skin fidelity -----------------
   // TM-30-20 S4.2 Eq. (55)-(56): Rf,CESi for each CES

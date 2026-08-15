@@ -114,6 +114,12 @@ struct ResampledTables {
                      // every SPD that reaches the Planckian or blend
                      // branch. See planckian_lambda_pow_table().
                      // TM-30-20 S3.3 Eq. (6)
+  std::vector<double>
+      trapezoidal_w; // Per-point trapezoidal weights for `wavelengths`,
+                     // which compute_ces_xyz() would otherwise rebuild on
+                     // each of its two calls per SPD. See
+                     // trapezoidal_weights().
+                     // TM-30-20 S3.6 Eq. (21)-(23)
 };
 
 /// Precompute (once) all wavelength-grid-dependent resampled tables for a

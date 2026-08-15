@@ -679,6 +679,161 @@ TEST_CASE("Gamut - Rf,hj in [0, 100] for all SPDs",
 }
 
 // -------------------------------------------------------------------------
+// Bucket-3 invariants: reused work must not change the answer
+// -------------------------------------------------------------------------
+
+// The 99 reference hue angles hr of TM-30-20 S4.3 are computed by
+// bin_by_hue() to pick each CES's bin, and were then thrown away and
+// recomputed - the identical atan2 on the identical inputs - by
+// compute_cvg_coordinates() for S4.5 Eqs. (58)-(59). bin_by_hue() now
+// hands them back and the CVG step reads them.
+//
+// Asserted with ==, not a tolerance: both paths run reference_hue_angle()
+// on the same Cam02Ucs, so this is an equality between two things this
+// test computes on the machine it runs on, portable to any libm. A
+// tolerance would hide a genuine change of expression (e.g. dropping the
+// [0, 2pi) normalisation, worth 2*pi per affected sample) in bins that
+// happen not to wrap.
+TEST_CASE("Gamut - CVG bit-identical with and without the hue angles "
+          "bin_by_hue already computed",
+          "[gamut][cvg][slice09][invariant]") {
+  struct SpdCase {
+    std::string name;
+    std::string csv_file;
+  };
+  const std::vector<SpdCase> cases = {
+      {"D65", "d65_1nm.csv"}, {"F1", "fl1_1nm.csv"},
+      {"HP1", "hp1_5nm.csv"}, {"F12", "fl12_1nm.csv"},
+      {"HP5", "hp5_5nm.csv"}, {"A", "illuminant_a_1nm.csv"},
+  };
+
+  auto &G = GlobalFixtures::instance();
+
+  for (const auto &c : cases) {
+    INFO("SPD: " << c.name);
+    auto [spd_wl, spd_vals] = load_spd_csv(data_path(c.csv_file));
+    const CesColorimetryResult res =
+        compute_ces_colorimetry(spd_wl, spd_vals, G.cmf_2deg, G.cmf_10deg,
+                                G.ces, G.daylight_basis, G.planckian_lut);
+
+    // Requesting the angles must not perturb the binning itself.
+    HueAngles angles{};
+    const HueBins bins_without = bin_by_hue(res.jab_ref_ces);
+    const HueBins bins_with = bin_by_hue(res.jab_ref_ces, &angles);
+    for (int j = 0; j < 16; ++j) {
+      INFO("bin " << j);
+      REQUIRE(bins_with[j] == bins_without[j]);
+    }
+
+    // What comes back is the angle itself, not a rounded copy of it.
+    for (std::size_t i = 0; i < 99; ++i) {
+      INFO("CES " << i);
+      REQUIRE(angles[i] == reference_hue_angle(res.jab_ref_ces[i]));
+    }
+
+    const auto delta_e = compute_delta_e(res.jab_test_ces, res.jab_ref_ces);
+    const BinAverages test_avg = bin_average(res.jab_test_ces, bins_with);
+    const BinAverages ref_avg = bin_average(res.jab_ref_ces, bins_with);
+
+    const CvgCoordinates cvg_without =
+        compute_cvg_coordinates(test_avg, ref_avg, res.jab_ref_ces, bins_with);
+    const CvgCoordinates cvg_with = compute_cvg_coordinates(
+        test_avg, ref_avg, res.jab_ref_ces, bins_with, &angles);
+
+    for (int j = 0; j < 16; ++j) {
+      INFO("bin " << j);
+      // Bit-identity, not "within tolerance".
+      REQUIRE(cvg_with.x_ref[j] == cvg_without.x_ref[j]);
+      REQUIRE(cvg_with.y_ref[j] == cvg_without.y_ref[j]);
+      REQUIRE(cvg_with.x_test[j] == cvg_without.x_test[j]);
+      REQUIRE(cvg_with.y_test[j] == cvg_without.y_test[j]);
+      REQUIRE(cvg_with.J_ref[j] == cvg_without.J_ref[j]);
+      REQUIRE(cvg_with.J_test[j] == cvg_without.J_test[j]);
+    }
+
+    // One level up: compute_gamut() has to thread the angles through to
+    // the CVG sub-step, or the whole hoist silently does nothing.
+    const GamutResult gamut_without =
+        compute_gamut(res.jab_test_ces, res.jab_ref_ces, delta_e, bins_with);
+    const GamutResult gamut_with = compute_gamut(
+        res.jab_test_ces, res.jab_ref_ces, delta_e, bins_with, &angles);
+
+    REQUIRE(gamut_with.Rg == gamut_without.Rg);
+    for (int j = 0; j < 16; ++j) {
+      INFO("bin " << j);
+      REQUIRE(gamut_with.cvg.x_ref[j] == gamut_without.cvg.x_ref[j]);
+      REQUIRE(gamut_with.cvg.y_ref[j] == gamut_without.cvg.y_ref[j]);
+      REQUIRE(gamut_with.cvg.x_test[j] == gamut_without.cvg.x_test[j]);
+      REQUIRE(gamut_with.cvg.y_test[j] == gamut_without.cvg.y_test[j]);
+      REQUIRE(gamut_with.local.Rf_hj[j] == gamut_without.local.Rf_hj[j]);
+      REQUIRE(gamut_with.local.Rcs_hj_percent[j] ==
+              gamut_without.local.Rcs_hj_percent[j]);
+      REQUIRE(gamut_with.local.Rhs_hj[j] == gamut_without.local.Rhs_hj[j]);
+    }
+  }
+}
+
+// compute_local_bin_metrics() used to evaluate cos(thetaj) and sin(thetaj)
+// for the bin bisector inside its 16-bin loop, on every call. Those depend
+// on the bin index alone, so they are now built once per process. This
+// pins that the hoist is arithmetically inert: the shipped Rcs,hj and
+// Rhs,hj must equal Eqs. (62)-(63) evaluated with cos/sin computed inline
+// here, from the same bin averages the same call produced.
+//
+// == again, deliberately: the point of the hoist is that it changes when
+// the value is computed and nothing else, so any difference at all is a
+// defect, not noise.
+TEST_CASE("Gamut - hoisted bin bisector directions reproduce the per-bin "
+          "cos/sin they replaced",
+          "[gamut][local][slice09][invariant]") {
+  struct SpdCase {
+    std::string name;
+    std::string csv_file;
+  };
+  const std::vector<SpdCase> cases = {
+      {"D65", "d65_1nm.csv"},  {"F1", "fl1_1nm.csv"},  {"HP1", "hp1_5nm.csv"},
+      {"F12", "fl12_1nm.csv"}, {"HP5", "hp5_5nm.csv"},
+  };
+
+  for (const auto &c : cases) {
+    INFO("SPD: " << c.name);
+    auto [spd_wl, spd_vals] = load_spd_csv(data_path(c.csv_file));
+    const auto gfs = run_gamut_for_spd(spd_wl, spd_vals);
+    const auto &gamut = gfs.gamut;
+
+    for (int j = 0; j < 16; ++j) {
+      INFO("bin " << j);
+      if (std::isnan(gamut.ref_avg.a_prime[j])) {
+        continue; // empty bin: metrics are NaN by construction
+      }
+
+      // TM-30-20 S4.6: thetaj = (j + 0.5) x 22.5-deg, spelled exactly as
+      // the loop used to spell it.
+      const double theta_deg = (static_cast<double>(j) + 0.5) * 22.5;
+      const double theta = theta_deg * std::numbers::pi / 180.0;
+      const double cos_t = std::cos(theta);
+      const double sin_t = std::sin(theta);
+
+      const double da = gamut.test_avg.a_prime[j] - gamut.ref_avg.a_prime[j];
+      const double db = gamut.test_avg.b_prime[j] - gamut.ref_avg.b_prime[j];
+      const double r_ref =
+          std::sqrt(gamut.ref_avg.a_prime[j] * gamut.ref_avg.a_prime[j] +
+                    gamut.ref_avg.b_prime[j] * gamut.ref_avg.b_prime[j]);
+      if (r_ref < 1e-12) {
+        continue; // degenerate guard: the shipped code reports 0 here
+      }
+
+      // TM-30-20 S4.6 Eq. (62), S4.7 Eq. (63)
+      const double rcs_expected = 100.0 * (da * cos_t + db * sin_t) / r_ref;
+      const double rhs_expected = 1.0 * (-da * sin_t + db * cos_t) / r_ref;
+
+      REQUIRE(gamut.local.Rcs_hj_percent[j] == rcs_expected);
+      REQUIRE(gamut.local.Rhs_hj[j] == rhs_expected);
+    }
+  }
+}
+
+// -------------------------------------------------------------------------
 // Unit tests: individual sub-functions
 // -------------------------------------------------------------------------
 

@@ -113,7 +113,8 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
                 const std::vector<double> &spd_values, const CesData &ces_data,
                 const std::vector<double> &cmf_x_bar,
                 const std::vector<double> &cmf_y_bar,
-                const std::vector<double> &cmf_z_bar, double k) {
+                const std::vector<double> &cmf_z_bar, double k,
+                const std::vector<double> *trapezoidal_w) {
 
   const std::size_t n = spd_wavelengths.size();
 
@@ -126,11 +127,19 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
   std::array<XyzTriple, 99> result;
 
   // Trapezoidal weights for this wavelength grid depend only on the grid
-  // itself, not on any CES sample - compute once per call (not once per
-  // CES) and reuse for all 99 samples.
+  // itself - not on any CES sample, and not on the SPD - so they are used
+  // for all 99 samples and, when the caller shares one grid across many
+  // SPDs, built once for all of those too (ResampledTables::trapezoidal_w).
+  // Absent such a table, or given one that does not match the grid, they
+  // are computed here from the identical call as before.
   // TM-30-20 S3.6: sum_i w[i]*f[i] == trapezoidal integration of f over
   // spd_wavelengths.
-  const std::vector<double> w = trapezoidal_weights(spd_wavelengths);
+  const bool have_weights =
+      trapezoidal_w != nullptr && trapezoidal_w->size() == n;
+  const std::vector<double> w_local =
+      have_weights ? std::vector<double>()
+                   : trapezoidal_weights(spd_wavelengths);
+  const std::vector<double> &w = have_weights ? *trapezoidal_w : w_local;
 
   // St(lambda)*xbar10(lambda)/ybar10(lambda)/zbar10(lambda), pre-multiplied by
   // the trapezoidal weight, is also CES-independent - hoist it out of the
@@ -445,7 +454,8 @@ std::vector<XyzTriple> cct_to_xyz_batch_prepared(
   results.reserve(ccts.size());
   for (double cct : ccts) {
     std::vector<double> ref_spd =
-        generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar);
+        generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar,
+                               /*already_resampled=*/false);
     SourceXyz src =
         compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);

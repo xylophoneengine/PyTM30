@@ -7,9 +7,8 @@
 #include "tm30/hue_bins.hpp"
 
 #include <array>
-#include <cmath> // atan2
+#include <cmath> // isnan
 #include <cstdint>
-#include <numbers> // std::numbers::pi
 
 namespace tm30 {
 
@@ -17,17 +16,23 @@ namespace tm30 {
 // Bin width in radians: 22.5-deg = pi/8 rad.
 static constexpr double kBinWidth = 0.39269908169872414; // TM-30-20 S4.3
 
-HueBins bin_by_hue(const std::array<Cam02Ucs, 99> &jab_ref) {
+HueBins bin_by_hue(const std::array<Cam02Ucs, 99> &jab_ref,
+                   HueAngles *out_hue_angles) {
   HueBins bins;
 
   for (int i = 0; i < 99; ++i) {
-    // TM-30-20 S4.3: hr = atan2(b'r,i, a'r,i) in [-pi, pi]
-    double h = std::atan2(jab_ref[i].b_prime, jab_ref[i].a_prime);
+    // TM-30-20 S4.3: hr = atan2(b'r,i, a'r,i) in [-pi, pi], normalized to
+    // [0, 2pi). reference_hue_angle() (hue_bins.hpp) is the single
+    // definition of that expression; compute_cvg_coordinates() consumes
+    // the very same values for S4.5 Eqs. (58)-(59).
+    const double h = reference_hue_angle(jab_ref[i]);
 
-    // Normalize to [0, 2pi)
-    // TM-30-20 S4.3 edge case: atan2 returns [-pi, pi]; map to [0, 2pi)
-    if (h < 0.0) {
-      h += 2.0 * std::numbers::pi;
+    // Hand the angle back if the caller asked for it, so the CVG step does
+    // not have to recompute all 99 atan2 calls. Storing and reloading a
+    // double is exact, so the two paths agree bit-for-bit - asserted in
+    // tests/slice_09_rg_local_cvg_test.cpp.
+    if (out_hue_angles != nullptr) {
+      (*out_hue_angles)[i] = h;
     }
 
     // Assign to bin. TM-30-20 S4.3:

@@ -21,6 +21,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1013,6 +1014,147 @@ TEST_CASE("XYZ - scale invariance: doubled SPD gives same XYZ",
 // -------------------------------------------------------------------------
 // Resampled input (5 nm grid)
 // -------------------------------------------------------------------------
+
+// -------------------------------------------------------------------------
+// Bucket-3 invariants: hoisted setup work must not change the answer
+// -------------------------------------------------------------------------
+
+// compute_ces_xyz() builds the per-point trapezoidal weights of TM-30-20
+// S3.6 Eq. (21)-(23) from the wavelength grid alone, so a caller running
+// many SPDs on one grid can build them once and hand them over
+// (ResampledTables::trapezoidal_w). Supplying them must be exactly the
+// same as letting the function call trapezoidal_weights() itself - it is
+// the identical call on the identical argument, only made fewer times.
+//
+// == and not a tolerance: the weights either are the same doubles or they
+// are not, and a tolerance here would mask a grid mix-up that only bites
+// on non-uniform grids.
+TEST_CASE("XYZ - CES tristimulus bit-identical with and without precomputed "
+          "trapezoidal weights",
+          "[xyz][slice02][invariant]") {
+  CesData ces_1nm = load_ces(data_path("ces.csv"));
+
+  for (const char *spd_name : {"d65_1nm.csv", "illuminant_a_1nm.csv"}) {
+    INFO("SPD: " << spd_name);
+    auto [spd_wl, spd_vals] = load_spd_csv(data_path(spd_name));
+    CmfData cmf = load_cmf_for_spd(data_path("cmf_1964_10.csv"), spd_wl);
+    SourceXyz src =
+        compute_source_xyz(spd_wl, spd_vals, cmf.x_bar, cmf.y_bar, cmf.z_bar);
+
+    const std::vector<double> weights = trapezoidal_weights(spd_wl);
+    REQUIRE(weights.size() == spd_wl.size());
+
+    const auto without = compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                         cmf.y_bar, cmf.z_bar, src.k);
+    const auto with = compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar,
+                                      cmf.y_bar, cmf.z_bar, src.k, &weights);
+
+    // A null table and a wrong-length table both fall back to computing
+    // the weights inline, so the result is unchanged either way.
+    const std::vector<double> empty_table;
+    const std::vector<double> short_table = trapezoidal_weights(
+        std::vector<double>(spd_wl.begin(), spd_wl.begin() + 10));
+    const auto from_empty =
+        compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar, cmf.y_bar,
+                        cmf.z_bar, src.k, &empty_table);
+    const auto from_short =
+        compute_ces_xyz(spd_wl, spd_vals, ces_1nm, cmf.x_bar, cmf.y_bar,
+                        cmf.z_bar, src.k, &short_table);
+
+    for (std::size_t i = 0; i < 99; ++i) {
+      INFO("CES index: " << i);
+      REQUIRE(with[i].X == without[i].X);
+      REQUIRE(with[i].Y == without[i].Y);
+      REQUIRE(with[i].Z == without[i].Z);
+      REQUIRE(from_empty[i].X == without[i].X);
+      REQUIRE(from_empty[i].Y == without[i].Y);
+      REQUIRE(from_empty[i].Z == without[i].Z);
+      REQUIRE(from_short[i].X == without[i].X);
+      REQUIRE(from_short[i].Y == without[i].Y);
+      REQUIRE(from_short[i].Z == without[i].Z);
+    }
+  }
+}
+
+// The St*w*cmf scratch buffers compute_ces_xyz() fills before its 99-CES
+// loop now outlive the call (thread_local, grown but never shrunk), so a
+// call on a short grid runs on storage a longer grid left behind. This
+// pins the property that makes that safe: the answer for a grid does not
+// depend on what was computed before it, on this thread or on any other.
+//
+// Both halves matter. Running two grids in both orders catches a value
+// that survives one call and is read by the next; running the same call on
+// a freshly spawned thread - whose scratch has never been touched - is the
+// only way to compare against genuinely virgin storage, and is what a
+// same-thread A/B cannot do once the buffers have converged.
+TEST_CASE("XYZ - CES tristimulus does not depend on what was computed before "
+          "it",
+          "[xyz][slice02][invariant]") {
+  CesData ces_1nm = load_ces(data_path("ces.csv"));
+  auto [wl_long, vals_long] = load_spd_csv(data_path("d65_1nm.csv"));
+  CmfData cmf_long = load_cmf_for_spd(data_path("cmf_1964_10.csv"), wl_long);
+
+  // A strictly shorter, coarser grid: 5 nm subsampled from the 1 nm one.
+  std::vector<double> wl_short, vals_short;
+  for (std::size_t i = 0; i < wl_long.size(); i += 5) {
+    wl_short.push_back(wl_long[i]);
+    vals_short.push_back(vals_long[i]);
+  }
+  CmfData cmf_source = load_cmf(data_path("cmf_1964_10.csv"));
+  CmfData cmf_short = resample_cmf(wl_short, cmf_source);
+  CesData ces_short = resample_ces(wl_short, ces_1nm);
+
+  const SourceXyz src_long = compute_source_xyz(
+      wl_long, vals_long, cmf_long.x_bar, cmf_long.y_bar, cmf_long.z_bar);
+  const SourceXyz src_short = compute_source_xyz(
+      wl_short, vals_short, cmf_short.x_bar, cmf_short.y_bar, cmf_short.z_bar);
+
+  // Order A: long grid, then short grid.
+  const auto long_a =
+      compute_ces_xyz(wl_long, vals_long, ces_1nm, cmf_long.x_bar,
+                      cmf_long.y_bar, cmf_long.z_bar, src_long.k);
+  const auto short_a =
+      compute_ces_xyz(wl_short, vals_short, ces_short, cmf_short.x_bar,
+                      cmf_short.y_bar, cmf_short.z_bar, src_short.k);
+
+  // Order B: the same two calls, swapped.
+  const auto short_b =
+      compute_ces_xyz(wl_short, vals_short, ces_short, cmf_short.x_bar,
+                      cmf_short.y_bar, cmf_short.z_bar, src_short.k);
+  const auto long_b =
+      compute_ces_xyz(wl_long, vals_long, ces_1nm, cmf_long.x_bar,
+                      cmf_long.y_bar, cmf_long.z_bar, src_long.k);
+
+  // Order C: each call on its own brand-new thread, so the scratch it
+  // runs on has never held anything.
+  std::array<XyzTriple, 99> long_c{}, short_c{};
+  std::thread t_long([&] {
+    long_c = compute_ces_xyz(wl_long, vals_long, ces_1nm, cmf_long.x_bar,
+                             cmf_long.y_bar, cmf_long.z_bar, src_long.k);
+  });
+  t_long.join();
+  std::thread t_short([&] {
+    short_c = compute_ces_xyz(wl_short, vals_short, ces_short, cmf_short.x_bar,
+                              cmf_short.y_bar, cmf_short.z_bar, src_short.k);
+  });
+  t_short.join();
+
+  for (std::size_t i = 0; i < 99; ++i) {
+    INFO("CES index: " << i);
+    REQUIRE(long_a[i].X == long_b[i].X);
+    REQUIRE(long_a[i].Y == long_b[i].Y);
+    REQUIRE(long_a[i].Z == long_b[i].Z);
+    REQUIRE(short_a[i].X == short_b[i].X);
+    REQUIRE(short_a[i].Y == short_b[i].Y);
+    REQUIRE(short_a[i].Z == short_b[i].Z);
+    REQUIRE(long_c[i].X == long_a[i].X);
+    REQUIRE(long_c[i].Y == long_a[i].Y);
+    REQUIRE(long_c[i].Z == long_a[i].Z);
+    REQUIRE(short_c[i].X == short_a[i].X);
+    REQUIRE(short_c[i].Y == short_a[i].Y);
+    REQUIRE(short_c[i].Z == short_a[i].Z);
+  }
+}
 
 TEST_CASE("XYZ - source XYZ from 5nm resampled data agrees with 1nm",
           "[xyz][slice02]") {

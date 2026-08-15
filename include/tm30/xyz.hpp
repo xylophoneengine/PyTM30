@@ -86,6 +86,19 @@ SourceXyz compute_source_xyz(const std::vector<double> &spd_wavelengths,
 /// @param cmf_z_bar        CIE 1964 10-deg zbar10(lambda), resampled.
 /// @param k                Source normalisation constant from
 /// compute_source_xyz.
+/// @param trapezoidal_w    Optional precomputed trapezoidal_weights() for
+///                         `spd_wavelengths` (see
+///                         prepare_resampled_tables(), which stores them
+///                         on ResampledTables). The weights depend only on
+///                         the wavelength grid, so a caller evaluating
+///                         many SPDs on one grid can build them once.
+///                         Purely a performance optimization with no
+///                         effect on the result: the function otherwise
+///                         calls trapezoidal_weights() itself with the
+///                         same argument. Ignored when null or when its
+///                         length does not match the grid. Defaults to
+///                         null, preserving existing behavior for all
+///                         current callers.
 ///
 /// @return Array of 99 XyzTriple values.
 ///
@@ -95,7 +108,8 @@ compute_ces_xyz(const std::vector<double> &spd_wavelengths,
                 const std::vector<double> &spd_values, const CesData &ces_data,
                 const std::vector<double> &cmf_x_bar,
                 const std::vector<double> &cmf_y_bar,
-                const std::vector<double> &cmf_z_bar, double k);
+                const std::vector<double> &cmf_z_bar, double k,
+                const std::vector<double> *trapezoidal_w = nullptr);
 
 // -- Convenience functions (handle CMF resampling internally) ----------
 

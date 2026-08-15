@@ -50,6 +50,49 @@ static constexpr double kRhsScale = 1.0; // TM-30-20 S4.7
 // scaling belongs in a plotting layer, not here.
 static constexpr double kCvgScale = 1.0; // TM-30-20 S4.5
 
+// --- Bin bisector directions ----------------------------------------------
+
+namespace {
+
+/// cos(thetaj) and sin(thetaj) for the 16 bin bisectors, where
+/// thetaj = (j + 0.5) x 22.5-deg is the bisector angle of bin j.
+///
+/// TM-30-20 S4.6, S4.7
+struct BisectorDirections {
+  std::array<double, kNumBins> cos_theta; // TM-30-20 S4.6
+  std::array<double, kNumBins> sin_theta; // TM-30-20 S4.7
+};
+
+/// The bisector directions depend on the bin index alone - not on the test
+/// source, the reference illuminant, or anything else that varies between
+/// SPDs - so the 32 transcendental calls belong outside the per-SPD path.
+/// Built once, on first use, and reused for the life of the process.
+///
+/// Deliberately NOT frozen as 32 decimal literals: cos/sin are permitted to
+/// differ by an ULP between C libraries, so literals taken from one
+/// platform's libm would quietly change the answer on another. Evaluating
+/// the identical expression the loop used to evaluate, just fewer times,
+/// keeps this platform-for-platform bit-identical to the previous code -
+/// asserted in tests/slice_09_rg_local_cvg_test.cpp.
+const BisectorDirections &bisector_directions() {
+  static const BisectorDirections dirs = [] {
+    BisectorDirections d{};
+    for (int j = 0; j < kNumBins; ++j) {
+      // Bin bisector angle: thetaj = (j + 0.5) x 22.5-deg (0-indexed)
+      // TM-30-20 S4.6: thetaj is the bisector angle of bin j
+      const double theta_deg = (static_cast<double>(j) + 0.5) * kBinWidthDeg;
+      const double theta =
+          theta_deg * std::numbers::pi / 180.0; // TM-30-20 S4.6
+      d.cos_theta[j] = std::cos(theta);         // TM-30-20 S4.6
+      d.sin_theta[j] = std::sin(theta);         // TM-30-20 S4.7
+    }
+    return d;
+  }();
+  return dirs;
+}
+
+} // namespace
+
 // --- Bin Averages ---------------------------------------------------------
 
 BinAverages bin_average(const std::array<Cam02Ucs, 99> &jab_ces,
@@ -153,6 +196,10 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
   // TM-30-20 S4.6, S4.7, S4.8
   LocalBinMetrics metrics{};
 
+  // Bin-index-only quantities, so they are shared by every SPD ever
+  // evaluated rather than rebuilt 16 times per call.
+  const BisectorDirections &dirs = bisector_directions();
+
   for (int j = 0; j < kNumBins; ++j) {
     // TM-30-20 S4.6, S4.7, S4.8
     const auto &bin = bins[j];
@@ -207,12 +254,10 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
     }
 
     // Bin bisector angle: thetaj = (j + 0.5) x 22.5-deg (0-indexed)
-    // TM-30-20 S4.6: thetaj is the bisector angle of bin j
-    const double theta_deg = (static_cast<double>(j) + 0.5) * kBinWidthDeg;
-    const double theta = theta_deg * std::numbers::pi / 180.0; // TM-30-20 S4.6
-
-    const double cos_t = std::cos(theta);
-    const double sin_t = std::sin(theta);
+    // TM-30-20 S4.6: thetaj is the bisector angle of bin j. Its cosine and
+    // sine are precomputed once per process (see bisector_directions()).
+    const double cos_t = dirs.cos_theta[j]; // TM-30-20 S4.6
+    const double sin_t = dirs.sin_theta[j]; // TM-30-20 S4.7
 
     // Local chroma shift: Eq. (62) ratio, represented as a percentage
     // TM-30-20 S4.6 Eq. (62)
@@ -232,7 +277,8 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
                                        const BinAverages &ref_avg,
                                        const std::array<Cam02Ucs, 99> &jab_ref,
-                                       const HueBins &bins) {
+                                       const HueBins &bins,
+                                       const HueAngles *hue_angles) {
 
   // TM-30-20 S4.5
   CvgCoordinates cvg{};
@@ -264,18 +310,30 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
     //
     // std::atan2 returns [-pi, pi], so samples with negative b' (bins 9-16)
     // come back negative and a raw mean would be meaningless; normalise
-    // each angle to [0, 2*pi) before averaging. After normalisation a plain
-    // arithmetic mean suffices: S4.3 places 0 deg on the positive a' axis with
-    // 16 bins of 22.5 deg increasing counterclockwise, and S4.6 confirms 0 deg
-    // is the boundary between bins 1 and 16, so no bin straddles the wrap point
-    // and circular-mean machinery is unnecessary.
+    // each angle to [0, 2*pi) before averaging - reference_hue_angle()
+    // (hue_bins.hpp) does exactly that and is the single definition of the
+    // angle. After normalisation a plain arithmetic mean suffices: S4.3
+    // places 0 deg on the positive a' axis with 16 bins of 22.5 deg
+    // increasing counterclockwise, and S4.6 confirms 0 deg is the boundary
+    // between bins 1 and 16, so no bin straddles the wrap point and
+    // circular-mean machinery is unnecessary.
+    //
+    // Two spellings of the same accumulation. The first reads the angles
+    // bin_by_hue() already computed for this same jab_ref and handed back;
+    // the second recomputes them, as every caller did before that became
+    // possible. Both add the same doubles in the same order - the stored
+    // angle IS the value reference_hue_angle() returns, not an
+    // approximation of it - so they agree bit-for-bit, asserted in
+    // tests/slice_09_rg_local_cvg_test.cpp.
     double sum_h = 0.0; // TM-30-20 S4.5 Eqs. (58)-(59) accumulator
-    for (int idx : bins[j]) {
-      double h = std::atan2(jab_ref[idx].b_prime, jab_ref[idx].a_prime);
-      if (h < 0.0) {                 // TM-30-20 S4.3: hue angles in [0, 360)
-        h += 2.0 * std::numbers::pi; // TM-30-20 S4.3: full turn, [0, 2*pi)
+    if (hue_angles != nullptr) {
+      for (int idx : bins[j]) {
+        sum_h += (*hue_angles)[idx];
       }
-      sum_h += h;
+    } else {
+      for (int idx : bins[j]) {
+        sum_h += reference_hue_angle(jab_ref[idx]);
+      }
     }
     const double h_bar = sum_h / static_cast<double>(bins[j].size());
 
@@ -319,7 +377,7 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
 GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
                           const std::array<Cam02Ucs, 99> &jab_ref,
                           const std::array<double, 99> &delta_e,
-                          const HueBins &bins) {
+                          const HueBins &bins, const HueAngles *hue_angles) {
 
   // TM-30-20 S4.4-S4.8
   GamutResult result{};
@@ -340,8 +398,8 @@ GamutResult compute_gamut(const std::array<Cam02Ucs, 99> &jab_test,
 
   // Step 4: CVG coordinates
   // TM-30-20 S4.5
-  result.cvg =
-      compute_cvg_coordinates(result.test_avg, result.ref_avg, jab_ref, bins);
+  result.cvg = compute_cvg_coordinates(result.test_avg, result.ref_avg, jab_ref,
+                                       bins, hue_angles);
 
   return result;
 }
