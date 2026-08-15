@@ -603,11 +603,46 @@ class Tm30BatchResult:
         "hue_bin_index": (99,),
     }
 
-    def __init__(self, raw: list, wavelengths: np.ndarray) -> None:
-        n = len(raw)
-        self._n = n
+    def __init__(self, raw: list | dict, wavelengths: np.ndarray) -> None:
+        """Build from either marshaling form the bindings can produce.
+
+        `raw` is a **dict** of columnar (N, ...) arrays when it came from
+        ``evaluate(columnar=True)`` - the arrays are already in their final
+        shape and dtype, so there is nothing to restack - or the original
+        **list** of per-SPD dicts (None for a rejected row), which is what
+        the single-SPD path and any direct `_ctx` caller still produce.
+        Both yield an identical object; the columnar form just skips ~17N
+        numpy __setitem__ calls to get there.
+        """
         self._wavelengths = wavelengths
         n_wavelengths = len(wavelengths)
+
+        if isinstance(raw, dict):
+            valid = raw["valid"]
+            self._n = len(valid)
+            self.valid = valid
+            ref = raw.get("reference_spd")
+            if ref is not None and ref.shape[1] != n_wavelengths:
+                # Pre-existing behaviour, deliberately preserved: the
+                # reference illuminant is generated on the TM-30-20 S3.5
+                # conformed grid (dropped outside 380-780 nm, zero-filled
+                # to 380/780), so on a caller grid narrower than that it is
+                # longer than the column this field is labelled for. The
+                # per-row path raised numpy's broadcast error here; a
+                # columnar copy would silently succeed with a mislabelled
+                # array, so raise the same thing rather than change what a
+                # narrow grid plus extras=True does.
+                raise ValueError(
+                    f"could not broadcast input array from shape "
+                    f"({ref.shape[1]},) into shape ({n_wavelengths},)"
+                )
+            # Do not mutate the caller's dict; drop only the `valid` entry,
+            # which is a sibling of _d rather than one of its fields.
+            self._d = {k: v for k, v in raw.items() if k != "valid"}
+            return
+
+        n = len(raw)
+        self._n = n
         self.valid = np.array([d is not None for d in raw], dtype=bool)
 
         # Which optional keys are actually present (depends on extras=...);
@@ -1156,6 +1191,7 @@ class TM30Calc:
                 samples=samples,
                 extras=extras,
                 n_workers=self._n_workers,
+                columnar=not single,
             )
             used_wavelengths = self._wavelengths
         else:
@@ -1170,6 +1206,7 @@ class TM30Calc:
                 samples=samples,
                 extras=extras,
                 n_workers=self._n_workers,
+                columnar=not single,
             )
             used_wavelengths = wavelengths
 

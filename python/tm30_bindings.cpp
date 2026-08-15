@@ -12,6 +12,8 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstring> // std::memcpy
+#include <limits>  // std::numeric_limits
 #include <memory>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -612,6 +614,287 @@ struct BatchContext {
                                        cmf_10deg, ces_data, daylight_basis);
   }
 
+  // ====================================================================
+  //  Columnar batch marshaling - one (N, ...) array per field
+  // ====================================================================
+  //
+  // The per-SPD marshaling in evaluate()/evaluate_cached() below builds up
+  // to 17 small numpy arrays PER SPD. Each one costs ~600 ns of Python /
+  // nanobind overhead that is flat in the element count (a 16-element and
+  // a 401-element array measure the same), so the cost is per ARRAY, not
+  // per byte. Tm30BatchResult.__init__ then restacks those N per-row dicts
+  // into one (N, ...) array per field with ~17N numpy __setitem__ calls.
+  // All of it holds the GIL, which makes it Amdahl's serial fraction on
+  // the parallel path: measured at ~28% of a one-worker extras=True run,
+  // i.e. roughly half the elapsed time at n_workers=4, with the other
+  // threads idle for it.
+  //
+  // marshal_columnar() allocates ONE (N, ...) array per field up front and
+  // fills it straight out of the results vector with the GIL released.
+  // Python-level array creations drop from 17N to 17, the Python-side
+  // restack disappears entirely, and the copying that remains no longer
+  // blocks other threads.
+  //
+  // GIL DISCIPLINE inside the release scope - the same rules the release
+  // scopes in prepare_batch() above and evaluate() below follow:
+  //   * Every numpy array is created BEFORE the scope and destroyed AFTER
+  //     it (`out` owns them and its lifetime brackets the scope), so no
+  //     Py_INCREF / Py_DECREF ever runs with the GIL released.
+  //   * Only POD crosses the boundary: raw double*/bool* into the numpy
+  //     buffers, plus sizes. Everything read inside is plain C++ - double,
+  //     std::array<double, K>, std::vector<double>, std::vector<int> for
+  //     the hue bins - with no nanobind or Python type anywhere in its
+  //     access path.
+  //   * Nothing inside the scope raises. The one condition that can fail
+  //     (a reference_spd row narrower or wider than its column) only sets
+  //     a flag; the throw happens after the scope, with the GIL held.
+  //   * No attribute lookup, no dtype lookup, no numpy object access, and
+  //     no allocation of anything Python-owned.
+  //
+  /// Marshal `results` into a dict of columnar (N, ...) numpy arrays.
+  /// `results` is taken by value and destroyed inside the release scope, so
+  /// the ~17N heap blocks it owns are also freed without holding the GIL.
+  nb::object
+  marshal_columnar(std::vector<std::optional<tm30::Tm30Result>> results,
+                   bool bins, bool samples, bool extras) {
+    // The 99x3 fields are copied as one flat run of 297 doubles per row,
+    // which is only correct if the triples are packed with no padding.
+    static_assert(sizeof(tm30::XyzTriple) == 3 * sizeof(double),
+                  "XyzTriple must be three packed doubles for the row copy");
+    static_assert(sizeof(tm30::Cam02Ucs) == 3 * sizeof(double),
+                  "Cam02Ucs must be three packed doubles for the row copy");
+    static_assert(sizeof(bool) == 1, "numpy's bool_ is one byte per element");
+
+    const std::size_t n = results.size();
+
+    // The key set follows the FIRST VALID row, exactly as
+    // Tm30BatchResult.__init__ does today
+    // (`next((d.keys() for d in raw if d is not None), ())`): with no valid
+    // row at all - an empty batch, or every row rejected - only the six
+    // scalars and `valid` come back, and the array properties keep raising
+    // their friendly AttributeError instead of handing back all-NaN
+    // columns. The same scan supplies reference_spd's width, which is the
+    // reference illuminant's own (S3.5-conformed) grid length and NOT
+    // necessarily the caller's; Tm30BatchResult.__init__ compares the two
+    // and reproduces today's failure when they differ.
+    std::size_t ref_width = 0;
+    bool any_valid = false;
+    for (const auto &opt : results) {
+      if (opt) {
+        any_valid = true;
+        ref_width = opt->colorimetry.reference_spd_values.size();
+        break;
+      }
+    }
+
+    auto np = nb::module_::import_("numpy");
+    // Hoisted: `np.attr("empty")` builds a temporary str on every call, and
+    // a dtype spelled "float64" is re-parsed by numpy on every call. Both
+    // are now paid once per batch instead of once per array.
+    nb::object empty = np.attr("empty");
+    nb::object f64 = np.attr("dtype")("float64");
+    nb::object boolean = np.attr("dtype")("bool");
+
+    // np.empty (not nb::ndarray): a nanobind-exported array would carry
+    // owndata=False and a non-None .base, and these arrays are handed
+    // straight out by Tm30BatchResult's public properties, so that would be
+    // an observable change. numpy keeps ownership of every buffer here.
+    nb::dict out;
+    auto add = [&](const char *key, nb::object shape,
+                   const nb::object &dt) -> void * {
+      nb::object arr = empty(shape, nb::arg("dtype") = dt);
+      void *buf = nb::cast<nb::ndarray<>>(arr).data();
+      out[key] = arr;
+      return buf;
+    };
+    auto col1 = [&](const char *key) {
+      return static_cast<double *>(add(key, nb::make_tuple(n), f64));
+    };
+    auto col2 = [&](const char *key, std::size_t w) {
+      return static_cast<double *>(add(key, nb::make_tuple(n, w), f64));
+    };
+    auto col3 = [&](const char *key, std::size_t a, std::size_t b) {
+      return static_cast<double *>(add(key, nb::make_tuple(n, a, b), f64));
+    };
+
+    // Insertion order matches the order Tm30BatchResult.__init__ builds
+    // `_d` in today (scalars, then _ARRAY_SHAPES order, then
+    // reference_spd), so the dict is a drop-in for it.
+    double *c_rf = col1("rf");
+    double *c_rg = col1("rg");
+    double *c_cct = col1("cct");
+    double *c_duv = col1("duv");
+    double *c_de_avg = col1("delta_e_avg");
+    double *c_rf_skin = col1("rf_skin");
+
+    double *c_rf_cesi = nullptr;
+    double *c_rcs_hj = nullptr;
+    double *c_rhs_hj = nullptr;
+    double *c_rf_hj = nullptr;
+    double *c_de_hj = nullptr;
+    double *c_cvg[6] = {};
+    double *c_xyz_test = nullptr;
+    double *c_xyz_ref = nullptr;
+    double *c_jab_test = nullptr;
+    double *c_jab_ref = nullptr;
+    double *c_hue_bin = nullptr;
+    double *c_ref_spd = nullptr;
+
+    if (any_valid && samples) {
+      c_rf_cesi = col2("rf_cesi", 99);
+    }
+    if (any_valid && bins) {
+      c_rcs_hj = col2("rcs_hj", 16);
+      c_rhs_hj = col2("rhs_hj", 16);
+    }
+    if (any_valid && extras) {
+      c_rf_hj = col2("rf_hj", 16);
+      c_de_hj = col2("de_hj", 16);
+      static const char *const kCvgKeys[6] = {"cvg_j_test", "cvg_x_test",
+                                              "cvg_y_test", "cvg_j_ref",
+                                              "cvg_x_ref",  "cvg_y_ref"};
+      for (int k = 0; k < 6; ++k) {
+        c_cvg[k] = col2(kCvgKeys[k], 16);
+      }
+      c_xyz_test = col3("xyz_test_ces", 99, 3);
+      c_xyz_ref = col3("xyz_ref_ces", 99, 3);
+      c_jab_test = col3("jab_test_ces", 99, 3);
+      c_jab_ref = col3("jab_ref_ces", 99, 3);
+      // float64, not int64: Tm30BatchResult's np.full((n, 99), np.nan)
+      // promotes the per-row int64 array to float64 today, and the batch
+      // path's dtype is that float64. The single-SPD path keeps int64.
+      // 0..15 is exact in double either way.
+      c_hue_bin = col2("hue_bin_index", 99);
+      c_ref_spd = col2("reference_spd", ref_width);
+    }
+    bool *c_valid =
+        static_cast<bool *>(add("valid", nb::make_tuple(n), boolean));
+
+    constexpr double kNan = std::numeric_limits<double>::quiet_NaN();
+    bool ref_width_mismatch = false;
+
+    {
+      nb::gil_scoped_release release;
+      for (std::size_t i = 0; i < n; ++i) {
+        const std::optional<tm30::Tm30Result> &opt = results[i];
+
+        if (!opt) {
+          // A rejected row is NaN across every field, which is what
+          // Tm30BatchResult.__init__'s np.full(..., np.nan) prefill left
+          // behind. Valid rows are overwritten in full (every one of the
+          // 99 CES lands in some hue bin - see bin_by_hue), so prefilling
+          // the whole payload the way Python did is unnecessary.
+          c_valid[i] = false;
+          c_rf[i] = kNan;
+          c_rg[i] = kNan;
+          c_cct[i] = kNan;
+          c_duv[i] = kNan;
+          c_de_avg[i] = kNan;
+          c_rf_skin[i] = kNan;
+          if (c_rf_cesi != nullptr) {
+            std::fill_n(c_rf_cesi + i * 99, 99, kNan);
+          }
+          if (c_rcs_hj != nullptr) {
+            std::fill_n(c_rcs_hj + i * 16, 16, kNan);
+            std::fill_n(c_rhs_hj + i * 16, 16, kNan);
+          }
+          if (c_rf_hj != nullptr) {
+            std::fill_n(c_rf_hj + i * 16, 16, kNan);
+            std::fill_n(c_de_hj + i * 16, 16, kNan);
+            for (int k = 0; k < 6; ++k) {
+              std::fill_n(c_cvg[k] + i * 16, 16, kNan);
+            }
+            std::fill_n(c_xyz_test + i * 297, 297, kNan);
+            std::fill_n(c_xyz_ref + i * 297, 297, kNan);
+            std::fill_n(c_jab_test + i * 297, 297, kNan);
+            std::fill_n(c_jab_ref + i * 297, 297, kNan);
+            std::fill_n(c_hue_bin + i * 99, 99, kNan);
+            std::fill_n(c_ref_spd + i * ref_width, ref_width, kNan);
+          }
+          continue;
+        }
+
+        c_valid[i] = true;
+        const tm30::CesColorimetryResult &cr = opt->colorimetry;
+        c_rf[i] = cr.Rf;
+        c_rg[i] = cr.gamut.Rg;
+        c_cct[i] = cr.cct;
+        c_duv[i] = cr.duv;
+        c_de_avg[i] = cr.delta_e_avg;
+        c_rf_skin[i] = cr.rf_skin;
+
+        if (c_rf_cesi != nullptr) {
+          std::memcpy(c_rf_cesi + i * 99, cr.rf_cesi.data(),
+                      99 * sizeof(double));
+        }
+        if (c_rcs_hj != nullptr) {
+          std::memcpy(c_rcs_hj + i * 16, cr.gamut.local.Rcs_hj_percent.data(),
+                      16 * sizeof(double));
+          std::memcpy(c_rhs_hj + i * 16, cr.gamut.local.Rhs_hj.data(),
+                      16 * sizeof(double));
+        }
+        if (c_rf_hj != nullptr) {
+          std::memcpy(c_rf_hj + i * 16, cr.gamut.local.Rf_hj.data(),
+                      16 * sizeof(double));
+          std::memcpy(c_de_hj + i * 16, cr.gamut.local.DE_hj.data(),
+                      16 * sizeof(double));
+
+          const tm30::CvgCoordinates &cvg = cr.gamut.cvg;
+          const std::array<double, 16> *const cvg_src[6] = {
+              &cvg.J_test, &cvg.x_test, &cvg.y_test,
+              &cvg.J_ref,  &cvg.x_ref,  &cvg.y_ref};
+          for (int k = 0; k < 6; ++k) {
+            std::memcpy(c_cvg[k] + i * 16, cvg_src[k]->data(),
+                        16 * sizeof(double));
+          }
+
+          std::memcpy(c_xyz_test + i * 297, cr.xyz_test_ces.data(),
+                      297 * sizeof(double));
+          std::memcpy(c_xyz_ref + i * 297, cr.xyz_ref_ces.data(),
+                      297 * sizeof(double));
+          std::memcpy(c_jab_test + i * 297, cr.jab_test_ces.data(),
+                      297 * sizeof(double));
+          std::memcpy(c_jab_ref + i * 297, cr.jab_ref_ces.data(),
+                      297 * sizeof(double));
+
+          // The one field that is not a straight copy: invert the per-bin
+          // CES index lists, same as the per-SPD path does, storing the
+          // bin number as a double instead of an int64.
+          double *hue_row = c_hue_bin + i * 99;
+          for (int j = 0; j < 16; ++j) {
+            for (int ces_idx : cr.hue_bins[j]) {
+              hue_row[ces_idx] = static_cast<double>(j);
+            }
+          }
+
+          // Every row of one batch shares one wavelength grid, so every
+          // reference_spd is the same length; the compare keeps the copy
+          // provably in bounds rather than resting on that invariant.
+          const std::vector<double> &rs = cr.reference_spd_values;
+          if (rs.size() == ref_width) {
+            std::memcpy(c_ref_spd + i * ref_width, rs.data(),
+                        ref_width * sizeof(double));
+          } else {
+            ref_width_mismatch = true;
+          }
+        }
+      }
+
+      // Free the ~17N heap blocks the results own here rather than at
+      // function exit, so that too happens off the GIL.
+      results.clear();
+    }
+
+    if (ref_width_mismatch) {
+      throw std::runtime_error(
+          "internal error: reference_spd rows of unequal length in one "
+          "batch - every row of a batch shares one wavelength grid, so "
+          "this should be unreachable");
+    }
+
+    return out;
+  }
+
   // NOTE: `bins`/`samples` gate which arrays get allocated and copied into
   // the per-SPD Python dict at *this* layer - `samples` controls `rf_cesi`,
   // `bins` controls `rcs_hj`/`rhs_hj`. The underlying C++ pipeline in
@@ -621,7 +904,8 @@ struct BatchContext {
   // same kind of gate: it only controls whether its additional fields get
   // array-copied into the per-SPD dict (the C++ pipeline computes them
   // unconditionally either way, same as bins/samples).
-  nb::list evaluate(bool bins, bool samples, bool extras, int n_workers) {
+  nb::object evaluate(bool bins, bool samples, bool extras, int n_workers,
+                      bool columnar) {
     if (n_workers < 1) {
       throw std::invalid_argument(
           "n_workers must be >= 1 (got " + std::to_string(n_workers) +
@@ -638,6 +922,9 @@ struct BatchContext {
           views, cmf_2deg, cmf_10deg, ces_data, daylight_basis, planckian_lut,
           req, static_cast<std::size_t>(n_workers), pool_.get());
     }();
+    if (columnar) {
+      return marshal_columnar(std::move(results), bins, samples, extras);
+    }
     nb::list out;
     auto np = nb::module_::import_("numpy");
     for (auto &opt : results) {
@@ -777,8 +1064,8 @@ struct BatchContext {
   /// try_evaluate_cached() - using the tables set up by set_fixed_grid().
   /// No CES/CMF/daylight-basis resampling happens here; that work was
   /// already done once, at set_fixed_grid() time.
-  nb::list evaluate_cached(bool bins, bool samples, bool extras,
-                           int n_workers) {
+  nb::object evaluate_cached(bool bins, bool samples, bool extras,
+                             int n_workers, bool columnar) {
     if (n_workers < 1) {
       throw std::invalid_argument(
           "n_workers must be >= 1 (got " + std::to_string(n_workers) +
@@ -797,6 +1084,9 @@ struct BatchContext {
                                        req, static_cast<std::size_t>(n_workers),
                                        pool_.get());
     }();
+    if (columnar) {
+      return marshal_columnar(std::move(results), bins, samples, extras);
+    }
     nb::list out;
     auto np = nb::module_::import_("numpy");
     for (auto &opt : results) {
@@ -1490,13 +1780,17 @@ NB_MODULE(tm30_core, m) {
            "wavelengths defaults to 380-780 nm (1 nm step) if None.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
            nb::arg("samples") = false, nb::arg("extras") = false,
-           nb::arg("n_workers") = 1,
+           nb::arg("n_workers") = 1, nb::arg("columnar") = false,
            "Run TM-30 on all prepared SPDs. Returns list of dicts "
            "(or None for failed SPDs). extras=True additionally includes "
            "rf_hj, de_hj, cvg_{j,x,y}_{test,ref}, reference_spd, "
            "xyz_test_ces, and xyz_ref_ces in each dict. n_workers>1 "
            "parallelizes across SPDs (bit-identical results); n_workers<1 "
-           "raises ValueError.")
+           "raises ValueError. columnar=True instead returns ONE dict of "
+           "(N, ...) arrays - one array per field plus a (N,) bool "
+           "'valid' - filled with the GIL released; the values are "
+           "bit-identical, but hue_bin_index comes back as float64 there "
+           "(matching what Tm30BatchResult produces) rather than int64.")
       .def("set_fixed_grid", &BatchContext::set_fixed_grid,
            nb::arg("wavelengths"),
            "Precompute and cache CES/CMF/daylight-basis tables resampled to "
@@ -1505,11 +1799,14 @@ NB_MODULE(tm30_core, m) {
       .def("evaluate_cached", &BatchContext::evaluate_cached,
            nb::arg("bins") = true, nb::arg("samples") = false,
            nb::arg("extras") = false, nb::arg("n_workers") = 1,
+           nb::arg("columnar") = false,
            "Like evaluate(), but uses the grid-fixed tables cached by "
            "set_fixed_grid() and skips CES/CMF/daylight-basis resampling "
            "entirely. Raises RuntimeError if set_fixed_grid() was never "
            "called. n_workers>1 parallelizes across SPDs (bit-identical "
-           "results); n_workers<1 raises ValueError.")
+           "results); n_workers<1 raises ValueError. columnar=True returns "
+           "one dict of (N, ...) arrays instead of a list of per-SPD "
+           "dicts - see evaluate().")
       .def("spd_to_xyz", &BatchContext::spd_to_xyz, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(), nb::arg("K") = nb::none(),
            nb::arg("lambda_min") = nb::none(),
