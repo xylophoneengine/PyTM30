@@ -277,7 +277,15 @@ def _multiindex_dataframe(
     if not fields:
         return pd.DataFrame(index=range(n_rows))
 
-    data_blocks = [np.asarray(v).reshape(n_rows, -1) for v in fields.values()]
+    # Width is computed rather than inferred with -1: at n_rows == 0 every
+    # width is consistent with a size-0 buffer, so numpy refuses to guess and
+    # raises "cannot reshape array of size 0 into shape (0,newaxis)".
+    def _block(value):
+        arr = np.asarray(value)
+        width = int(np.prod(arr.shape[1:])) if arr.ndim > 1 else 1
+        return arr.reshape(n_rows, width)
+
+    data_blocks = [_block(v) for v in fields.values()]
 
     shapes = tuple(
         (key, np.asarray(value).shape[1:]) for key, value in fields.items()

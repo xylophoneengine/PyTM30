@@ -73,6 +73,16 @@ tm30::CesData load_ces(const std::string &path) {
 /// DLPack (which nanobind's ndarray is built on) always reports strides
 /// in element counts, not bytes, so this compares directly against shape.
 bool is_c_contiguous(const nb::ndarray<> &arr) {
+  // An array with no elements has nothing to step over, so numpy leaves its
+  // strides at 0 rather than at the values a non-empty array of the same
+  // shape would carry. The walk below would read those zeros as gaps and
+  // reject a (0, N) array that numpy itself reports as C-contiguous -- and
+  // the advice in the resulting error is unfollowable, because
+  // np.ascontiguousarray() returns the same zero strides.
+  if (arr.size() == 0) {
+    return true;
+  }
+
   int64_t expected = 1;
   for (int i = static_cast<int>(arr.ndim()) - 1; i >= 0; --i) {
     if (arr.shape(i) > 1 && arr.stride(i) != expected)
