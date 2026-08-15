@@ -1,9 +1,9 @@
 ======================================================================
 0) ENVIRONMENT
 ======================================================================
-Date (UTC):     2026-08-15 07:09
-Python:         3.12.13 (CPython)
-OS / machine:   macOS-26.6.1-arm64-arm-64bit (arm64)
+Date (UTC):     2026-08-15 14:28
+Python:         3.14.6 (CPython)
+OS / machine:   macOS-26.6.1-arm64-arm-64bit-Mach-O (arm64)
 CPU:            Apple M4 Pro
 Power mode:     0 (macOS pmset powermode; 1 = low power)
 numpy:          2.5.2
@@ -40,20 +40,20 @@ Calculator: TM30Calc(tables loaded)
 2) SPEED
 ======================================================================
 pytm30 single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.1144 +/- 0.0395 ms/SPD (median 0.1306, max 0.2784)
+  0.0810 +/- 0.0217 ms/SPD (median 0.0915, max 0.1100)
 
 colour-science single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  1.0740 +/- 0.3813 ms/SPD (median 1.0326, max 7.9436)
+  1.0500 +/- 0.2551 ms/SPD (median 1.0235, max 7.8125)
 
-pytm30 is 9.4x faster, single eval
+pytm30 is 13.0x faster, single eval
 
 pytm30 true batch, all 19 SPDs in one call, 100 repetitions:
-  2.5736 +/- 0.0366 ms total (0.1355 ms/SPD)
+  1.7380 +/- 0.0304 ms total (0.0915 ms/SPD)
 
 colour-science pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  20.2105 +/- 0.3968 ms total (1.0637 ms/SPD)
+  19.9289 +/- 0.4403 ms total (1.0489 ms/SPD)
 
-pytm30 is 7.9x faster, batch
+pytm30 is 11.5x faster, batch
 
 Timing plot saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_tm30_timing.png
 

@@ -61,14 +61,14 @@ corpus (`benchmarks/benchmark_tm30.py`):
 
 | Path | colour-science | pytm30 | Speedup |
 |---|---|---|---|
-| Single eval | 1.074 ms/SPD | 0.114 ms/SPD | **9.4x** |
-| Batch (19 SPDs per call) | 1.064 ms/SPD | 0.135 ms/SPD | **7.9x** |
+| Single eval | 1.050 ms/SPD | 0.081 ms/SPD | **13.0x** |
+| Batch (19 SPDs per call) | 1.049 ms/SPD | 0.091 ms/SPD | **11.5x** |
 
 Accuracy on the same corpus: Rf within 0.004, Rg within
 0.001, and CCT within 0.07 K of colour-science's own
 values.
 
-Measured on: Apple M4 Pro, Python 3.12.13,
+Measured on: Apple M4 Pro, Python 3.14.6,
 numpy 2.5.2, colour-science 0.4.7, macOS power mode 0 (automatic) -- full
 environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
 
