@@ -12,7 +12,6 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <numbers> // std::numbers::pi
 
 namespace tm30 {
 namespace {
@@ -174,13 +173,6 @@ inline constexpr double kAOffset = 0.305;
 inline constexpr double kJScale = 100.0;
 
 // -------------------------------------------------------------------------
-// Step 8: atan2 -> degrees
-// -------------------------------------------------------------------------
-
-// TM-30-20 S3.7.1 Eq. (45)
-inline constexpr double kRadToDeg = 180.0 / std::numbers::pi;
-
-// -------------------------------------------------------------------------
 // Step 9 constants (TM-30-20 S3.7.1 Eq. (47))
 // -------------------------------------------------------------------------
 
@@ -192,6 +184,15 @@ inline constexpr double kEtPhase = 2.0;
 
 // TM-30-20 S3.7.1 Eq. (47)
 inline constexpr double kEtBaseline = 3.8;
+
+// cos(2) and sin(2), the two fixed factors of the angle-addition form of
+// Eq. (47) used in ciecam02_forward: cos(h + 2) = cos h cos 2 - sin h sin 2.
+// TM-30-20 S3.7.1 Eq. (47)
+inline const double kCosEtPhase =
+    std::cos(kEtPhase); // not constexpr: see kNbb above
+// TM-30-20 S3.7.1 Eq. (47)
+inline const double kSinEtPhase =
+    std::sin(kEtPhase); // not constexpr: see kNbb above
 
 // -------------------------------------------------------------------------
 // Step 10 constant (TM-30-20 S3.7.1 Eq. (46))
@@ -392,23 +393,47 @@ ciecam02_forward(const XyzTriple &xyz_white,
     const double J = kJScale * std::pow(A_ratio, cz);
 
     // -- Step 8: Hue angle h ----------------------------------------
+    // TM-30-20 S3.7.1 Eq. (45) defines h = atan2(b, a). The angle itself
+    // never leaves this loop: it is consumed only as cos(h + 2) in Eq. (47)
+    // and as cos h / sin h in Eq. (49)-(50). Both follow algebraically from
+    // the chroma radius r = sqrt(a^2 + b^2) that Eq. (46) computes anyway,
+    //   cos h = a / r,   sin h = b / r,
+    // so no angle is formed here. These are exact identities, not
+    // approximations; what disappears with them is the radians -> degrees
+    // -> radians round trip Eq. (45) would otherwise require.
+    const double r = std::sqrt(a * a + b * b);
+
+    // r == 0 means a == b == 0, where Eq. (45) gives h = 0 and hence
+    // cos h = 1, sin h = 0. Those are the correct values here specifically
+    // because `a` cannot be -0.0: `a` and `b` are each the result of a
+    // final addition, and IEEE-754 round-to-nearest gives an exactly-zero
+    // sum the sign +. (Were `a` ever -0.0, atan2(+/-0.0, -0.0) = +/-pi, so
+    // (1, 0) would be a 180-degree error, moving the sample from bin index
+    // 8 to bin index 0 under TM-30-20 S4.3.) No physically realizable input
+    // reaches r == 0 anyway - the closest is XYZ = (0, 0, 0), which gives
+    // a = 8.1e-18 and b exactly +0.0 - so the branch is defensive.
+    // The test is `!= 0.0` rather than `> 0.0` so that a NaN r still
+    // divides and keeps propagating NaN, exactly as atan2 did; the
+    // downstream binning has a live NaN path (hue_bins.cpp).
+    // TM-30-20 S3.7.1 Eq. (45) evaluated at a == b == 0
+    double cos_h = 1.0;
+    double sin_h = 0.0;
     // TM-30-20 S3.7.1 Eq. (45)
-    double h = std::atan2(b, a) * kRadToDeg;
-    if (h < 0.0) {
-      h += 360.0;
+    if (r != 0.0) {
+      cos_h = a / r;
+      sin_h = b / r;
     }
 
     // -- Step 9: Eccentricity et ------------------------------------
-    // TM-30-20 S3.7.1 Eq. (47)
-    // cos((pi/180)*h + 2) where the "+ 2" is in radians
-    const double h_rad = h * std::numbers::pi / 180.0;
-    const double et = kEtScale * (std::cos(h_rad + kEtPhase) + kEtBaseline);
+    // TM-30-20 S3.7.1 Eq. (47): et = 0.25*(cos(h + 2) + 3.8), expanded by
+    // the angle-addition identity cos(h + 2) = cos h cos 2 - sin h sin 2.
+    const double et =
+        kEtScale * (cos_h * kCosEtPhase - sin_h * kSinEtPhase + kEtBaseline);
 
     // -- Step 10: Temporary t ---------------------------------------
     // TM-30-20 S3.7.1 Eq. (46)
     const double denom = Ra + Ga + (21.0 / 20.0) * Ba;
-    const double t =
-        kTFactor * kNc * kNbb * et * std::sqrt(a * a + b * b) / denom;
+    const double t = kTFactor * kNc * kNbb * et * r / denom;
 
     // -- Step 11: Chroma C and Colorfulness M -----------------------
     // TM-30-20 S3.7.1 Eq. (42)
@@ -426,9 +451,7 @@ ciecam02_forward(const XyzTriple &xyz_white,
         (1.0 + kJScale * kJCompress) * J / (1.0 + kJCompress * J);
     // TM-30-20 S3.7.1 Eq. (51)
     const double M_prime = (1.0 / kMCompress) * std::log(1.0 + kMCompress * M);
-    // TM-30-20 S3.7.1 Eq. (49)-(50)
-    const double cos_h = std::cos(h_rad);
-    const double sin_h = std::sin(h_rad);
+    // TM-30-20 S3.7.1 Eq. (49)-(50) - cos h and sin h from Step 8 above
     const double a_prime = M_prime * cos_h;
     const double b_prime = M_prime * sin_h;
 

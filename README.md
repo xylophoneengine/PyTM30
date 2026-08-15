@@ -470,6 +470,10 @@ uncertainty is nine orders of magnitude larger and does reach boundaries.
   measurement uncertainty of a boundary means that SPD's per-bin metrics are
   not reproducible to better than one bin.
 
+Note that PyTM30 obtains `cos h` and `sin h` from the chroma components
+rather than from `atan2`, which is an identity but rounds differently -- see
+[docs/divergences.md](docs/divergences.md).
+
 ---
 
 ## Data Files & Provenance

@@ -129,6 +129,39 @@ The standard prints its tristimulus formulas as true integrals (S3.6
 Eqs. (21)-(28)). PyTM30 evaluates them by the trapezoidal rule, a
 quadrature choice the standard leaves open.
 
+## CIECAM02 hue terms are derived from the chroma components (S3.7.1)
+
+S3.7.1 Eq. (45) defines the CIECAM02 hue angle as `h = atan2(b, a)` in
+degrees. The forward transform never uses the angle itself: Eq. (47)
+consumes `cos(h + 2)` and Eqs. (49)-(50) consume `cos h` and `sin h`.
+PyTM30 therefore takes
+
+```
+cos h = a / r,   sin h = b / r,   r = sqrt(a^2 + b^2)
+```
+
+reusing the `r` that Eq. (46) computes anyway, and expands Eq. (47) as
+`cos(h + 2) = cos h cos 2 - sin h sin 2`. `a == b == 0` is guarded
+explicitly and yields `cos h = 1, sin h = 0`, matching Eq. (45) at the
+origin; unguarded, `a / r` would be `0 / 0`.
+
+These are algebraic identities, so no approximation is introduced and the
+quantities Eqs. (47) and (49)-(50) receive are the ones the clause defines.
+What differs from a literal transcription is the rounding: `atan2` and the
+degree/radian round trip are not evaluated, so results differ in their last
+bits from an implementation that computes the angle explicitly, and that
+difference propagates to everything downstream of the hue terms. `J'`,
+`CCT`, `Duv`, `hue_bin_index`, `reference_spd` and the per-CES `XYZ` are not
+downstream of them and are unaffected.
+
+An implementation needing the literal form -- to match another
+implementation bit-for-bit, or to eliminate this as a variable while
+debugging -- will find the change confined to the hue-term block of
+`ciecam02_forward` in `src/tm30/ciecam02.cpp`, self-contained in one commit
+(`git log --oneline -- src/tm30/ciecam02.cpp`). The tests in
+`tests/slice_06_ciecam02_test.cpp` assert the identities rather than either
+spelling, so they hold either way: `ctest -R "CIECAM02 hue terms" -V`.
+
 ## Rf,skin is a research extension (S4.0)
 
 Rf,skin (the mean of the CES15 and CES18 fidelity values) is informed by

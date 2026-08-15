@@ -18,11 +18,15 @@
 #include "tm30/xyz.hpp"
 #include "tolerances.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <iostream>
+#include <limits>
+#include <numbers>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -679,6 +683,231 @@ TEST_CASE("CIECAM02 - negative XYZ does not produce NaN",
   CHECK_FALSE(std::isnan(result[0].J_prime));
   CHECK_FALSE(std::isnan(result[0].a_prime));
   CHECK_FALSE(std::isnan(result[0].b_prime));
+}
+
+// =========================================================================
+//  Steps 8/9/12: the hue angle is only ever needed as cos h and sin h
+//
+//  TM-30-20 S3.7.1 Eq. (45) defines h = atan2(b, a), but ciecam02_forward
+//  never needs the angle itself: Eq. (47) consumes cos(h + 2), and
+//  Eq. (49)-(50) consume cos h and sin h. This implementation therefore
+//  takes them straight off the opponent channels,
+//
+//      cos h = a / r,   sin h = b / r,   r = sqrt(a^2 + b^2),
+//
+//  reusing the r that Eq. (46) has to compute anyway, and expands Eq. (47)
+//  with the angle-addition identity. See the provenance note in README.md
+//  ("How the hue angle is computed here").
+//
+//  The cases below characterise that substitution. They deliberately do
+//  NOT assert bit-identity against the trig form: the two forms differ in
+//  the last few bits by construction, and the bounds asserted here are the
+//  documented size of that difference.
+// =========================================================================
+
+/// The three quantities Steps 9 and 12 need from the hue angle.
+struct HueTerms {
+  double cos_h; // TM-30-20 S3.7.1 Eq. (49)-(50)
+  double sin_h; // TM-30-20 S3.7.1 Eq. (49)-(50)
+  double et;    // TM-30-20 S3.7.1 Eq. (47)
+};
+
+/// The trig form: Eq. (45)'s atan2, its degrees round trip, and libm
+/// cos/sin. This is what a naive reading of the standard produces, and it
+/// is the reference the shipped substitution is measured against.
+HueTerms hue_terms_trig(double a, double b) {
+  // TM-30-20 S3.7.1 Eq. (45)
+  const double rad_to_deg = 180.0 / std::numbers::pi;
+  double h = std::atan2(b, a) * rad_to_deg;
+  if (h < 0.0)
+    h += 360.0; // TM-30-20 S3.7.1 Eq. (45): wrap onto [0, 360)
+  const double h_rad = h * std::numbers::pi / 180.0;
+  HueTerms out{};
+  out.cos_h = std::cos(h_rad); // TM-30-20 S3.7.1 Eq. (49)
+  out.sin_h = std::sin(h_rad); // TM-30-20 S3.7.1 Eq. (50)
+  // TM-30-20 S3.7.1 Eq. (47)
+  out.et = 0.25 * (std::cos(h_rad + 2.0) + 3.8);
+  return out;
+}
+
+/// The shipped form, mirroring src/tm30/ciecam02.cpp Steps 8-9. Kept in
+/// the test so the substitution can be exercised over inputs the pipeline
+/// cannot reach - in particular r == 0, which no physical SPD produces.
+HueTerms hue_terms_direct(double a, double b) {
+  const double r = std::sqrt(a * a + b * b);
+  HueTerms out{1.0, 0.0, 0.0};
+  if (r != 0.0) {
+    out.cos_h = a / r;
+    out.sin_h = b / r;
+  }
+  // TM-30-20 S3.7.1 Eq. (47), by cos(h + 2) = cos h cos 2 - sin h sin 2
+  const double cos2 = std::cos(2.0);
+  const double sin2 = std::sin(2.0);
+  out.et = 0.25 * (out.cos_h * cos2 - out.sin_h * sin2 + 3.8);
+  return out;
+}
+
+/// Deterministic sweep of the opponent (a, b) plane: 1440 hue directions
+/// at 0.25 deg spacing - so every 22.5 deg bin boundary of TM-30-20 S4.3
+/// is landed on exactly - crossed with chroma radii spanning the range the
+/// transform can produce and well beyond it. Trig is used here only to
+/// GENERATE inputs; nothing under test consumes an angle.
+///
+/// The radii stop at 1e100: Eq. (46) already squares a and b, so radii
+/// near the overflow and underflow limits of a^2 + b^2 are outside what
+/// this substitution changes - the shipped code computed that same
+/// sqrt(a^2 + b^2) before the substitution and after it.
+std::vector<std::pair<double, double>> opponent_sweep() {
+  std::vector<std::pair<double, double>> out;
+  const int n_dir = 1440; // 0.25 deg steps
+  for (const double radius :
+       {1.0e-100, 1.0e-8, 1.0e-4, 4.56e-3, 1.0, 12.7, 800.0, 1.0e100}) {
+    for (int k = 0; k < n_dir; ++k) {
+      const double theta =
+          2.0 * std::numbers::pi * static_cast<double>(k) / n_dir;
+      out.emplace_back(radius * std::cos(theta), radius * std::sin(theta));
+    }
+  }
+  // Exact axis cases, where one component is a true zero and the trig form
+  // returns a nonzero sin(pi) / cos(pi/2) residue instead.
+  for (const double m : {1.0e-8, 1.0, 800.0}) {
+    out.emplace_back(m, 0.0);
+    out.emplace_back(-m, 0.0);
+    out.emplace_back(0.0, m);
+    out.emplace_back(0.0, -m);
+  }
+  return out;
+}
+
+TEST_CASE("CIECAM02 hue terms - the direction taken from the chroma "
+          "components is a unit vector",
+          "[ciecam02][slice06][hue_terms]") {
+  double worst_norm = 0.0;
+  double worst_et_lo = 2.0;
+  double worst_et_hi = 0.0;
+
+  for (const auto &[a, b] : opponent_sweep()) {
+    const HueTerms d = hue_terms_direct(a, b);
+    INFO("a = " << a << ", b = " << b);
+    REQUIRE_FALSE(std::isnan(d.cos_h));
+    REQUIRE_FALSE(std::isnan(d.sin_h));
+    worst_norm = std::max(
+        worst_norm, std::abs(d.cos_h * d.cos_h + d.sin_h * d.sin_h - 1.0));
+    worst_et_lo = std::min(worst_et_lo, d.et);
+    worst_et_hi = std::max(worst_et_hi, d.et);
+  }
+
+  std::cout << "\nhue direction from chroma components\n"
+            << "  worst |cos^2 + sin^2 - 1| : " << worst_norm << "\n"
+            << "  et range                  : [" << worst_et_lo << ", "
+            << worst_et_hi << "]\n"
+            << std::flush;
+
+  // ASSERTED: cos h and sin h are a genuine unit vector. Both are a
+  // correctly-rounded division by a correctly-rounded sqrt, and IEEE-754
+  // mandates both operations exactly, so the norm error is bounded by a
+  // small multiple of the machine epsilon on every conforming platform:
+  // ~1.5 eps from r, doubled through the squares, plus ~1.5 eps from
+  // squaring and adding - about 5 eps = 1.1e-15 in the worst case.
+  // Measured here: 4.4e-16 (2 eps). The bound is set an order of
+  // magnitude above the theoretical worst, not above the measurement.
+  CHECK(worst_norm < 1.0e-14);
+
+  // ASSERTED: Eq. (47) cannot leave its mathematical range. et is
+  // 0.25*(cos(h + 2) + 3.8) with cos in [-1, 1], so et is in [0.7, 1.2].
+  // The angle-addition form only respects that if cos h and sin h really
+  // are a unit vector, so this is the same claim seen from Step 9.
+  CHECK(worst_et_lo >= 0.7 - 1.0e-15);
+  CHECK(worst_et_hi <= 1.2 + 1.0e-15);
+}
+
+TEST_CASE("CIECAM02 hue terms - agreement with the trig form of "
+          "Eq. (45)-(47), to rounding",
+          "[ciecam02][slice06][hue_terms]") {
+  double worst_cos = 0.0;
+  double worst_sin = 0.0;
+  double worst_et = 0.0;
+
+  for (const auto &[a, b] : opponent_sweep()) {
+    const HueTerms t = hue_terms_trig(a, b);
+    const HueTerms d = hue_terms_direct(a, b);
+    INFO("a = " << a << ", b = " << b);
+    worst_cos = std::max(worst_cos, std::abs(d.cos_h - t.cos_h));
+    worst_sin = std::max(worst_sin, std::abs(d.sin_h - t.sin_h));
+    worst_et = std::max(worst_et, std::abs(d.et - t.et));
+  }
+
+  std::cout << "\ndirect vs trig form, over the (a, b) sweep\n"
+            << "  worst |d cos h| : " << worst_cos << "\n"
+            << "  worst |d sin h| : " << worst_sin << "\n"
+            << "  worst |d et|    : " << worst_et << "\n"
+            << std::flush;
+
+  // ASSERTED: the two forms agree to rounding, and no further. The bounds
+  // are absolute (not ULP) because the difference is dominated by the trig
+  // form's own radians -> degrees -> radians round trip, whose error is
+  // proportional to the angle rather than to the value being compared.
+  // They are stated an order of magnitude above what is measured here so
+  // they hold on a libm whose atan2/cos/sin are a few ULP worse than this
+  // machine's; a tighter bound would be asserting a property of Apple libm
+  // rather than of this substitution.
+  CHECK(worst_cos < 1.0e-13);
+  CHECK(worst_sin < 1.0e-13);
+  CHECK(worst_et < 1.0e-14);
+}
+
+TEST_CASE("CIECAM02 hue terms - the r == 0 guard reproduces "
+          "atan2(+0.0, +0.0) and still propagates NaN",
+          "[ciecam02][slice06][hue_terms]") {
+  // a == b == 0 makes a/r and b/r 0/0 = NaN, so Step 8 guards it. The
+  // guard value is the h = 0 that Eq. (45) gives, and it is correct here
+  // because a and b are each the result of a final addition and IEEE-754
+  // round-to-nearest gives an exactly-zero sum the sign +. A negative-zero
+  // a would instead mean atan2(a, b) = +/-pi.
+  const HueTerms z = hue_terms_direct(0.0, 0.0);
+  CHECK(z.cos_h == 1.0);
+  CHECK(z.sin_h == 0.0);
+  CHECK_FALSE(std::isnan(z.et));
+  CHECK(z.et == hue_terms_trig(0.0, 0.0).et);
+
+  // ASSERTED: the guard tests `!= 0.0`, not `> 0.0`, so a NaN opponent
+  // channel still divides and keeps propagating NaN the way atan2 did.
+  // hue_bins.cpp has a live NaN path that depends on that.
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (const auto &[a, b] :
+       {std::pair{nan, 1.0}, std::pair{1.0, nan}, std::pair{nan, nan}}) {
+    INFO("a = " << a << ", b = " << b);
+    const HueTerms d = hue_terms_direct(a, b);
+    CHECK(std::isnan(d.cos_h));
+    CHECK(std::isnan(d.sin_h));
+    CHECK(std::isnan(d.et));
+  }
+}
+
+TEST_CASE("CIECAM02 hue terms - near-achromatic samples stay finite and "
+          "near the achromatic axis",
+          "[ciecam02][slice06][hue_terms]") {
+  // The inputs that come closest to a == b == 0 through the public
+  // interface. None of them reaches it: XYZ = (0, 0, 0) forces
+  // Ra = Ga = Ba = 0.1 exactly, which makes b exactly +0.0 but leaves a at
+  // ~8e-18, and a sample equal to the white point is achromatic only to
+  // ~5e-05. So the Step 8 guard is defensive - what is asserted here is
+  // that the neighbourhood of the guard behaves.
+  const XyzTriple white{94.811, 100.0, 107.304}; // D65, 10-deg
+
+  for (const double scale : {0.0, 0.25, 0.5, 1.0}) {
+    INFO("sample = " << scale << " x white");
+    std::array<XyzTriple, 99> samples;
+    samples.fill(XyzTriple{scale * white.X, scale * white.Y, scale * white.Z});
+
+    const auto result = ciecam02_forward(white, samples);
+
+    CHECK(std::isfinite(result[0].J_prime));
+    CHECK(std::isfinite(result[0].a_prime));
+    CHECK(std::isfinite(result[0].b_prime));
+    // Chroma is small but the coordinates are well defined - no 0/0.
+    CHECK(std::hypot(result[0].a_prime, result[0].b_prime) < 1.0e-2);
+  }
 }
 
 } // anonymous namespace
