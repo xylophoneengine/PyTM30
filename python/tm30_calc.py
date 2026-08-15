@@ -46,6 +46,7 @@ from __future__ import annotations
 import numpy as np
 import tm30_core
 from enum import Enum
+from functools import lru_cache
 import os
 
 
@@ -226,6 +227,43 @@ def _field_column_tuples(
     )
 
 
+def _wavelength_key(wavelengths: np.ndarray | None) -> tuple:
+    """Hashable key for `wavelengths`, keyed on its VALUES not just its
+    length -- `_field_column_tuples` reads the actual wavelength values
+    for the 'reference_spd' column labels (`wvl_{w:g}`), so two same-length
+    grids with different points must not collide in the MultiIndex cache."""
+    if wavelengths is None:
+        return (None,)
+    return (len(wavelengths), wavelengths.tobytes())
+
+
+# Bounded cache for the (field-signature, wavelength-grid) -> MultiIndex
+# mapping. maxsize=16: a 1954-column MultiIndex is ~16 KiB pickled, so 16
+# entries is ~256 KiB worst case -- bounded regardless of how many distinct
+# wavelength grids or field-signatures a caller cycles through, unlike an
+# unbounded module-level dict keyed on user-supplied grids.
+@lru_cache(maxsize=16)
+def _cached_multiindex(shapes: tuple, wl_key: tuple):
+    """Build the luxpy-style column pd.MultiIndex for a given field
+    signature (`shapes`: ordered (field_key, per_row_shape) pairs) and
+    wavelength-grid key. Column labels are a pure function of these two
+    things and never of the data itself, so the result is safe to memoize."""
+    import pandas as pd
+
+    wavelengths = None
+    if wl_key[0] is not None:
+        _, wl_bytes = wl_key
+        wavelengths = np.frombuffer(wl_bytes, dtype=np.float64)
+
+    col_tuples: list[tuple] = []
+    for key, per_row_shape in shapes:
+        col_tuples.extend(_field_column_tuples(key, per_row_shape, wavelengths))
+
+    max_depth = max(len(t) for t in col_tuples)
+    padded = [t + ("",) * (max_depth - len(t)) for t in col_tuples]
+    return pd.MultiIndex.from_tuples(padded)
+
+
 def _multiindex_dataframe(
     fields: dict[str, np.ndarray],
     n_rows: int,
@@ -236,21 +274,36 @@ def _multiindex_dataframe(
     tm30_dict_to_dataframe() final hstack + pd.MultiIndex.from_tuples()."""
     import pandas as pd
 
-    col_tuples: list[tuple] = []
-    data_blocks: list[np.ndarray] = []
-    for key, value in fields.items():
-        value = np.asarray(value)
-        per_row_shape = value.shape[1:]
-        col_tuples.extend(_field_column_tuples(key, per_row_shape, wavelengths))
-        data_blocks.append(value.reshape(n_rows, -1))
-
-    if not col_tuples:
+    if not fields:
         return pd.DataFrame(index=range(n_rows))
 
-    max_depth = max(len(t) for t in col_tuples)
-    padded = [t + ("",) * (max_depth - len(t)) for t in col_tuples]
-    final_data = np.hstack(data_blocks)
-    return pd.DataFrame(final_data, columns=pd.MultiIndex.from_tuples(padded))
+    data_blocks = [np.asarray(v).reshape(n_rows, -1) for v in fields.values()]
+
+    shapes = tuple(
+        (key, np.asarray(value).shape[1:]) for key, value in fields.items()
+    )
+    # The wavelength grid only affects column labels via the 'reference_spd'
+    # field (see _field_column_tuples); omitting it from the key otherwise
+    # lets calls with different wavelength grids but the same field
+    # signature share a cache entry.
+    wl_key = _wavelength_key(wavelengths) if "reference_spd" in fields else (None,)
+    columns = _cached_multiindex(shapes, wl_key)
+
+    # Build the destination in F-order (column-major) and hand it to
+    # pandas with copy=False: pandas' internal block layout is column-
+    # major C-contiguous (ncols, n_rows), i.e. exactly the transpose of an
+    # F-order (n_rows, ncols) array -- a zero-copy view, not the strided
+    # transpose-copy `pd.DataFrame(np.hstack(...))` (C-order input) forces.
+    ncols = sum(b.shape[1] for b in data_blocks)
+    dtype = np.result_type(*data_blocks)
+    final_data = np.empty((n_rows, ncols), dtype=dtype, order="F")
+    c = 0
+    for b in data_blocks:
+        w = b.shape[1]
+        final_data[:, c : c + w] = b
+        c += w
+
+    return pd.DataFrame(final_data, columns=columns, copy=False)
 
 
 class Tm30Result:
@@ -868,20 +921,27 @@ def to_dataframe(
         return pd.DataFrame()
 
     if multiindex:
+        # Read _d directly instead of round-tripping through the property
+        # (which just does float(self._d[key]) / np.asarray(self._d[key])
+        # for exactly these keys -- _present_keys() guarantees each key is
+        # present on every result, so the property's presence-checking
+        # branches never fire here anyway).
         keys = results[0]._present_keys()
         fields = {
-            key: np.array([getattr(r, key) for r in results], dtype=np.float64)
+            key: np.array([r._d[key] for r in results], dtype=np.float64)
             for key in keys
         }
         return _multiindex_dataframe(
             fields, n_rows=n, wavelengths=results[0]._wavelengths
         )
 
-    # Scalar columns via numpy (fastest path)
+    # Scalar columns via numpy (fastest path). Reads _d directly -- same
+    # reasoning as above; the scalar properties are unconditional
+    # float(self._d[key]) with no presence check to preserve.
     data: dict[str, np.ndarray] = {}
     for key in Tm30Result._SCALAR_KEYS:
         data[key] = np.fromiter(
-            (getattr(r, key) for r in results), dtype=np.float64, count=n
+            (r._d[key] for r in results), dtype=np.float64, count=n
         )
 
     if arrays or expand_arrays:
