@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -70,6 +71,109 @@ TEST_CASE("Reference - Planckian values monotonic with T at fixed wavelength",
   REQUIRE(spd_6500[0] > spd_2700[0]);
   // At long wavelengths (780nm), higher T -> lower relative radiance
   REQUIRE(spd_6500[400] < spd_2700[400]);
+}
+
+// -- Grid-fixed lambda^(-5) table -----------------------------------
+
+// Bucket-3 invariant: generate_planckian() must not depend on WHERE the
+// grid-fixed lambda^(-5) factor of TM-30-20 S3.3 Eq. (6) came from.
+//
+// The cached pipeline builds that factor once per wavelength grid
+// (planckian_lambda_pow_table(), stored on ResampledTables) and hands it
+// to generate_planckian(); the per-call path has no such table and lets
+// generate_planckian() build one itself. Both must return bit-identical
+// SPDs, because both evaluate the identical std::pow expression on the
+// identical argument - only the number of times differs.
+//
+// Asserted with ==, not a tolerance: this is an equality between two
+// things this test computes on the machine it runs on, so it is
+// portable to any libm. A tolerance here would let a genuine
+// reassociation (e.g. hoisting c2/lambda out of the exponent, which
+// costs 2 ULP) slip through unnoticed.
+TEST_CASE("Reference - Planckian bit-identical with and without the "
+          "precomputed lambda^(-5) grid table",
+          "[reference][slice04]") {
+  // Two grid resolutions: the 1 nm grid the cached pipeline uses, and a
+  // 5 nm grid, so the invariant is not an accident of one grid.
+  std::vector<std::vector<double>> grids;
+  grids.push_back(wl_1nm());
+  {
+    std::vector<double> wl_5nm(81);
+    for (int i = 0; i < 81; ++i)
+      wl_5nm[i] = 380.0 + 5.0 * i;
+    grids.push_back(wl_5nm);
+  }
+
+  for (const auto &wl : grids) {
+    const std::vector<double> table = planckian_lambda_pow_table(wl);
+    REQUIRE(table.size() == wl.size());
+
+    // Covers the pure-Planckian branch (Tt <= 4000 K, Eq. (14)) and the
+    // blend branch (4000 < Tt < 5000, Eq. (15)), plus the range beyond it.
+    for (double cct = 1500.0; cct <= 5000.0; cct += 25.0) {
+      const std::vector<double> without = generate_planckian(cct, wl);
+      const std::vector<double> with = generate_planckian(cct, wl, &table);
+
+      REQUIRE(with.size() == without.size());
+      for (std::size_t i = 0; i < without.size(); ++i) {
+        // Bit-identity, not "within tolerance".
+        REQUIRE(with[i] == without[i]);
+      }
+    }
+  }
+}
+
+TEST_CASE("Reference - Planckian ignores a table that does not match the grid",
+          "[reference][slice04]") {
+  auto wl = wl_1nm();
+  const std::vector<double> expected = generate_planckian(2700.0, wl);
+
+  // A null table and a wrong-length table both fall back to computing
+  // lambda^(-5) inline, so the result is unchanged either way.
+  const std::vector<double> empty_table;
+  const std::vector<double> short_table = planckian_lambda_pow_table(
+      std::vector<double>(wl.begin(), wl.begin() + 10));
+
+  const std::vector<double> from_null = generate_planckian(2700.0, wl, nullptr);
+  const std::vector<double> from_empty =
+      generate_planckian(2700.0, wl, &empty_table);
+  const std::vector<double> from_short =
+      generate_planckian(2700.0, wl, &short_table);
+
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    REQUIRE(from_null[i] == expected[i]);
+    REQUIRE(from_empty[i] == expected[i]);
+    REQUIRE(from_short[i] == expected[i]);
+  }
+}
+
+// The same invariant one level up: generate_reference_spd() has to
+// thread the table into BOTH of its generate_planckian() calls - the
+// pure-Planckian branch (Eq. (14)) and the blend branch (Eq. (15)) -
+// or the blend silently keeps the untabulated result.
+TEST_CASE("Reference - reference SPD bit-identical with and without the "
+          "precomputed lambda^(-5) grid table",
+          "[reference][slice04]") {
+  auto wl = wl_1nm();
+  auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  auto cmf = load_cmf_10deg(data_path("cmf_1964_10.csv"));
+  const std::vector<double> table = planckian_lambda_pow_table(wl);
+
+  // 2700/3500 K: pure Planckian.  4200/4500/4800 K: blend.
+  // 6500 K: pure D-series, which never touches the table at all.
+  for (double cct : {2700.0, 3500.0, 4000.0, 4200.0, 4500.0, 4800.0, 6500.0}) {
+    const std::vector<double> without =
+        generate_reference_spd(cct, wl, basis, cmf.y_bar,
+                               /*already_resampled=*/false);
+    const std::vector<double> with =
+        generate_reference_spd(cct, wl, basis, cmf.y_bar,
+                               /*already_resampled=*/false, &table);
+
+    REQUIRE(with.size() == without.size());
+    for (std::size_t i = 0; i < without.size(); ++i) {
+      REQUIRE(with[i] == without[i]);
+    }
+  }
 }
 
 // -- D-series -------------------------------------------------------

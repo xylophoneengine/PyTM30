@@ -29,17 +29,44 @@ struct DaylightBasis {
 /// @throws std::runtime_error on file-not-found or parse failure.
 DaylightBasis load_daylight_basis(const std::string &filepath);
 
+/// Precompute the grid-fixed lambda^(-5) factor of TM-30-20 S3.3 Eq. (6).
+///
+/// Element i is std::pow(wavelengths[i] * 1.0e-9, -5.0), i.e. the half of
+/// Planck's law that depends only on the wavelength and not on the
+/// temperature. generate_planckian() otherwise recomputes it - one
+/// std::pow per grid point - on every call.
+///
+/// Exposed so callers who share one wavelength grid across many SPDs can
+/// build the table once and pass it to generate_planckian() /
+/// generate_reference_spd() (see prepare_resampled_tables(), which stores
+/// it on ResampledTables). The result is bit-identical either way: the
+/// table holds the value of the very same std::pow expression the loop
+/// would have evaluated.
+///
+/// TM-30-20 S3.3 Eq. (6)
+std::vector<double>
+planckian_lambda_pow_table(const std::vector<double> &wavelengths);
+
 /// Generate a Planckian radiator SPD at the given CCT.
 ///
 /// Normalized at 560 nm so that Sr,P(560 nm) = 1.0.
 ///
 /// @param cct         Correlated color temperature (K).
 /// @param wavelengths Wavelength grid (nm), monotonically increasing.
+/// @param lambda_pow_m5
+///                    Optional precomputed lambda^(-5) table for
+///                    `wavelengths` (see planckian_lambda_pow_table()) -
+///                    a pure performance optimization with no effect on
+///                    the result. When null, or when its length does not
+///                    match `wavelengths`, the table is built internally
+///                    instead. Defaults to null, preserving existing
+///                    behavior for all current callers.
 /// @return            SPD values at each wavelength, normalized at 560 nm.
 ///
 /// TM-30-20 S3.3 Eq. (5)-(6)
-std::vector<double> generate_planckian(double cct,
-                                       const std::vector<double> &wavelengths);
+std::vector<double>
+generate_planckian(double cct, const std::vector<double> &wavelengths,
+                   const std::vector<double> *lambda_pow_m5 = nullptr);
 
 /// Resample daylight basis vectors (S0, S1, S2) to a target wavelength
 /// grid, using the same linear-interpolation + flat-extrapolation rule
@@ -100,6 +127,9 @@ std::vector<double> generate_cie_d(double cct,
 /// @param already_resampled
 ///                    Forwarded to generate_cie_d() - see its docs.
 ///                    Defaults to false, preserving existing behavior.
+/// @param lambda_pow_m5
+///                    Forwarded to generate_planckian() - see its docs.
+///                    Defaults to null, preserving existing behavior.
 /// @return            Reference illuminant SPD, normalized at 560 nm.
 ///
 /// TM-30-20 S3.3 Eq. (13)-(16)
@@ -107,6 +137,7 @@ std::vector<double>
 generate_reference_spd(double cct, const std::vector<double> &wavelengths,
                        const DaylightBasis &basis,
                        const std::vector<double> &cmf_y_bar,
-                       bool already_resampled = false);
+                       bool already_resampled = false,
+                       const std::vector<double> *lambda_pow_m5 = nullptr);
 
 } // namespace tm30

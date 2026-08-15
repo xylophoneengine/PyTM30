@@ -107,6 +107,13 @@ struct ResampledTables {
   CmfData cmf_10deg; // CIE 1964 10-deg CMF, resampled to `wavelengths`.
   DaylightBasis
       daylight_basis; // Daylight basis (S0,S1,S2), resampled to `wavelengths`.
+  std::vector<double>
+      lambda_pow_m5; // lambda^(-5), lambda in metres, one per grid point.
+                     // The grid-fixed half of Planck's law, which
+                     // generate_planckian() would otherwise recompute for
+                     // every SPD that reaches the Planckian or blend
+                     // branch. See planckian_lambda_pow_table().
+                     // TM-30-20 S3.3 Eq. (6)
 };
 
 /// Precompute (once) all wavelength-grid-dependent resampled tables for a

@@ -106,14 +106,56 @@ resample_daylight_basis(const std::vector<double> &target_wavelengths,
 }
 
 // -------------------------------------------------------------------------
-// generate_planckian
+// planckian_lambda_pow_table / generate_planckian
 // -------------------------------------------------------------------------
 
-std::vector<double> generate_planckian(double cct,
-                                       const std::vector<double> &wavelengths) {
-  // TM-30-20 S3.3, Eq. (6): second radiation constant
-  constexpr double c2 = 1.4388e-2; // TM-30-20 S3.3 Eq. (6)
+namespace {
 
+// TM-30-20 S3.3, Eq. (6): second radiation constant
+constexpr double kC2 = 1.4388e-2; // TM-30-20 S3.3 Eq. (6)
+
+/// One grid point of the 560-nm-normalised Planckian SPD.
+///
+/// `lambda_m5` is the lambda^(-5) factor of Eq. (6). It is passed in
+/// rather than computed here because it depends only on the wavelength
+/// grid, so a caller evaluating many SPDs on one grid can hoist it into a
+/// table - see planckian_lambda_pow_table(). Everything else in Eq. (6)
+/// lives here and nowhere else, which is what makes the tabulated and
+/// untabulated paths bit-identical rather than merely close.
+///
+/// The exponent argument is deliberately left as c2 / (lambda_m * cct).
+/// Folding it to (c2 / lambda_m) / cct would make that grid-fixed too,
+/// but it is a different order of operations and measures 2 ULP worse
+/// (worst case at 1500 K on a 380-780 nm 1 nm grid) for the price of one
+/// multiply. Do not "optimize" it.
+inline double planckian_point(double lambda_m5, double lambda_m, double cct,
+                              double L_560) {
+  // TM-30-20 S3.3 Eq. (6)
+  const double L_lambda = lambda_m5 / (std::exp(kC2 / (lambda_m * cct)) - 1.0);
+
+  // TM-30-20 S3.3 Eq. (5): normalise at 560 nm
+  return L_lambda / L_560; // TM-30-20 S3.3 Eq. (5)
+}
+
+} // anonymous namespace
+
+std::vector<double>
+planckian_lambda_pow_table(const std::vector<double> &wavelengths) {
+  const std::size_t n = wavelengths.size();
+  std::vector<double> table(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    // Convert nm to m: 1 nm = 1e-9 m
+    const double lambda_m = wavelengths[i] * 1.0e-9; // TM-30-20 S3.3
+    // TM-30-20 S3.3 Eq. (6): the lambda^(-5) factor, which depends on the
+    // wavelength grid alone and not on the temperature.
+    table[i] = std::pow(lambda_m, -5.0); // TM-30-20 S3.3 Eq. (6)
+  }
+  return table;
+}
+
+std::vector<double>
+generate_planckian(double cct, const std::vector<double> &wavelengths,
+                   const std::vector<double> *lambda_pow_m5) {
   const std::size_t n = wavelengths.size();
   std::vector<double> spd(n);
 
@@ -124,19 +166,29 @@ std::vector<double> generate_planckian(double cct,
   //   Le,lambda(lambda, T) = lambda^(-5) / (exp(c2/(lambda*T)) - 1)
   const double L_560 =
       std::pow(lambda_560_m, -5.0) /
-      (std::exp(c2 / (lambda_560_m * cct)) - 1.0); // TM-30-20 S3.3 Eq. (6)
+      (std::exp(kC2 / (lambda_560_m * cct)) - 1.0); // TM-30-20 S3.3 Eq. (6)
 
-  for (std::size_t i = 0; i < n; ++i) {
-    // Convert nm to m: 1 nm = 1e-9 m
-    const double lambda_m = wavelengths[i] * 1.0e-9; // TM-30-20 S3.3
-
-    // TM-30-20 S3.3 Eq. (6)
-    const double L_lambda =
-        std::pow(lambda_m, -5.0) /
-        (std::exp(c2 / (lambda_m * cct)) - 1.0); // TM-30-20 S3.3 Eq. (6)
-
-    // TM-30-20 S3.3 Eq. (5): normalise at 560 nm
-    spd[i] = L_lambda / L_560; // TM-30-20 S3.3 Eq. (5)
+  // Two spellings of the same loop. The first reads the grid-fixed
+  // lambda^(-5) factor off a table the caller built once for this grid;
+  // the second is the original, one std::pow per point. Both feed the
+  // identical planckian_point(), so they agree bit-for-bit - asserted in
+  // tests/slice_04_reference_test.cpp.
+  if (lambda_pow_m5 != nullptr && lambda_pow_m5->size() == n) {
+    const std::vector<double> &pow_m5 = *lambda_pow_m5;
+    for (std::size_t i = 0; i < n; ++i) {
+      // Convert nm to m: 1 nm = 1e-9 m
+      const double lambda_m = wavelengths[i] * 1.0e-9; // TM-30-20 S3.3
+      spd[i] = planckian_point(pow_m5[i], lambda_m, cct, L_560);
+    }
+  } else {
+    for (std::size_t i = 0; i < n; ++i) {
+      // Convert nm to m: 1 nm = 1e-9 m
+      const double lambda_m = wavelengths[i] * 1.0e-9; // TM-30-20 S3.3
+      // TM-30-20 S3.3 Eq. (6): same expression planckian_lambda_pow_table()
+      // stores, so the two loops agree bit-for-bit.
+      const double lambda_m5 = std::pow(lambda_m, -5.0);
+      spd[i] = planckian_point(lambda_m5, lambda_m, cct, L_560);
+    }
   }
 
   return spd;
@@ -240,16 +292,15 @@ std::vector<double> generate_cie_d(double cct,
 // generate_reference_spd
 // -------------------------------------------------------------------------
 
-std::vector<double>
-generate_reference_spd(double cct, const std::vector<double> &wavelengths,
-                       const DaylightBasis &basis,
-                       const std::vector<double> &cmf_y_bar,
-                       bool already_resampled) {
+std::vector<double> generate_reference_spd(
+    double cct, const std::vector<double> &wavelengths,
+    const DaylightBasis &basis, const std::vector<double> &cmf_y_bar,
+    bool already_resampled, const std::vector<double> *lambda_pow_m5) {
   const std::size_t n = wavelengths.size();
 
   // TM-30-20 S3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   if (cct <= 4000.0) { // TM-30-20 S3.3 Eq. (14)
-    return generate_planckian(cct, wavelengths);
+    return generate_planckian(cct, wavelengths, lambda_pow_m5);
   }
 
   // TM-30-20 S3.3 Eq. (16): Tt >= 5000 K -> pure D-series
@@ -267,8 +318,8 @@ generate_reference_spd(double cct, const std::vector<double> &wavelengths,
   //
   // TM-30-20 S3.3 Eq. (13) and normative text
 
-  std::vector<double> planck =
-      generate_planckian(cct, wavelengths); // TM-30-20 S3.3 Eq. (5)
+  std::vector<double> planck = generate_planckian(
+      cct, wavelengths, lambda_pow_m5); // TM-30-20 S3.3 Eq. (5)
   std::vector<double> daylight = generate_cie_d(
       cct, wavelengths, basis, already_resampled); // TM-30-20 S3.3 Eq. (7)
 

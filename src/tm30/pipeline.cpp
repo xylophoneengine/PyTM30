@@ -150,6 +150,9 @@ prepare_resampled_tables(const std::vector<double> &target_wavelengths,
   tables.cmf_10deg = resample_cmf(target_wavelengths, cmf_10deg_src);
   tables.daylight_basis =
       resample_daylight_basis(target_wavelengths, daylight_basis_src);
+  // TM-30-20 S3.3 Eq. (6): grid-fixed lambda^(-5), so generate_planckian()
+  // does not repeat 401 std::pow calls per SPD.
+  tables.lambda_pow_m5 = planckian_lambda_pow_table(target_wavelengths);
   return tables;
 }
 
@@ -175,10 +178,12 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   // -- Step 4: Generate reference illuminant SPD -------------------------
   // TM-30-20 S3.3 Eq. (13)-(16). Daylight basis is already resampled to
   // spd_wavelengths (tables.daylight_basis), so skip the internal
-  // interpolation that generate_cie_d() would otherwise redo.
+  // interpolation that generate_cie_d() would otherwise redo. Likewise the
+  // grid-fixed lambda^(-5) factor of Eq. (6) is precomputed on the tables,
+  // so generate_planckian() does not rebuild it per SPD.
   const std::vector<double> ref_spd = generate_reference_spd(
       cct_duv.cct, spd_wavelengths, tables.daylight_basis, cmf10.y_bar,
-      /*already_resampled=*/true);
+      /*already_resampled=*/true, &tables.lambda_pow_m5);
   // TM-30-20 S3.3
 
   // -- Step 5: Compute test source 10-deg XYZ -> normalisation constant kt ---
