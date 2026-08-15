@@ -1,0 +1,33 @@
+# Bundled standard-illuminant SPD corpus -- the single source of truth for
+# "which spectra the benchmarks and the timing test run on". One data/<name>.csv
+# basename per line; blank lines and '#' comments are ignored.
+#
+# Consumers (add or rename an SPD HERE, not in each of them):
+#   benchmarks/_common.py            -> benchmark_tm30.py, benchmark_spd_utils.py,
+#                                       benchmark_parallel.py,
+#                                       benchmark_synthetic_parallel.py
+#   tests/slice_13_parallel_test.cpp
+#   tools/bench_cpp_baseline.cpp
+#   tools/oracle_recompute_12.py
+#
+# The list was previously copied into all seven, and only the C++ test copy is
+# exercised in CI -- a missed copy surfaced as a FileNotFoundError months later.
+d65_1nm
+fl1_1nm
+fl2_1nm
+fl3_1nm
+fl4_1nm
+fl5_1nm
+fl6_1nm
+fl7_1nm
+fl8_1nm
+fl9_1nm
+fl10_1nm
+fl11_1nm
+fl12_1nm
+hp1_5nm
+hp2_5nm
+hp3_5nm
+hp4_5nm
+hp5_5nm
+illuminant_a_1nm

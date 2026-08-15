@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Rudimentary benchmark for TM30Calc.spd_to_xyz() / .spd_to_Yuv().
 
-Three sections: (1) test setup, (2) speed, (3) accuracy. Uses only the
-real, bundled standard-illuminant SPDs in PyTM30/data/ -- no synthetic
-spectra. colour-science is an optional dependency, used only for the
-accuracy section as an independent cross-check.
+Four sections: (0) environment, (1) test setup, (2) speed, (3) accuracy.
+Uses only the real, bundled standard-illuminant SPDs in PyTM30/data/ -- no
+synthetic spectra. colour-science is an optional dependency, used only for
+the accuracy section as an independent cross-check.
 
 Console output is also saved to benchmark_spd_utils_report.txt alongside
 this script. Timing plots (histograms, not just mean/std) are saved next
-to it too.
+to it too. Corpus list, environment block and plotting helpers are shared
+with benchmark_tm30.py through _common.py.
 
 Run from the PyTM30/ directory:
     python3 benchmarks/benchmark_spd_utils.py
@@ -16,10 +17,11 @@ Run from the PyTM30/ directory:
 
 import sys
 import time
-from pathlib import Path
 
 import numpy as np
 from tm30_calc import TM30Calc
+
+import _common as com
 
 try:
     import colour
@@ -27,88 +29,27 @@ try:
 except ImportError:
     HAVE_COLOUR = False
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-BENCH_DIR = Path(__file__).resolve().parent
-
-
-class _Tee:
-    """Writes to both the real console and a log file at the same time."""
-
-    def __init__(self, *streams):
-        self.streams = streams
-
-    def write(self, data):
-        for s in self.streams:
-            s.write(data)
-
-    def flush(self):
-        for s in self.streams:
-            s.flush()
-
+BENCH_DIR = com.BENCH_DIR
 
 log_path = BENCH_DIR / "benchmark_spd_utils_report.txt"
-log_file = open(log_path, "w")
-sys.stdout = _Tee(sys.__stdout__, log_file)
+log_file = com.tee_stdout(log_path)
 
-# The ~19 real standard-illuminant SPDs bundled with the package.
-SPD_NAMES = (
-    ["d65_1nm"]
-    + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_5nm" for i in range(1, 6)]
-    + ["illuminant_a_1nm"]
-)
-
-
-def load_spd(name):
-    """Load a bundled 2-column (wavelength, value) CSV from data/."""
-    arr = np.loadtxt(DATA_DIR / f"{name}.csv", delimiter=",", skiprows=1)
-    return arr[:, 0], arr[:, 1]
-
-
-def hist_panel(ax, data, color, xlabel, title, groups=None):
-    """Plain histogram (no scipy KDE dependency) showing the actual
-    distribution shape -- a mean+/-std number alone hides skew, outliers,
-    and multi-modality.
-
-    `groups` is an optional list of (subset, color, label) that splits the
-    histogram into labelled series over shared bins. Used for the single-eval
-    panels, whose bimodality is a corpus property (two wavelength-grid sizes,
-    per-call cost scales with grid length) that an unlabelled histogram
-    presents as a mystery."""
-    bins = np.histogram_bin_edges(data, bins=min(30, max(10, len(data) // 10)))
-    if groups:
-        for g_data, g_color, g_label in groups:
-            ax.hist(g_data, bins=bins, color=g_color, edgecolor="white",
-                    alpha=0.85, label=f"{g_label} (n={len(g_data)})")
-        ax.legend(fontsize=7)
-    else:
-        ax.hist(data, bins=bins, color=color, edgecolor="white", alpha=0.85)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("Count")
-    ax.set_title(title, fontsize=9)
-
-
-def grid_split(times_ms, npts, shades):
-    """Split per-call timings into one histogram series per wavelength-grid
-    size (finest grid first), pairing each with a shade of the panel's
-    implementation colour. Returns None when the shades can't cover the
-    grids, so the caller falls back to a plain unsplit histogram."""
-    npts = np.asarray(npts)
-    uniq = sorted(set(npts.tolist()), reverse=True)
-    if len(uniq) < 2 or len(uniq) > len(shades):
-        return None
-    return [(times_ms[npts == n], shade, f"{n}-pt grid")
-            for n, shade in zip(uniq, shades)]
-
+# ===================================================================
+# 0) ENVIRONMENT -- same block benchmark_tm30.py prints, for the same
+#    reason: without it, a shift in this report's numbers between two
+#    commits is indistinguishable from a performance change.
+# ===================================================================
+env = com.print_environment(colour if HAVE_COLOUR else None)
 
 # ===================================================================
 # 1) TEST SETUP
 # ===================================================================
-print("=" * 70)
+print("\n" + "=" * 70)
 print("1) TEST SETUP")
 print("=" * 70)
 
-corpus = {name: load_spd(name) for name in SPD_NAMES}
+corpus = com.load_corpus()
+GRID_STEPS = com.grid_steps(corpus)
 
 print(f"SPD corpus: {len(corpus)} real standard-illuminant spectra from data/*.csv")
 for name, (wl, _) in corpus.items():
@@ -127,24 +68,9 @@ print("\n" + "=" * 70)
 print("2) SPEED")
 print("=" * 70)
 
-PYTM30_COLOR = "#10b981"   # green -- pytm30, used consistently below
-COLOUR_COLOR = "#2563eb"   # blue  -- colour-science, used consistently below
-# Two-tone shades of each implementation colour, used to split the
-# single-eval histograms by wavelength-grid size (finest grid gets the
-# first shade). Pairs validated for CVD separation, lightness band and
-# chroma on a white surface.
-PYTM30_GRID_SHADES = ("#10b981", "#047857")
-COLOUR_GRID_SHADES = ("#60a5fa", "#1d4ed8")
-
 N_SINGLE_REPS = 50
 N_REPS = 100
 wl0, spd0 = next(iter(corpus.values()))
-
-# Grid length of each timed single-eval call, in loop order (rep outer,
-# corpus inner) -- identical for every timed function below, so computed
-# once and reused to split the timing histograms by grid.
-SINGLE_NPTS = np.array(
-    [len(wl) for _ in range(N_SINGLE_REPS) for wl, _ in corpus.values()])
 
 if HAVE_COLOUR:
     _cmfs_10deg = colour.MSDS_CMFS["CIE 1964 10 Degree Standard Observer"].copy()
@@ -173,33 +99,45 @@ CS_FNS = {"spd_to_xyz": cs_spd_to_xyz, "spd_to_Yuv": cs_spd_to_Yuv} if HAVE_COLO
 _ = calc.spd_to_xyz(spd0, wl0)  # warm-up
 _ = calc.spd_to_Yuv(spd0, wl0)
 
+# Per-call grid lengths are appended inside each timing loop, next to the
+# timing they belong to, rather than precomputed once from the loop bounds:
+# a precomputed array stays the same length when a loop is reordered or an
+# SPD is skipped, so a desync would silently relabel the timing modes.
 single_ms = {}
+single_npts = {}
 for fn_name, fn in PT_FNS.items():
     times = []
+    npts = []
     for _ in range(N_SINGLE_REPS):
         for wl, spd in corpus.values():
             t0 = time.perf_counter()
             fn(spd, wl)
             times.append(time.perf_counter() - t0)
+            npts.append(len(wl))
     single_ms[fn_name] = np.array(times) * 1000.0
+    single_npts[fn_name] = np.array(npts)
     print(f"pytm30 {fn_name} single eval, {N_SINGLE_REPS} repetitions x {len(corpus)} SPDs "
           f"= {len(times)} timed calls:")
     print(f"  {single_ms[fn_name].mean():.4f} +/- {single_ms[fn_name].std():.4f} ms/SPD "
           f"(median {np.median(single_ms[fn_name]):.4f}, max {single_ms[fn_name].max():.4f})")
 
 cs_single_ms = {}
+cs_single_npts = {}
 if HAVE_COLOUR:
     _ = cs_spd_to_xyz(wl0, spd0)  # warm-up
     _ = cs_spd_to_Yuv(wl0, spd0)
     print()
     for fn_name, fn in CS_FNS.items():
         times = []
+        npts = []
         for _ in range(N_SINGLE_REPS):
             for wl, spd in corpus.values():
                 t0 = time.perf_counter()
                 fn(wl, spd)
                 times.append(time.perf_counter() - t0)
+                npts.append(len(wl))
         cs_single_ms[fn_name] = np.array(times) * 1000.0
+        cs_single_npts[fn_name] = np.array(npts)
         print(f"colour-science {fn_name}-equivalent single eval, {N_SINGLE_REPS} reps x "
               f"{len(corpus)} SPDs = {len(times)} timed calls:")
         print(f"  {cs_single_ms[fn_name].mean():.4f} +/- {cs_single_ms[fn_name].std():.4f} ms/SPD "
@@ -210,6 +148,9 @@ if HAVE_COLOUR:
 # tabulated at 5 nm; linearly resample them onto the common 1 nm grid so
 # every row of the batch matrix has the same width (a resampling of real
 # data for the batch API's fixed-width matrix, not synthetic generation).
+# It happens here, once, outside the timed region -- the batch timings
+# below cover the call on an already-uniform matrix, and every published
+# description of them has to say so.
 common_wl = np.arange(380.0, 781.0, 1.0)
 batch_matrix = np.array([np.interp(common_wl, wl, spd) for wl, spd in corpus.values()])
 
@@ -257,35 +198,39 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # The single-eval histograms are bimodal because the corpus mixes two
-# wavelength grids (401-pt 1 nm and 81-pt 5 nm) and per-call cost scales
-# with grid length -- split them by grid so the modes are attributable,
-# and say so in a caption on the figure itself.
-GRID_CAPTION = (
-    "Single-eval panels are split by SPD wavelength grid: per-call cost scales with grid length\n"
-    "(CMF resampling and the XYZ integration run on the input grid), so the 401-pt (1 nm) and\n"
-    "81-pt (5 nm) illuminants form two timing modes. The batch call first resamples all SPDs\n"
-    "onto one common 1 nm grid, hence its single mode.")
+# wavelength grids and per-call cost scales with grid length -- split them
+# by grid so the modes are attributable, and say so in a caption on the
+# figure itself. The caption is built from the same predicate as the split,
+# so it is None (and no caption is drawn) whenever the split falls back.
+GRID_PANELS = [(single_npts[fn_name], com.PYTM30_GRID_SHADES) for fn_name in PT_FNS]
+GRID_PANELS += [(cs_single_npts[fn_name], com.COLOUR_GRID_SHADES) for fn_name in CS_FNS]
+GRID_CAPTION = com.grid_caption(
+    GRID_PANELS,
+    "CMF resampling and the XYZ integration run on the input grid",
+    GRID_STEPS)
 
 if HAVE_COLOUR:
     fig, axes = plt.subplots(2, 4, figsize=(19, 7.8))
     for col, fn_name in enumerate(["spd_to_xyz", "spd_to_Yuv"]):
-        hist_panel(
-            axes[0, col * 2], single_ms[fn_name], PYTM30_COLOR, "Time per SPD (ms)",
+        com.hist_panel(
+            axes[0, col * 2], single_ms[fn_name], com.PYTM30_COLOR, "Time per SPD (ms)",
             f"pytm30 {fn_name} single eval -- mean={single_ms[fn_name].mean():.4f} ms  "
             f"n={len(single_ms[fn_name])}",
-            groups=grid_split(single_ms[fn_name], SINGLE_NPTS, PYTM30_GRID_SHADES))
-        hist_panel(
-            axes[0, col * 2 + 1], cs_single_ms[fn_name], COLOUR_COLOR, "Time per SPD (ms)",
+            groups=com.grid_split(single_ms[fn_name], single_npts[fn_name],
+                                  com.PYTM30_GRID_SHADES))
+        com.hist_panel(
+            axes[0, col * 2 + 1], cs_single_ms[fn_name], com.COLOUR_COLOR, "Time per SPD (ms)",
             f"colour-science {fn_name}-eq single eval -- "
             f"mean={cs_single_ms[fn_name].mean():.4f} ms  n={len(cs_single_ms[fn_name])}",
-            groups=grid_split(cs_single_ms[fn_name], SINGLE_NPTS, COLOUR_GRID_SHADES))
-        hist_panel(
-            axes[1, col * 2], batch_ms_total[fn_name], PYTM30_COLOR,
+            groups=com.grid_split(cs_single_ms[fn_name], cs_single_npts[fn_name],
+                                  com.COLOUR_GRID_SHADES))
+        com.hist_panel(
+            axes[1, col * 2], batch_ms_total[fn_name], com.PYTM30_COLOR,
             f"Total time for {len(corpus)} SPDs (ms)",
             f"pytm30 {fn_name} true batch ({N_REPS} reps) -- "
             f"mean={batch_ms_total[fn_name].mean():.4f} ms")
-        hist_panel(
-            axes[1, col * 2 + 1], cs_batch_ms_total[fn_name], COLOUR_COLOR,
+        com.hist_panel(
+            axes[1, col * 2 + 1], cs_batch_ms_total[fn_name], com.COLOUR_COLOR,
             f"Total time for {len(corpus)} SPDs (ms)",
             f"colour-science {fn_name}-eq pseudo-batch ({N_REPS} reps) -- "
             f"mean={cs_batch_ms_total[fn_name].mean():.4f} ms")
@@ -294,21 +239,20 @@ if HAVE_COLOUR:
 else:
     fig, axes = plt.subplots(2, 2, figsize=(11, 7.8))
     for col, fn_name in enumerate(["spd_to_xyz", "spd_to_Yuv"]):
-        hist_panel(
-            axes[0, col], single_ms[fn_name], PYTM30_COLOR, "Time per SPD (ms)",
+        com.hist_panel(
+            axes[0, col], single_ms[fn_name], com.PYTM30_COLOR, "Time per SPD (ms)",
             f"pytm30 {fn_name} single eval -- mean={single_ms[fn_name].mean():.4f} ms  "
             f"n={len(single_ms[fn_name])}",
-            groups=grid_split(single_ms[fn_name], SINGLE_NPTS, PYTM30_GRID_SHADES))
-        hist_panel(
-            axes[1, col], batch_ms_total[fn_name], PYTM30_COLOR,
+            groups=com.grid_split(single_ms[fn_name], single_npts[fn_name],
+                                  com.PYTM30_GRID_SHADES))
+        com.hist_panel(
+            axes[1, col], batch_ms_total[fn_name], com.PYTM30_COLOR,
             f"Total time for {len(corpus)} SPDs (ms)",
             f"pytm30 {fn_name} true batch ({N_REPS} reps) -- "
             f"mean={batch_ms_total[fn_name].mean():.4f} ms")
     fig.suptitle("spd_to_xyz / spd_to_Yuv Timing Distributions "
                  "(colour-science unavailable -- pytm30 only)", fontsize=12)
-fig.text(0.5, 0.005, GRID_CAPTION, ha="center", va="bottom", fontsize=8,
-         color="#555555")
-fig.tight_layout(rect=(0.0, 0.09, 1.0, 1.0))
+com.add_caption(fig, GRID_CAPTION)
 timing_plot_path = BENCH_DIR / "benchmark_spd_utils_timing.png"
 fig.savefig(timing_plot_path, dpi=150)
 plt.close(fig)

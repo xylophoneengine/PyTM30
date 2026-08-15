@@ -28,10 +28,31 @@ Run: python3 tools/oracle_recompute_12.py
 """
 import os
 import csv
+import re
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.normpath(os.path.join(HERE, "..", "data"))
+
+
+def corpus_names():
+    """Basenames of the bundled illuminant corpus, from the manifest in
+    data/ -- the same file the benchmarks and the C++ timing test read, so
+    a renamed SPD is one edit rather than seven."""
+    names = []
+    with open(os.path.join(DATA, "illuminant_corpus.txt")) as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()
+            if line:
+                names.append(line)
+    return names
+
+
+def spd_label(name):
+    """Short display label for a corpus basename: d65_1nm -> D65,
+    fl3_1nm -> FL3, hp2_5nm -> HP2, illuminant_a_1nm -> IllA."""
+    base = re.sub(r"_\d+nm$", "", name)
+    return {"d65": "D65", "illuminant_a": "IllA"}.get(base, base.upper())
 
 
 def load_csv_cols(path):
@@ -169,9 +190,7 @@ def compute_d65_source_xyz():
 
 
 if __name__ == "__main__":
-    sources = [("D65", "d65_1nm.csv"), ("IllA", "illuminant_a_1nm.csv")]
-    sources += [(f"FL{i}", f"fl{i}_1nm.csv") for i in range(1, 13)]
-    sources += [(f"HP{i}", f"hp{i}_5nm.csv") for i in range(1, 6)]
+    sources = [(spd_label(name), f"{name}.csv") for name in corpus_names()]
 
     print("=== CCT/Duv recompute (slice_03 corpus), from data/*.csv ===")
     for name, fn in sources:

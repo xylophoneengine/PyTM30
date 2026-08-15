@@ -1,4 +1,16 @@
 ======================================================================
+0) ENVIRONMENT
+======================================================================
+Date (UTC):     2026-08-15 07:08
+Python:         3.12.13 (CPython)
+OS / machine:   macOS-26.6.1-arm64-arm-64bit (arm64)
+CPU:            Apple M4 Pro
+Power mode:     0 (macOS pmset powermode; 1 = low power)
+numpy:          2.5.2
+colour-science: 0.4.7
+pytm30:         0.1.0
+
+======================================================================
 1) TEST SETUP
 ======================================================================
 SPD corpus: 19 real standard-illuminant spectra from data/*.csv
@@ -28,28 +40,28 @@ Calculator: TM30Calc(tables loaded)  (spd_to_xyz/spd_to_Yuv use the CIE 1964 10-
 2) SPEED
 ======================================================================
 pytm30 spd_to_xyz single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.0043 +/- 0.0023 ms/SPD (median 0.0043, max 0.0473)
+  0.0026 +/- 0.0008 ms/SPD (median 0.0026, max 0.0118)
 pytm30 spd_to_Yuv single eval, 50 repetitions x 19 SPDs = 950 timed calls:
-  0.0041 +/- 0.0011 ms/SPD (median 0.0043, max 0.0135)
+  0.0026 +/- 0.0007 ms/SPD (median 0.0027, max 0.0077)
 
 colour-science spd_to_xyz-equivalent single eval, 50 reps x 19 SPDs = 950 timed calls:
-  0.9046 +/- 0.1582 ms/SPD (median 0.9088, max 4.8797)
-  pytm30 is 212.0x faster
+  0.5588 +/- 0.0469 ms/SPD (median 0.5735, max 0.7903)
+  pytm30 is 219.1x faster
 colour-science spd_to_Yuv-equivalent single eval, 50 reps x 19 SPDs = 950 timed calls:
-  0.9260 +/- 0.0552 ms/SPD (median 0.9484, max 1.4453)
-  pytm30 is 225.4x faster
+  0.5819 +/- 0.0448 ms/SPD (median 0.5965, max 0.7780)
+  pytm30 is 219.6x faster
 
 pytm30 spd_to_xyz true batch, all 19 SPDs in one call, 100 repetitions:
-  0.0326 +/- 0.0017 ms total (0.0017 ms/SPD)
+  0.0196 +/- 0.0012 ms total (0.0010 ms/SPD)
 pytm30 spd_to_Yuv true batch, all 19 SPDs in one call, 100 repetitions:
-  0.0324 +/- 0.0018 ms total (0.0017 ms/SPD)
+  0.0195 +/- 0.0005 ms total (0.0010 ms/SPD)
 
 colour-science spd_to_xyz-equivalent pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  16.6887 +/- 0.1636 ms total (0.8784 ms/SPD)
-  pytm30 is 511.5x faster
+  10.4839 +/- 0.0644 ms total (0.5518 ms/SPD)
+  pytm30 is 535.9x faster
 colour-science spd_to_Yuv-equivalent pseudo-batch (loop over 19 SPDs, no native batch API), 100 repetitions:
-  17.5081 +/- 0.1553 ms total (0.9215 ms/SPD)
-  pytm30 is 540.0x faster
+  11.0136 +/- 0.1333 ms total (0.5797 ms/SPD)
+  pytm30 is 565.8x faster
 
 Timing plot saved: /Users/zwenger/mini_projects/PyTM30/benchmarks/benchmark_spd_utils_timing.png
 

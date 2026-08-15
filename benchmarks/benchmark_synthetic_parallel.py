@@ -35,18 +35,16 @@ import numpy as np
 import pandas as pd
 from tm30_calc import TM30Calc
 
+import _common as com
+
 OUT_DIR = Path(__file__).resolve().parent / "out_synthetic_parallel"
 N_SPDS = 1000
 N_REPS = 100
 N_WORKERS = 4  # matches this machine's 4 hardware threads
 
-# The bundled real illuminant corpus (same set benchmarks use).
-CORPUS_NAMES = (
-    ["d65_1nm"]
-    + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_5nm" for i in range(1, 6)]
-    + ["illuminant_a_1nm"]
-)
+# The bundled real illuminant corpus (same set benchmarks use), from the
+# manifest every consumer of the corpus reads (data/illuminant_corpus.txt).
+CORPUS_NAMES = com.SPD_NAMES
 
 
 def make_corpus(n_spds: int = N_SPDS, seed: int = 42):
@@ -57,12 +55,8 @@ def make_corpus(n_spds: int = N_SPDS, seed: int = 42):
     All corpus SPDs are resampled to the common 1 nm grid first.
     """
     wl = np.arange(380.0, 781.0, 1.0)
-    data_dir = Path(__file__).resolve().parent.parent / "data"
-    base = []
-    for n in CORPUS_NAMES:
-        arr = np.loadtxt(data_dir / f"{n}.csv", delimiter=",", skiprows=1)
-        base.append(np.interp(wl, arr[:, 0], arr[:, 1]))
-    base = np.ascontiguousarray(np.array(base))  # (19, 401)
+    base = [np.interp(wl, *com.load_spd(n)) for n in CORPUS_NAMES]
+    base = np.ascontiguousarray(np.array(base))  # (len(CORPUS_NAMES), 401)
 
     rng = np.random.default_rng(seed)
     idx_a = rng.integers(0, len(base), n_spds)

@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <fstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -25,14 +27,33 @@
 
 using namespace tm30;
 
-static const std::vector<std::string> kSpdNames = {
-    "d65_1nm",  "fl1_1nm",  "fl2_1nm",  "fl3_1nm",         "fl4_1nm",
-    "fl5_1nm",  "fl6_1nm",  "fl7_1nm",  "fl8_1nm",         "fl9_1nm",
-    "fl10_1nm", "fl11_1nm", "fl12_1nm", "hp1_5nm",         "hp2_5nm",
-    "hp3_5nm",  "hp4_5nm",  "hp5_5nm",  "illuminant_a_1nm"};
-
 static std::string data_path(const std::string &f) {
   return std::string(TM30_DATA_DIR) + "/" + f;
+}
+
+// The bundled illuminant corpus, from data/illuminant_corpus.txt -- the
+// single source of truth this tool, the benchmark scripts and
+// tests/slice_13_parallel_test.cpp all read, so renaming an SPD is one edit.
+static std::vector<std::string> load_spd_names() {
+  std::ifstream in(data_path("illuminant_corpus.txt"));
+  if (!in)
+    throw std::runtime_error("cannot open data/illuminant_corpus.txt");
+  std::vector<std::string> names;
+  std::string line;
+  while (std::getline(in, line)) {
+    const std::size_t hash = line.find('#');
+    if (hash != std::string::npos)
+      line.erase(hash);
+    // Trims the \r of a CRLF checkout too (data/ is committed -text).
+    const std::size_t first = line.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+      continue;
+    const std::size_t last = line.find_last_not_of(" \t\r\n");
+    names.push_back(line.substr(first, last - first + 1));
+  }
+  if (names.empty())
+    throw std::runtime_error("data/illuminant_corpus.txt lists no SPDs");
+  return names;
 }
 
 static CmfData load_cmf(const std::string &path) {
@@ -85,7 +106,7 @@ static Corpus load_corpus() {
   c.ces = load_ces(data_path("ces.csv"));
   c.basis = load_daylight_basis(data_path("daylight_basis.csv"));
   c.lut = load_planckian_lut(data_path("planckian_uv.csv"));
-  for (const auto &n : kSpdNames) {
+  for (const auto &n : load_spd_names()) {
     auto [wl, v] = load_spd_csv(data_path(n + ".csv"));
     c.wls.push_back(std::move(wl));
     c.vals.push_back(std::move(v));
@@ -127,7 +148,7 @@ int main() {
       prepare_resampled_tables(wl1, c.cmf_2deg, c.cmf_10deg, c.ces, c.basis);
 
   std::vector<Spd> owned;
-  for (size_t i = 0; i < kSpdNames.size(); ++i)
+  for (size_t i = 0; i < c.wls.size(); ++i)
     owned.emplace_back(wl1, vals1[i]);
   std::vector<SpdView> views19, views1;
   for (auto &s : owned)

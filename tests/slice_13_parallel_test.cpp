@@ -35,6 +35,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <fstream>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -107,13 +108,32 @@ Tables &tables() {
   return t;
 }
 
-// The bundled 19-illuminant corpus (same set benchmarks use), all
-// resampled onto the common 1 nm grid (380-780, 401 pts).
-const std::vector<std::string> kCorpusNames = {
-    "d65_1nm",  "fl1_1nm",  "fl2_1nm",  "fl3_1nm",         "fl4_1nm",
-    "fl5_1nm",  "fl6_1nm",  "fl7_1nm",  "fl8_1nm",         "fl9_1nm",
-    "fl10_1nm", "fl11_1nm", "fl12_1nm", "hp1_5nm",         "hp2_5nm",
-    "hp3_5nm",  "hp4_5nm",  "hp5_5nm",  "illuminant_a_1nm"};
+// The bundled illuminant corpus (same set the benchmarks use), all
+// resampled onto the common 1 nm grid (380-780, 401 pts). The names come
+// from data/illuminant_corpus.txt -- the single source of truth this test,
+// the four benchmark scripts, tools/bench_cpp_baseline.cpp and
+// tools/oracle_recompute_12.py all read, so renaming an SPD is one edit.
+std::vector<std::string> load_corpus_names() {
+  std::ifstream in(data_path("illuminant_corpus.txt"));
+  if (!in)
+    throw std::runtime_error("cannot open data/illuminant_corpus.txt");
+  std::vector<std::string> names;
+  std::string line;
+  while (std::getline(in, line)) {
+    const std::size_t hash = line.find('#');
+    if (hash != std::string::npos)
+      line.erase(hash);
+    // Trims the \r of a CRLF checkout too (data/ is committed -text).
+    const std::size_t first = line.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+      continue;
+    const std::size_t last = line.find_last_not_of(" \t\r\n");
+    names.push_back(line.substr(first, last - first + 1));
+  }
+  if (names.empty())
+    throw std::runtime_error("data/illuminant_corpus.txt lists no SPDs");
+  return names;
+}
 
 std::vector<double> resample_to_1nm(const std::vector<double> &wl,
                                     const std::vector<double> &vals) {
@@ -142,7 +162,7 @@ struct Corpus {
     wl.reserve(401);
     for (std::size_t j = 0; j < 401; ++j)
       wl.push_back(380.0 + static_cast<double>(j));
-    for (const auto &name : kCorpusNames) {
+    for (const auto &name : load_corpus_names()) {
       auto [w, v] = load_spd_csv(data_path(name + ".csv"));
       std::vector<double> vals =
           (w.size() == wl.size()) ? std::move(v) : resample_to_1nm(w, v);
@@ -501,8 +521,9 @@ TEST_CASE("Parallel - grid matrix: custom 5 nm grid via per-call path",
 
   std::vector<Spd> owned;
   std::vector<SpdView> views;
-  for (std::size_t i = 0; i < 19; ++i) {
-    auto [w, v] = load_spd_csv(data_path(kCorpusNames[i] + ".csv"));
+  const std::vector<std::string> names = load_corpus_names();
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    auto [w, v] = load_spd_csv(data_path(names[i] + ".csv"));
     std::vector<double> vals(w.size() == wl5.size() ? std::move(v)
                                                     : std::vector<double>());
     if (vals.empty()) {

@@ -61,25 +61,26 @@ corpus (`benchmarks/benchmark_tm30.py`):
 
 | Path | colour-science | pytm30 | Speedup |
 |---|---|---|---|
-| Single eval | 1.675 ms/SPD | 0.189 ms/SPD | **8.8x** |
-| Batch (19 SPDs per call) | 1.669 ms/SPD | 0.223 ms/SPD | **7.5x** |
+| Single eval | 1.074 ms/SPD | 0.114 ms/SPD | **9.4x** |
+| Batch (19 SPDs per call) | 1.064 ms/SPD | 0.135 ms/SPD | **7.9x** |
 
 Accuracy on the same corpus: Rf within 0.004, Rg within
 0.001, and CCT within 0.07 K of colour-science's own
 values.
 
-Measured on: Apple M4 Pro, Python 3.11.15,
-numpy 2.4.6, colour-science 0.4.7 -- full
+Measured on: Apple M4 Pro, Python 3.12.13,
+numpy 2.5.2, colour-science 0.4.7, macOS power mode 0 (automatic) -- full
 environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
 
 ![Timing distributions, pytm30 vs colour-science](benchmarks/benchmark_tm30_timing.png)
 
-The two modes in the single-eval histograms are a corpus property, not
-timing noise: the bundled illuminants mix two wavelength grids (401-pt
-1 nm and 81-pt 5 nm), and per-eval cost scales with grid length because
+The modes in the single-eval histograms are a corpus property, not
+timing noise: the bundled illuminants mix wavelength grids (401-pt 1 nm
+and 81-pt 5 nm), and per-eval cost scales with grid length because
 CES/CMF resampling and tristimulus integration run on the input grid.
-The batch call resamples everything onto one common 1 nm grid first,
-hence its single mode.
+The benchmark script resamples the batch matrix onto one common 1 nm
+grid before the timed call -- that resampling is not part of the batch
+timing -- hence the batch panels' single mode.
 <!-- benchmark-results:end -->
 
 ---

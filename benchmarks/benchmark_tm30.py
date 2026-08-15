@@ -8,20 +8,22 @@ accuracy section as an independent cross-check.
 
 Console output is also saved to benchmark_tm30_report.txt alongside this
 script. Timing plots (histograms, not just mean/std) are saved next to it
-too.
+too. Corpus list, environment block and plotting helpers are shared with
+benchmark_spd_utils.py through _common.py.
 
 Run from the PyTM30/ directory:
     python3 benchmarks/benchmark_tm30.py
 """
 
 import platform
-import subprocess
 import sys
+import textwrap
 import time
-from pathlib import Path
 
 import numpy as np
 from tm30_calc import TM30Calc
+
+import _common as com
 
 try:
     import colour
@@ -29,120 +31,17 @@ try:
 except ImportError:
     HAVE_COLOUR = False
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-BENCH_DIR = Path(__file__).resolve().parent
-
-
-class _Tee:
-    """Writes to both the real console and a log file at the same time."""
-
-    def __init__(self, *streams):
-        self.streams = streams
-
-    def write(self, data):
-        for s in self.streams:
-            s.write(data)
-
-    def flush(self):
-        for s in self.streams:
-            s.flush()
-
+BENCH_DIR = com.BENCH_DIR
 
 log_path = BENCH_DIR / "benchmark_tm30_report.txt"
-log_file = open(log_path, "w")
-sys.stdout = _Tee(sys.__stdout__, log_file)
-
-# The ~19 real standard-illuminant SPDs bundled with the package.
-SPD_NAMES = (
-    ["d65_1nm"]
-    + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_5nm" for i in range(1, 6)]
-    + ["illuminant_a_1nm"]
-)
-
-
-def load_spd(name):
-    """Load a bundled 2-column (wavelength, value) CSV from data/."""
-    arr = np.loadtxt(DATA_DIR / f"{name}.csv", delimiter=",", skiprows=1)
-    return arr[:, 0], arr[:, 1]
-
-
-def hist_panel(ax, data, color, xlabel, title, groups=None):
-    """Plain histogram (no scipy KDE dependency) showing the actual
-    distribution shape -- a mean+/-std number alone hides skew, outliers,
-    and multi-modality.
-
-    `groups` is an optional list of (subset, color, label) that splits the
-    histogram into labelled series over shared bins. Used for the single-eval
-    panels, whose bimodality is a corpus property (two wavelength-grid sizes,
-    per-eval cost scales with grid length) that an unlabelled histogram
-    presents as a mystery."""
-    bins = np.histogram_bin_edges(data, bins=min(30, max(10, len(data) // 10)))
-    if groups:
-        for g_data, g_color, g_label in groups:
-            ax.hist(g_data, bins=bins, color=g_color, edgecolor="white",
-                    alpha=0.85, label=f"{g_label} (n={len(g_data)})")
-        ax.legend(fontsize=7)
-    else:
-        ax.hist(data, bins=bins, color=color, edgecolor="white", alpha=0.85)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("Count")
-    ax.set_title(title, fontsize=9)
-
-
-def grid_split(times_ms, npts, shades):
-    """Split per-call timings into one histogram series per wavelength-grid
-    size (finest grid first), pairing each with a shade of the panel's
-    implementation colour. Returns None when the shades can't cover the
-    grids, so the caller falls back to a plain unsplit histogram."""
-    npts = np.asarray(npts)
-    uniq = sorted(set(npts.tolist()), reverse=True)
-    if len(uniq) < 2 or len(uniq) > len(shades):
-        return None
-    return [(times_ms[npts == n], shade, f"{n}-pt grid")
-            for n, shade in zip(uniq, shades)]
-
+log_file = com.tee_stdout(log_path)
 
 # ===================================================================
 # 0) ENVIRONMENT -- timings are meaningless without the machine and the
 #    library versions they were taken on, and byte-level reproducibility
 #    of results is only claimed for pinned versions.
 # ===================================================================
-print("=" * 70)
-print("0) ENVIRONMENT")
-print("=" * 70)
-
-CPU_LABEL = platform.machine()
-print(f"Date (UTC):     {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}")
-print(f"Python:         {platform.python_version()} ({platform.python_implementation()})")
-print(f"OS / machine:   {platform.platform()} ({platform.machine()})")
-if sys.platform == "darwin":
-    try:
-        cpu = subprocess.run(
-            ["sysctl", "-n", "machdep.cpu.brand_string"],
-            capture_output=True, text=True, timeout=5,
-        ).stdout.strip()
-        if cpu:
-            CPU_LABEL = cpu
-            print(f"CPU:            {cpu}")
-        # Timings taken in low-power mode are not comparable to normal
-        # ones; record the mode so a skewed run is recognisable later.
-        pm = subprocess.run(["pmset", "-g"], capture_output=True, text=True,
-                            timeout=5).stdout
-        for line in pm.splitlines():
-            if "powermode" in line:
-                print(f"Power mode:     {line.split()[-1]} "
-                      "(macOS pmset powermode; 1 = low power)")
-    except Exception:
-        pass  # environment report is best-effort, never fails the run
-print(f"numpy:          {np.__version__}")
-if HAVE_COLOUR:
-    print(f"colour-science: {colour.__version__}")
-try:
-    from importlib.metadata import version as _pkg_version
-    print(f"pytm30:         {_pkg_version('pytm30')}")
-except Exception:
-    print("pytm30:         (not installed as a package -- run from source tree)")
+env = com.print_environment(colour if HAVE_COLOUR else None)
 
 # ===================================================================
 # 1) TEST SETUP
@@ -151,7 +50,8 @@ print("\n" + "=" * 70)
 print("1) TEST SETUP")
 print("=" * 70)
 
-corpus = {name: load_spd(name) for name in SPD_NAMES}
+corpus = com.load_corpus()
+GRID_STEPS = com.grid_steps(corpus)
 
 print(f"SPD corpus: {len(corpus)} real standard-illuminant spectra from data/*.csv")
 for name, (wl, _) in corpus.items():
@@ -169,15 +69,6 @@ print(f"\nCalculator: {calc!r}")
 print("\n" + "=" * 70)
 print("2) SPEED")
 print("=" * 70)
-
-PYTM30_COLOR = "#10b981"   # green -- pytm30, used consistently below
-COLOUR_COLOR = "#2563eb"   # blue  -- colour-science, used consistently below
-# Two-tone shades of each implementation colour, used to split the
-# single-eval histograms by wavelength-grid size (finest grid gets the
-# first shade). Pairs validated for CVD separation, lightness band and
-# chroma on a white surface.
-PYTM30_GRID_SHADES = ("#10b981", "#047857")
-COLOUR_GRID_SHADES = ("#60a5fa", "#1d4ed8")
 
 N_SINGLE_REPS = 50
 N_REPS = 100
@@ -232,7 +123,10 @@ if HAVE_COLOUR:
 # HP1-5 are natively tabulated at 5 nm; linearly resample them onto the
 # common 1 nm grid so every row of the batch matrix has the same width
 # (this is just a resampling of real data for the batch API's fixed-width
-# matrix, not synthetic spectrum generation).
+# matrix, not synthetic spectrum generation). It happens here, once,
+# outside the timed region -- the batch timings below are for the eval
+# call on an already-uniform matrix, and every published description of
+# them has to say so.
 common_wl = np.arange(380.0, 781.0, 1.0)
 batch_matrix = np.array([np.interp(common_wl, wl, spd) for wl, spd in corpus.values()])
 
@@ -275,53 +169,54 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # The single-eval histograms are bimodal because the corpus mixes two
-# wavelength grids (401-pt 1 nm and 81-pt 5 nm) and per-eval cost scales
-# with grid length -- split them by grid so the modes are attributable,
-# and say so in a caption on the figure itself.
-GRID_CAPTION = (
-    "Single-eval panels are split by SPD wavelength grid: per-eval cost scales with grid length\n"
-    "(CES/CMF resampling and tristimulus integration run on the input grid), so the 401-pt (1 nm)\n"
-    "and 81-pt (5 nm) illuminants form two timing modes. The batch call first resamples all SPDs\n"
-    "onto one common 1 nm grid, hence its single mode.")
+# wavelength grids and per-eval cost scales with grid length -- split them
+# by grid so the modes are attributable, and say so in a caption on the
+# figure itself. The caption is built from the same predicate as the split,
+# so it is None (and no caption is drawn) whenever the split falls back.
+GRID_PANELS = [(single_npts, com.PYTM30_GRID_SHADES)]
+if HAVE_COLOUR:
+    GRID_PANELS.append((cs_single_npts, com.COLOUR_GRID_SHADES))
+GRID_CAPTION = com.grid_caption(
+    GRID_PANELS,
+    "CES/CMF resampling and tristimulus integration run on the input grid",
+    GRID_STEPS)
 
 if HAVE_COLOUR:
     fig, axes = plt.subplots(2, 2, figsize=(11, 7.8))
-    hist_panel(
-        axes[0, 0], single_ms, PYTM30_COLOR, "Time per SPD (ms)",
+    com.hist_panel(
+        axes[0, 0], single_ms, com.PYTM30_COLOR, "Time per SPD (ms)",
         f"pytm30 single eval -- mean={single_ms.mean():.4f} ms  "
         f"std={single_ms.std():.4f} ms  n={len(single_ms)}",
-        groups=grid_split(single_ms, single_npts, PYTM30_GRID_SHADES))
-    hist_panel(
-        axes[0, 1], cs_single_ms, COLOUR_COLOR, "Time per SPD (ms)",
+        groups=com.grid_split(single_ms, single_npts, com.PYTM30_GRID_SHADES))
+    com.hist_panel(
+        axes[0, 1], cs_single_ms, com.COLOUR_COLOR, "Time per SPD (ms)",
         f"colour-science single eval -- mean={cs_single_ms.mean():.4f} ms  "
         f"std={cs_single_ms.std():.4f} ms  n={len(cs_single_ms)}",
-        groups=grid_split(cs_single_ms, cs_single_npts, COLOUR_GRID_SHADES))
-    hist_panel(
-        axes[1, 0], batch_ms_total, PYTM30_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
+        groups=com.grid_split(cs_single_ms, cs_single_npts, com.COLOUR_GRID_SHADES))
+    com.hist_panel(
+        axes[1, 0], batch_ms_total, com.PYTM30_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
         f"pytm30 true batch ({N_REPS} reps) -- mean={batch_ms_total.mean():.4f} ms  "
         f"std={batch_ms_total.std():.4f} ms")
-    hist_panel(
-        axes[1, 1], cs_batch_ms_total, COLOUR_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
+    com.hist_panel(
+        axes[1, 1], cs_batch_ms_total, com.COLOUR_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
         f"colour-science pseudo-batch ({N_REPS} reps) -- "
         f"mean={cs_batch_ms_total.mean():.4f} ms  std={cs_batch_ms_total.std():.4f} ms")
     fig.suptitle("TM30Calc.eval() vs colour-science -- Timing Distributions "
                  "(green=pytm30, blue=colour-science)", fontsize=12)
 else:
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.3))
-    hist_panel(
-        axes[0], single_ms, PYTM30_COLOR, "Time per SPD (ms)",
+    com.hist_panel(
+        axes[0], single_ms, com.PYTM30_COLOR, "Time per SPD (ms)",
         f"pytm30 single eval -- mean={single_ms.mean():.4f} ms  "
         f"std={single_ms.std():.4f} ms  n={len(single_ms)}",
-        groups=grid_split(single_ms, single_npts, PYTM30_GRID_SHADES))
-    hist_panel(
-        axes[1], batch_ms_total, PYTM30_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
+        groups=com.grid_split(single_ms, single_npts, com.PYTM30_GRID_SHADES))
+    com.hist_panel(
+        axes[1], batch_ms_total, com.PYTM30_COLOR, f"Total time for {len(corpus)} SPDs (ms)",
         f"pytm30 true batch ({N_REPS} reps) -- mean={batch_ms_total.mean():.4f} ms  "
         f"std={batch_ms_total.std():.4f} ms")
     fig.suptitle("TM30Calc.eval() Timing Distributions "
                  "(colour-science unavailable -- pytm30 only)", fontsize=12)
-fig.text(0.5, 0.005, GRID_CAPTION, ha="center", va="bottom", fontsize=8,
-         color="#555555")
-fig.tight_layout(rect=(0.0, 0.09 if HAVE_COLOUR else 0.16, 1.0, 1.0))
+com.add_caption(fig, GRID_CAPTION)
 timing_plot_path = BENCH_DIR / "benchmark_tm30_timing.png"
 fig.savefig(timing_plot_path, dpi=150)
 plt.close(fig)
@@ -386,9 +281,16 @@ else:
 # 4) README SYNC -- rewrite the measured-claims block in README.md so
 #    the published numbers can never go stale: rerunning this benchmark
 #    IS the edit. Comparative claims, so only runs when colour-science
-#    was available.
+#    was available -- and never for a run taken in macOS low-power mode,
+#    whose timings are not comparable to normal-mode ones and so must not
+#    become the published headline numbers.
 # ===================================================================
-if HAVE_COLOUR:
+if HAVE_COLOUR and env.power_mode == com.LOW_POWER_MODE:
+    print(f"\nREADME claims block NOT updated: this run was taken in macOS "
+          f"low-power mode (pmset powermode {env.power_mode}). Those timings "
+          f"are not comparable to normal-mode ones. Turn low-power mode off "
+          f"and rerun to refresh the published numbers.")
+elif HAVE_COLOUR:
     readme_path = BENCH_DIR.parent / "README.md"
     begin = "<!-- benchmark-results:begin -->"
     end = "<!-- benchmark-results:end -->"
@@ -398,6 +300,21 @@ if HAVE_COLOUR:
     rf_max = float(np.abs(np.asarray(deltas["Rf"])).max())
     rg_max = float(np.abs(np.asarray(deltas["Rg"])).max())
     cct_max = float(np.abs(np.asarray(deltas["CCT"])).max())
+    # Same predicate as the figure's split and caption: no grid paragraph
+    # when the panels were not split by grid.
+    sizes = com.grid_sizes(single_npts, com.PYTM30_GRID_SHADES)
+    if sizes is None:
+        grid_note = ""
+    else:
+        listed = " and ".join(f"{s}-pt {GRID_STEPS[s]:g} nm" for s in sizes)
+        grid_note = "\n" + textwrap.fill(
+            f"The modes in the single-eval histograms are a corpus property, not timing "
+            f"noise: the bundled illuminants mix wavelength grids ({listed}), and per-eval "
+            f"cost scales with grid length because CES/CMF resampling and tristimulus "
+            f"integration run on the input grid. The benchmark script resamples the batch "
+            f"matrix onto one common 1 nm grid before the timed call -- that resampling is "
+            f"not part of the batch timing -- hence the batch panels' single mode.",
+            width=72) + "\n"
     block = f"""{begin}
 <!-- Auto-written by benchmarks/benchmark_tm30.py; do not edit by hand.
      Rerun the benchmark to refresh numbers, plot, and environment. -->
@@ -413,19 +330,13 @@ Accuracy on the same corpus: Rf within {rf_max:.3f}, Rg within
 {rg_max:.3f}, and CCT within {cct_max:.2f} K of colour-science's own
 values.
 
-Measured on: {CPU_LABEL}, Python {platform.python_version()},
-numpy {np.__version__}, colour-science {colour.__version__} -- full
+Measured on: {env.cpu}, Python {platform.python_version()},
+numpy {np.__version__}, colour-science {colour.__version__}\
+{com.power_mode_note(env.power_mode)} -- full
 environment and distributions in `benchmarks/benchmark_tm30_report.txt`.
 
 ![Timing distributions, pytm30 vs colour-science](benchmarks/benchmark_tm30_timing.png)
-
-The two modes in the single-eval histograms are a corpus property, not
-timing noise: the bundled illuminants mix two wavelength grids (401-pt
-1 nm and 81-pt 5 nm), and per-eval cost scales with grid length because
-CES/CMF resampling and tristimulus integration run on the input grid.
-The batch call resamples everything onto one common 1 nm grid first,
-hence its single mode.
-{end}"""
+{grid_note}{end}"""
     text = readme_path.read_text()
     if begin in text and end in text:
         pre, rest = text.split(begin, 1)

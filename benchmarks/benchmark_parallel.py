@@ -30,26 +30,14 @@ from pathlib import Path
 import numpy as np
 from tm30_calc import TM30Calc
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-
-# The ~19 real standard-illuminant SPDs bundled with the package.
-SPD_NAMES = (
-    ["d65_1nm"]
-    + [f"fl{i}_1nm" for i in range(1, 13)]
-    + [f"hp{i}_5nm" for i in range(1, 6)]
-    + ["illuminant_a_1nm"]
-)
+import _common as com
 
 COMMON_WL = np.arange(380.0, 781.0, 1.0)
 
-
-def load_corpus():
-    """Return {name: (wl, spd)} for all 19 bundled SPDs."""
-    corpus = {}
-    for name in SPD_NAMES:
-        arr = np.loadtxt(DATA_DIR / f"{name}.csv", delimiter=",", skiprows=1)
-        corpus[name] = (arr[:, 0], arr[:, 1])
-    return corpus
+# {name: (wl, spd)} for the bundled real standard-illuminant SPDs. The name
+# list lives in data/illuminant_corpus.txt, the one file every consumer of
+# the corpus reads.
+load_corpus = com.load_corpus
 
 
 def stats_ms(times_s):
