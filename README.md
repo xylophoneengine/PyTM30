@@ -105,6 +105,10 @@ timing -- hence the batch panels' single mode.
   - [Performance](#performance)
     - [Parallel batch evaluation (`n_workers`, `persistent_workers`)](#parallel-batch-evaluation-n_workers-persistent_workers)
       - [Which mode should I use?](#which-mode-should-i-use)
+  - [Known issue: hue-bin assignment is discontinuous](#known-issue-hue-bin-assignment-is-discontinuous)
+    - [What actually happens at a boundary](#what-actually-happens-at-a-boundary)
+    - [How often real spectra land there](#how-often-real-spectra-land-there)
+    - [Practical consequences](#practical-consequences)
   - [Data Files \& Provenance](#data-files--provenance)
   - [Tests](#tests)
     - [Formatting](#formatting)
@@ -356,6 +360,117 @@ spawn-per-call has been small to unmeasurable in this project's own
 benchmarks (see `benchmarks/`). Measure your own case rather than assuming
 a multiplier.
 
+
+## Known issue: hue-bin assignment is discontinuous
+
+This is a property of TM-30-20 itself, not of this implementation. It affects
+every conforming implementation equally. It is documented here because it is
+rarely stated explicitly, and because it sets a floor on how reproducible the
+per-bin metrics can be.
+
+TM-30-20 S4.3 sorts the 99 CES into 16 hue bins of exactly 22.5 deg, using the
+reference hue angle `hr = atan2(b'r, a'r)` and half-open intervals
+`[j x 22.5, (j+1) x 22.5)`. Bin assignment is therefore a **step function** of
+a continuous quantity. A sample lying a hair inside one bin can move to the
+next under an arbitrarily small perturbation of the SPD, the CMF table, the
+interpolation, or the floating-point rounding of `atan2`.
+
+Everything below is reproducible: `ctest -R hue-bin -V`, source in
+`tests/slice_14_hue_bin_stability_test.cpp`.
+
+### What actually happens at a boundary
+
+Counting flips over a whole corpus is a diluted statistic -- most CES samples
+sit far from any edge and could not flip under any realistic perturbation. So
+the evidence here is *constructed*: bisect a one-parameter SPD family
+`(1-t) x D65 + t x HP1` until one CES's reference hue angle lands a chosen
+distance from a boundary, then perturb across it.
+
+Driving CES 32 onto the 90.0 deg boundary (bin h5 / h4), and comparing two
+**adjacent double** perturbations that straddle the flip -- so the bin
+assignment is the only material difference between the two runs:
+
+| | distance 2.3e-04 deg | 7.5e-06 deg | 6.7e-08 deg |
+|---|---|---|---|
+| `Rf,h5` | **+3.518** | +3.517 | +3.517 |
+| `Rcs,h5` | **-1.217** | -1.217 | -1.217 |
+| `Rhs,h5` | -0.0409 | -0.0409 | -0.0409 |
+| `Rf,h4` | -0.118 | -0.118 | -0.118 |
+| `Rg` | +0.0069 | +0.0069 | +0.0069 |
+| `Rf` | -1.1e-13 | -5.0e-14 | +2.8e-14 |
+| `CCT` | -1.4e-12 K | -6.8e-13 K | +1.4e-12 K |
+| `Duv` | **exactly 0** | exactly 0 | exactly 0 |
+
+Two things to read off it. The jump **does not shrink** as the sample gets
+closer to the boundary -- the three columns span a factor of 3500 in distance
+and are identical to four digits. That is what makes it a discontinuity rather
+than a rounding error. And the damage is concentrated in the **local** bin
+metrics: `Rf,hj` moves by 3.5 on a 0-100 scale, while `Rg` moves by 0.007,
+because the sample leaves one bin and joins its neighbour, so the two bin
+means move in opposite directions and the polygon area barely changes.
+
+`Rf`, `CCT` and `Duv` do not depend on bin assignment and are unaffected --
+`Duv` bit-exactly, the other two at rounding level.
+
+The perturbation needed to flip scales linearly with the distance: 6.5e-04
+relative SPD noise at 2.3e-04 deg, 2.1e-05 at 7.5e-06 deg, 1.9e-07 at
+6.7e-08 deg.
+
+### How often real spectra land there
+
+Over the bundled corpus plus synthetic blackbody, narrowband and equal-energy
+spectra (30 SPDs, 2970 CES samples), distance to the nearest bin boundary:
+
+| percentile | distance |
+|---|---|
+| minimum | 0.0106 deg |
+| 1st | 0.120 deg |
+| 25th | 2.58 deg |
+| 50th | 5.04 deg |
+
+The median is 5.04 deg against 5.625 deg for a uniform distribution, so
+samples are spread across the bins rather than clustering at edges.
+
+Perturbing every SPD and re-running the pipeline, counting **samples at risk**
+(boundary distance below the hue shift applied) alongside samples that flipped
+-- an unconditioned flip count would hide whether anything could have flipped
+at all:
+
+| relative SPD noise | max hue shift | at risk | flipped | max abs dRg |
+|---|---|---|---|---|
+| float64 rounding (~78 ULP) | 3.5e-11 deg | 0 | 0 | -- |
+| 0.01% | 2.1e-03 deg | 0 | 0 | 1.3e-03 |
+| 0.1% | 2.1e-02 deg | 0 | 0 | 1.3e-02 |
+| 1% | 2.1e-01 deg | 6 | **5** | 1.3e-01 |
+
+Below 0.1% noise nothing is ever at risk, so those zero-flip rows say nothing
+about robustness. At 1% noise, five of the six samples at risk flipped.
+
+**Floating-point rounding is not a practical concern**: the closest sample
+observed sits 3e8 times further from a boundary than double-precision could
+move it, and extrapolating the observed distribution a rounding-scale flip
+would need on the order of 1e9 SPDs to appear once. Ordinary photometric
+uncertainty is nine orders of magnitude larger and does reach boundaries.
+
+### Practical consequences
+
+- **Treat `Rf,hj`, `Rcs,hj` and `Rhs,hj` as the fragile outputs.** A single
+  sample crossing a boundary moves them by whole units. They are not
+  reproducible below the precision of your SPD measurement, however exact the
+  arithmetic.
+- **`Rg` is comparatively robust to flips** (0.007 per flip here) but inherits
+  the same continuous drift as everything else.
+- **`Rf`, `CCT` and `Duv` are unaffected** -- they do not depend on bin
+  assignment.
+- **Two conforming implementations may disagree on a bin** for a near-boundary
+  sample, and so disagree on the per-bin metrics far more than their agreement
+  on `Rf` would suggest. Expected behaviour, not a bug in either.
+- To check a specific SPD, compute `atan2(b'r, a'r)` for its 99 samples and
+  measure the distance to the nearest 22.5 deg multiple. A sample within your
+  measurement uncertainty of a boundary means that SPD's per-bin metrics are
+  not reproducible to better than one bin.
+
+---
 
 ## Data Files & Provenance
 

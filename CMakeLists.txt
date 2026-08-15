@@ -117,6 +117,7 @@ add_executable(tm30-tests
   tests/slice_11_tm30_test.cpp
   tests/slice_12_spd_utils_test.cpp
   tests/slice_13_parallel_test.cpp
+  tests/slice_14_hue_bin_stability_test.cpp
 )
 target_link_libraries(tm30-tests PRIVATE
   tm30-core
