@@ -528,7 +528,7 @@ struct BatchContext {
     planckian_lut = tm30::load_planckian_lut(df("planckian_uv.csv"));
   }
 
-  void prepare_batch(nb::ndarray<> spd_matrix, nb::object wl_arg) {
+  nb::object prepare_batch(nb::ndarray<> spd_matrix, nb::object wl_arg) {
     if (spd_matrix.ndim() != 2)
       throw std::invalid_argument("spd_matrix must be 2-D (N_spds x N_wl)");
     require_c_contiguous(spd_matrix, "spd_matrix");
@@ -583,6 +583,21 @@ struct BatchContext {
         views.push_back({spd.wavelengths(), spd.values()});
       }
     }
+
+    std::vector<double> conformed;
+    if (N == 0) {
+      tm30::Spd grid_probe(wl, std::vector<double>(wl.size(), 1.0));
+      conformed = grid_probe.wavelengths();
+    } else {
+      conformed = owned_spds.front().wavelengths();
+    }
+    auto np = nb::module_::import_("numpy");
+    auto result =
+        np.attr("empty")(conformed.size(), nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    std::copy(conformed.begin(), conformed.end(),
+              static_cast<double *>(nd.data()));
+    return result;
   }
 
   /// Precompute and cache CES/CMF/daylight-basis tables resampled to `wl`
@@ -1777,7 +1792,8 @@ NB_MODULE(tm30_core, m) {
       .def("prepare_batch", &BatchContext::prepare_batch, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(),
            "Load SPDs from a 2-D numpy array (N_spds x N_wl). "
-           "wavelengths defaults to 380-780 nm (1 nm step) if None.")
+           "wavelengths defaults to 380-780 nm (1 nm step) if None. "
+           "Returns the S3.5-conformed wavelength grid.")
       .def("evaluate", &BatchContext::evaluate, nb::arg("bins") = true,
            nb::arg("samples") = false, nb::arg("extras") = false,
            nb::arg("n_workers") = 1, nb::arg("columnar") = false,

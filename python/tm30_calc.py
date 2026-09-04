@@ -346,6 +346,10 @@ class Tm30Result:
         self._d = d
         self._wavelengths = wavelengths
 
+    @property
+    def wavelengths(self) -> np.ndarray | None:
+        return self._wavelengths
+
     def _present_keys(self) -> tuple[str, ...]:
         """All field names actually present on this result (scalars, the
         default arrays, and any extras=True fields)."""
@@ -675,6 +679,10 @@ class Tm30BatchResult:
 
     def __len__(self) -> int:
         return self._n
+
+    @property
+    def wavelengths(self) -> np.ndarray:
+        return self._wavelengths
 
     def _present_keys(self) -> tuple[str, ...]:
         """All field names actually present on this result (scalars, the
@@ -1185,7 +1193,7 @@ class TM30Calc:
                     f"construct TM30Calc(wavelengths=...) matching your "
                     f"data."
                 )
-            self._ctx.prepare_batch(matrix, self._wavelengths)
+            used_wavelengths = self._ctx.prepare_batch(matrix, self._wavelengths)
             raw = self._ctx.evaluate_cached(
                 bins=bins,
                 samples=samples,
@@ -1193,14 +1201,13 @@ class TM30Calc:
                 n_workers=self._n_workers,
                 columnar=not single,
             )
-            used_wavelengths = self._wavelengths
         else:
             if wavelengths.dtype != np.float64:
                 wavelengths = wavelengths.astype(np.float64)
             # A column slice (e.g. `csv[:, 0]`), transpose, or reversed view
             # is not contiguous - the C++ layer requires it to be.
             wavelengths = np.ascontiguousarray(wavelengths)
-            self._ctx.prepare_batch(matrix, wavelengths)
+            used_wavelengths = self._ctx.prepare_batch(matrix, wavelengths)
             raw = self._ctx.evaluate(
                 bins=bins,
                 samples=samples,
@@ -1208,7 +1215,6 @@ class TM30Calc:
                 n_workers=self._n_workers,
                 columnar=not single,
             )
-            used_wavelengths = wavelengths
 
         if single:
             results = [
