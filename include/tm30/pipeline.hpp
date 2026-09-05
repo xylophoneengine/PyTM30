@@ -164,4 +164,50 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
                                const ResampledTables &tables,
                                const PlanckianLut &planckian_lut);
 
+// ==========================================================================
+//  Linear tristimulus maps - unnormalised integrands on an input grid.
+// ==========================================================================
+
+/// Linear maps from an SPD's samples to its (unnormalised) source and CES
+/// tristimulus integrands, on the caller's own (unconformed) input
+/// wavelength grid.
+///
+/// For an SPD `s` sampled on `input_wavelengths`: `source` and `ces` are
+/// built so that, treating `source`/`ces` as (3, n_in) / (99, 3, n_in)
+/// row-major matrices W / M, `k = 100 / (W[1] . s)` and
+/// `k * (W . s)` / `k * (M[i] . s)` reproduce compute_source_xyz's and
+/// compute_ces_xyz's X/Y/Z exactly (TM-30-20 S3.2 Eq. (1)-(4), S3.6 Eq.
+/// (21)-(23)) for any `s` aligned with `input_wavelengths`.
+struct XyzLinearMaps {
+  std::vector<double> ces;    // 99*3*n_in, row-major (i, c, lambda)
+  std::vector<double> source; // 3*n_in, row-major (c, lambda)
+  std::size_t n_in;           // = input_wavelengths.size()
+};
+
+/// Build the linear source/CES tristimulus maps for `input_wavelengths`.
+///
+/// `tables` must be prepared (via prepare_resampled_tables()) on
+/// `Spd(input_wavelengths, ...).wavelengths()` - the S3.5-conformed form
+/// of `input_wavelengths` - so its trapezoidal weights, CES reflectance,
+/// and 10-deg CMF line up with the conformed grid this function maps back
+/// onto the caller's input columns.
+///
+/// Each conformed-grid point is matched (by exact double comparison) to
+/// the input column holding the same wavelength; TM-30-20 S3.5 keeps an
+/// in-range input sample's value unchanged in the conformed grid (see
+/// Spd::normalize), so every conformed point either equals one input
+/// point exactly or is a synthetic zero-fill edge point that matches no
+/// input column and is skipped. Columns for input wavelengths outside
+/// 380-780 nm, and any zero-fill point, are left at zero.
+///
+/// @param input_wavelengths  The caller's own wavelength grid (nm), the
+///                           same grid `tables` was prepared from (after
+///                           S3.5 conforming).
+/// @param tables             Pre-resampled tables for
+///                           Spd(input_wavelengths, ...).wavelengths()
+///                           (see prepare_resampled_tables()).
+/// @return XyzLinearMaps with `source` (3, n_in) and `ces` (99, 3, n_in).
+XyzLinearMaps xyz_linear_maps(const std::vector<double> &input_wavelengths,
+                              const ResampledTables &tables);
+
 } // namespace tm30

@@ -439,6 +439,12 @@ struct BatchContext {
   // shares that grid. Unset (nullopt) until set_fixed_grid() is called.
   std::optional<tm30::ResampledTables> fixed_tables_;
 
+  // Raw (un-conformed) fixed grid passed to set_fixed_grid(), kept
+  // alongside fixed_tables_ so xyz_linear_maps() can map its output back
+  // onto the caller's own input columns (fixed_tables_->wavelengths is
+  // the S3.5-conformed form, which may differ from this).
+  std::vector<double> fixed_grid_raw_;
+
   // Per-grid resampled-CMF cache for the AAA_to_BBB convenience methods:
   // the resample depends only on (grid, source CMF), so repeated calls
   // on one grid reuse the previous resample. Keyed on the exact grid
@@ -629,6 +635,7 @@ struct BatchContext {
     fixed_tables_ =
         tm30::prepare_resampled_tables(grid_probe.wavelengths(), cmf_2deg,
                                        cmf_10deg, ces_data, daylight_basis);
+    fixed_grid_raw_ = std::move(wl_vec);
   }
 
   // ====================================================================
@@ -1461,6 +1468,59 @@ struct BatchContext {
     return result;
   }
 
+  /// Linear maps of the CES/source tristimulus integrals on an input
+  /// wavelength grid. wl_arg=None: this context's grid-fixed wavelengths
+  /// (set via set_fixed_grid()) -- requires set_fixed_grid() to have been
+  /// called, like cct_to_xyz(). wl_arg=array: a one-off grid for this
+  /// call only, resampled on the fly (same recipe as set_fixed_grid()).
+  /// Returns (M, W): M shape (99, 3, n_wl), W shape (3, n_wl).
+  nb::object xyz_linear_maps(nb::object wl_arg) {
+    std::vector<double> wl_vec;
+    const tm30::ResampledTables *tables = nullptr;
+    std::optional<tm30::ResampledTables> local_tables;
+
+    if (wl_arg.is_none()) {
+      if (!fixed_tables_.has_value())
+        throw std::runtime_error(
+            "xyz_linear_maps() called with wavelengths=None before "
+            "set_fixed_grid() was ever called.");
+      wl_vec = fixed_grid_raw_;
+      tables = &*fixed_tables_;
+    } else {
+      auto wl_arr = nb::cast<nb::ndarray<>>(wl_arg);
+      if (wl_arr.ndim() != 1)
+        throw std::invalid_argument("wavelengths must be a 1-D array");
+      require_c_contiguous(wl_arr, "wavelengths");
+      size_t nwl = wl_arr.shape(0);
+      const double *wl_data = static_cast<const double *>(wl_arr.data());
+      wl_vec.assign(wl_data, wl_data + nwl);
+
+      const tm30::Spd probe(wl_vec, std::vector<double>(wl_vec.size(), 1.0));
+      local_tables = tm30::prepare_resampled_tables(
+          probe.wavelengths(), cmf_2deg, cmf_10deg, ces_data, daylight_basis);
+      tables = &*local_tables;
+    }
+
+    const tm30::XyzLinearMaps maps = tm30::xyz_linear_maps(wl_vec, *tables);
+    const size_t n_in = maps.n_in;
+
+    auto np = nb::module_::import_("numpy");
+
+    auto ces_result = np.attr("empty")(nb::make_tuple(99, 3, n_in),
+                                       nb::arg("dtype") = "float64");
+    auto ces_nd = nb::cast<nb::ndarray<>>(ces_result);
+    std::copy(maps.ces.begin(), maps.ces.end(),
+              static_cast<double *>(ces_nd.data()));
+
+    auto source_result =
+        np.attr("empty")(nb::make_tuple(3, n_in), nb::arg("dtype") = "float64");
+    auto source_nd = nb::cast<nb::ndarray<>>(source_result);
+    std::copy(maps.source.begin(), maps.source.end(),
+              static_cast<double *>(source_nd.data()));
+
+    return nb::make_tuple(ces_result, source_result);
+  }
+
   /// Compute XYZ for the reference illuminant at each CCT (N,) in,
   /// returns (N, 3). Always uses this context's grid-fixed wavelengths (set
   /// via set_fixed_grid()) - no per-call wavelengths override. cmf_path=None
@@ -1896,6 +1956,15 @@ NB_MODULE(tm30_core, m) {
            "Nc=1, F=1, D=1). Input xyz_matrix shape (N, 3), white shape "
            "(3,) shared by all N samples. Output shape (N, 3) with "
            "[J', a', b']. white must be scaled so Y=100.")
+      .def("xyz_linear_maps", &BatchContext::xyz_linear_maps,
+           nb::arg("wavelengths") = nb::none(),
+           "Linear maps of the TM-30-20 tristimulus integrals on the "
+           "given input grid (None: the fixed grid). Returns (M, W): M "
+           "shape (99, 3, n_wl) is the unnormalised CES XYZ integrand "
+           "(S3.6 Eq. 21-23), W shape (3, n_wl) the source XYZ integrand "
+           "(S3.2 Eq. 1-3), both with the S3.5-conformed trapezoid "
+           "weights folded in and columns indexed by the input "
+           "wavelengths; columns outside 380-780 nm are zero.")
       .def("cct_to_xyz", &BatchContext::cct_to_xyz, nb::arg("cct_array"),
            nb::arg("cmf_path") = nb::none(), nb::arg("K") = nb::none(),
            "Compute XYZ for the TM-30-20 reference illuminant at each CCT. "

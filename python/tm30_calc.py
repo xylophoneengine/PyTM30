@@ -1488,6 +1488,89 @@ class TM30Calc:
         result = self._ctx.xyz_to_jab_ucs(matrix, xyzw)
         return result.reshape(xyz.shape)
 
+    def ces_xyz_matrix(self, wavelengths: np.ndarray | None = None) -> np.ndarray:
+        """Linear map from an SPD to its (unnormalised) CES XYZ integrals.
+
+        For an SPD `s` sampled on `wavelengths` (default: this
+        calculator's fixed grid, see `wavelengths` in ``TM30Calc.__init__``):
+
+        - ``k = 100 / (source_xyz_matrix(wavelengths)[1] @ s)``
+        - ``k * np.einsum('ijk,k->ij', M, s)`` equals
+          ``self.eval(s, extras=True).xyz_test_ces`` to 1e-9, where
+          ``M = self.ces_xyz_matrix(wavelengths)``.
+        - ``M.reshape(297, -1)`` gives the (297, n_wl) stacked form.
+
+        Columns for input wavelengths outside 380-780 nm are zero (the
+        S3.5 calculation range excludes them); a zero-filled S3.5 edge
+        point never appears as a column here, since the SPD itself has
+        no sample there.
+
+        Parameters
+        ----------
+        wavelengths : np.ndarray or None
+            Wavelength grid (nm) indexing the columns of `M`. None (the
+            common case): this calculator's fixed grid. Explicit array:
+            a one-off grid for this call only.
+
+        Returns
+        -------
+        np.ndarray, shape (99, 3, n_wl)
+            M[i, c] is the linear map from an SPD on `wavelengths` to CES
+            i's unnormalised X/Y/Z (c = 0, 1, 2) integrand (TM-30-20 S3.6
+            Eq. (21)-(23)), with the S3.5-conformed trapezoid weights
+            already folded in.
+        """
+        if wavelengths is None:
+            wl_arg = None
+        else:
+            if wavelengths.dtype != np.float64:
+                wavelengths = wavelengths.astype(np.float64)
+            wl_arg = np.ascontiguousarray(wavelengths)
+        return self._ctx.xyz_linear_maps(wl_arg)[0]
+
+    def source_xyz_matrix(self, wavelengths: np.ndarray | None = None) -> np.ndarray:
+        """Linear map from an SPD to its (unnormalised) source XYZ integrals.
+
+        For an SPD `s` sampled on `wavelengths` (default: this
+        calculator's fixed grid, see `wavelengths` in ``TM30Calc.__init__``):
+
+        - ``k = 100 / (W[1] @ s)``, where ``W = source_xyz_matrix(wavelengths)``.
+        - ``k * (W @ s)`` equals the test-source white XYZ (Y = 100)
+          that ``eval()`` uses internally and that `xyz_to_jab_ucs`
+          expects as `xyzw`. This matches ``spd_to_xyz(s, wavelengths)``
+          only when `wavelengths` lies within 380-780 nm (or
+          ``spd_to_xyz`` is called with ``lambda_min=380,
+          lambda_max=780``), since ``spd_to_xyz`` integrates the raw
+          grid it is given rather than the S3.5-conformed range.
+
+        Columns for input wavelengths outside 380-780 nm are zero (the
+        S3.5 calculation range excludes them); a zero-filled S3.5 edge
+        point never appears as a column here, since the SPD itself has
+        no sample there.
+
+        Parameters
+        ----------
+        wavelengths : np.ndarray or None
+            Wavelength grid (nm) indexing the columns of `W`. None (the
+            common case): this calculator's fixed grid. Explicit array:
+            a one-off grid for this call only.
+
+        Returns
+        -------
+        np.ndarray, shape (3, n_wl)
+            W[c] is the linear map from an SPD on `wavelengths` to the
+            source's unnormalised X/Y/Z (c = 0, 1, 2) integrand
+            (TM-30-20 S3.2 Eq. (1)-(3)), with the S3.5-conformed
+            trapezoid weights already folded in.
+        """
+        if wavelengths is None:
+            wl_arg = None
+        else:
+            if wavelengths.dtype != np.float64:
+                wavelengths = wavelengths.astype(np.float64)
+            wl_arg = np.ascontiguousarray(wavelengths)
+        return self._ctx.xyz_linear_maps(wl_arg)[1]
+
     def cct_to_xyz(
         self,
         cct,

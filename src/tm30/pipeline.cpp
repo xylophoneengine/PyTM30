@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace tm30 {
@@ -279,6 +280,74 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   result.rf_skin = compute_rf_skin(result.rf_cesi);
 
   return result;
+}
+
+// ==========================================================================
+//  Linear tristimulus maps
+// ==========================================================================
+
+XyzLinearMaps xyz_linear_maps(const std::vector<double> &input_wavelengths,
+                              const ResampledTables &tables) {
+  if (tables.ces.samples.size() != 99) {
+    throw std::invalid_argument(
+        "xyz_linear_maps requires exactly 99 CES samples in tables.ces, "
+        "got " +
+        std::to_string(tables.ces.samples.size()));
+  }
+
+  const std::size_t n_in = input_wavelengths.size();
+  const std::size_t n_conf = tables.wavelengths.size();
+
+  XyzLinearMaps maps;
+  maps.n_in = n_in;
+  // Columns for a zero-filled conformed point, or an input wavelength
+  // outside 380-780 nm, carry no integrand contribution and stay zero.
+  // TM-30-20 S3.2 Eq. (1)-(4): source integrand.
+  maps.source.assign(3 * n_in, 0.0);
+  // TM-30-20 S3.6 Eq. (21)-(23): CES integrand.
+  maps.ces.assign(99 * 3 * n_in, 0.0);
+
+  const std::vector<double> &w = tables.trapezoidal_w;
+  const std::vector<double> &xbar = tables.cmf_10deg.x_bar;
+  const std::vector<double> &ybar = tables.cmf_10deg.y_bar;
+  const std::vector<double> &zbar = tables.cmf_10deg.z_bar;
+
+  // Merge walk: both input_wavelengths and tables.wavelengths are
+  // strictly increasing (Spd validation), so a single left-to-right scan
+  // finds every exact match in O(n_in + n_conf) instead of an O(n_in *
+  // n_conf) search. TM-30-20 S3.5: an in-range input sample's wavelength
+  // is unchanged in the conformed grid (Spd::normalize), so a match here
+  // is always an exact double comparison, never a nearest-point pick.
+  std::size_t p = 0; // next unconsidered index into input_wavelengths
+  for (std::size_t j = 0; j < n_conf; ++j) {
+    const double lam = tables.wavelengths[j];
+    while (p < n_in && input_wavelengths[p] < lam) {
+      ++p;
+    }
+    if (p >= n_in || input_wavelengths[p] != lam) {
+      continue; // synthetic zero-fill point: no matching input column
+    }
+    const std::size_t col = p;
+
+    // TM-30-20 S3.2 Eq. (1)-(4): source[c][col] is the per-column
+    // integrand for X/Y/Z_c = k * sum_j w[j]*S(lambda_j)*cmf_c(lambda_j).
+    const double wj = w[j];
+    maps.source[0 * n_in + col] = wj * xbar[j];
+    maps.source[1 * n_in + col] = wj * ybar[j];
+    maps.source[2 * n_in + col] = wj * zbar[j];
+
+    // TM-30-20 S3.6 Eq. (21)-(23): ces[(i,c)][col] is the per-column
+    // integrand for CES i's X/Y/Z_c = k * sum_j w[j]*S(lambda_j)*
+    // R_i(lambda_j)*cmf_c(lambda_j).
+    for (std::size_t i = 0; i < 99; ++i) {
+      const double wr = wj * tables.ces.samples[i][j];
+      maps.ces[(i * 3 + 0) * n_in + col] = wr * xbar[j];
+      maps.ces[(i * 3 + 1) * n_in + col] = wr * ybar[j];
+      maps.ces[(i * 3 + 2) * n_in + col] = wr * zbar[j];
+    }
+  }
+
+  return maps;
 }
 
 } // namespace tm30
