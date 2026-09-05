@@ -1182,6 +1182,24 @@ class TM30Calc:
         """The fixed wavelength grid (nm) this calculator is bound to."""
         return self._wavelengths
 
+    @property
+    def conformed_wavelengths(self) -> np.ndarray:
+        """The S3.5-conformed form of `wavelengths`.
+
+        TM-30-20 S3.5: samples outside 380-780 nm are dropped, and 380/780
+        nm edge points are added where `wavelengths` doesn't already reach
+        them. Identical to `wavelengths` when that grid already lies
+        entirely within 380-780 nm and already reaches both edges.
+
+        This is the grid `reference_spd` and ``Tm30Result.wavelengths``
+        (from `eval`) are sampled on - not necessarily `wavelengths`.
+
+        Returns
+        -------
+        np.ndarray, shape (n_conf,)
+        """
+        return self._ctx.fixed_wavelengths()
+
     def eval(
         self,
         spd: np.ndarray,
@@ -1570,6 +1588,74 @@ class TM30Calc:
                 wavelengths = wavelengths.astype(np.float64)
             wl_arg = np.ascontiguousarray(wavelengths)
         return self._ctx.xyz_linear_maps(wl_arg)[1]
+
+    def reference_jab(self, cct) -> np.ndarray:
+        """Reference-adapted CAM02-UCS J'a'b' for the 99 CES at a given CCT.
+
+        Builds the TM-30-20 S3.5 reference illuminant for `cct` (Planckian
+        radiator below 4000 K, CIE daylight illuminant above 5000 K, a
+        proportional blend of the two between 4000 K and 5000 K), then
+        runs the S3.7 CIECAM02 forward transform under fixed viewing
+        conditions (LA=100, Yb=20, c=0.69, Nc=1, F=1, D=1) - the same
+        reference-side computation ``eval()`` runs internally for every
+        test SPD, exposed here for a CCT alone with no test SPD required.
+
+        Always uses this calculator's fixed wavelength grid (see the
+        `wavelengths` parameter of ``TM30Calc.__init__``) - there's no
+        per-call wavelengths override, like `cct_to_xyz`.
+
+        Parameters
+        ----------
+        cct : float or np.ndarray, shape (N,)
+            Correlated color temperature(s) (K).
+            scalar -> returns (99, 3) array
+            (N,) array -> returns (N, 99, 3) array
+
+        Returns
+        -------
+        np.ndarray, shape (99, 3) or (N, 99, 3)
+            [J', a', b'] for each of the 99 CES.
+        """
+        single = np.ndim(cct) == 0
+        cct_arr = np.ascontiguousarray(
+            np.atleast_1d(np.asarray(cct, dtype=np.float64))
+        )
+        _, jab = self._ctx.reference_colorimetry(cct_arr)
+        return jab[0] if single else jab
+
+    def reference_spd(self, cct) -> np.ndarray:
+        """Reference illuminant SPD at a given CCT, on the conformed grid.
+
+        Builds the TM-30-20 S3.5 reference illuminant for `cct` (Planckian
+        radiator below 4000 K, CIE daylight illuminant above 5000 K, a
+        proportional blend of the two between 4000 K and 5000 K). The
+        returned SPD is sampled on ``self.conformed_wavelengths`` - the
+        S3.5-conformed form of `wavelengths` - which differs from
+        `wavelengths` itself whenever the input grid (see the
+        `wavelengths` parameter of ``TM30Calc.__init__``) extends past
+        380-780 nm; it is not any per-call grid.
+
+        Always uses this calculator's fixed wavelength grid - there's no
+        per-call wavelengths override, like `cct_to_xyz`.
+
+        Parameters
+        ----------
+        cct : float or np.ndarray, shape (N,)
+            Correlated color temperature(s) (K).
+            scalar -> returns (n_conf,) array
+            (N,) array -> returns (N, n_conf) array,
+            n_conf = len(self.conformed_wavelengths)
+
+        Returns
+        -------
+        np.ndarray, shape (n_conf,) or (N, n_conf)
+        """
+        single = np.ndim(cct) == 0
+        cct_arr = np.ascontiguousarray(
+            np.atleast_1d(np.asarray(cct, dtype=np.float64))
+        )
+        spd, _ = self._ctx.reference_colorimetry(cct_arr)
+        return spd[0] if single else spd
 
     def cct_to_xyz(
         self,

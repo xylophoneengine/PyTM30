@@ -1521,6 +1521,67 @@ struct BatchContext {
     return nb::make_tuple(ces_result, source_result);
   }
 
+  /// Reference-side colorimetry (S3.5, S3.7) for each CCT (N,) in. Always
+  /// uses this context's grid-fixed wavelengths (set via
+  /// set_fixed_grid()) - no per-call wavelengths override, like
+  /// cct_to_xyz(). Returns (spd, jab): spd shape (N, n_conf) - the
+  /// reference illuminant SPD on the fixed grid; jab shape (N, 99, 3) -
+  /// the reference-adapted CAM02-UCS J'a'b' for the 99 CES.
+  nb::object reference_colorimetry(nb::ndarray<> cct_array) {
+    if (!fixed_tables_.has_value())
+      throw std::runtime_error(
+          "reference_colorimetry() called before set_fixed_grid() was ever "
+          "called.");
+    if (cct_array.ndim() != 1)
+      throw std::invalid_argument("cct_array must be a 1-D array");
+    require_c_contiguous(cct_array, "cct_array");
+    size_t N = cct_array.shape(0);
+    const double *cct_data = static_cast<const double *>(cct_array.data());
+
+    const size_t n_conf = fixed_tables_->wavelengths.size();
+
+    auto np = nb::module_::import_("numpy");
+    auto spd_result = np.attr("empty")(nb::make_tuple(N, n_conf),
+                                       nb::arg("dtype") = "float64");
+    auto spd_nd = nb::cast<nb::ndarray<>>(spd_result);
+    double *spd_buf = static_cast<double *>(spd_nd.data());
+
+    auto jab_result = np.attr("empty")(nb::make_tuple(N, 99, 3),
+                                       nb::arg("dtype") = "float64");
+    auto jab_nd = nb::cast<nb::ndarray<>>(jab_result);
+    double *jab_buf = static_cast<double *>(jab_nd.data());
+
+    for (size_t i = 0; i < N; ++i) {
+      const tm30::ReferenceColorimetry ref =
+          tm30::compute_reference_colorimetry(cct_data[i], *fixed_tables_);
+      std::copy(ref.spd.begin(), ref.spd.end(), spd_buf + i * n_conf);
+      for (size_t j = 0; j < 99; ++j) {
+        jab_buf[(i * 99 + j) * 3 + 0] = ref.jab_ces[j].J_prime;
+        jab_buf[(i * 99 + j) * 3 + 1] = ref.jab_ces[j].a_prime;
+        jab_buf[(i * 99 + j) * 3 + 2] = ref.jab_ces[j].b_prime;
+      }
+    }
+
+    return nb::make_tuple(spd_result, jab_result);
+  }
+
+  /// The S3.5-conformed fixed wavelength grid (nm), as set by
+  /// set_fixed_grid(). Returns shape (n_conf,).
+  nb::object fixed_wavelengths() {
+    if (!fixed_tables_.has_value())
+      throw std::runtime_error(
+          "fixed_wavelengths() called before set_fixed_grid() was ever "
+          "called.");
+
+    const auto &wl = fixed_tables_->wavelengths;
+    auto np = nb::module_::import_("numpy");
+    auto result = np.attr("empty")(nb::make_tuple(wl.size()),
+                                   nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    std::copy(wl.begin(), wl.end(), static_cast<double *>(nd.data()));
+    return result;
+  }
+
   /// Compute XYZ for the reference illuminant at each CCT (N,) in,
   /// returns (N, 3). Always uses this context's grid-fixed wavelengths (set
   /// via set_fixed_grid()) - no per-call wavelengths override. cmf_path=None
@@ -1965,6 +2026,18 @@ NB_MODULE(tm30_core, m) {
            "(S3.2 Eq. 1-3), both with the S3.5-conformed trapezoid "
            "weights folded in and columns indexed by the input "
            "wavelengths; columns outside 380-780 nm are zero.")
+      .def("reference_colorimetry", &BatchContext::reference_colorimetry,
+           nb::arg("cct_array"),
+           "Reference-side colorimetry (S3.5, S3.7) for each CCT. Input "
+           "shape (N,). Returns (spd, jab): spd shape (N, n_conf) is the "
+           "reference illuminant SPD on the fixed grid (S3.5 Eq. 13-16), "
+           "jab shape (N, 99, 3) is the reference-adapted CAM02-UCS "
+           "J'a'b' for the 99 CES (S3.7). Always uses this context's "
+           "grid-fixed wavelengths (set via set_fixed_grid()) - no "
+           "wavelengths override.")
+      .def("fixed_wavelengths", &BatchContext::fixed_wavelengths,
+           "The S3.5-conformed fixed wavelength grid (nm) set by "
+           "set_fixed_grid().")
       .def("cct_to_xyz", &BatchContext::cct_to_xyz, nb::arg("cct_array"),
            nb::arg("cmf_path") = nb::none(), nb::arg("K") = nb::none(),
            "Compute XYZ for the TM-30-20 reference illuminant at each CCT. "

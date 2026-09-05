@@ -164,6 +164,45 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
                                const ResampledTables &tables,
                                const PlanckianLut &planckian_lut);
 
+/// Reference-side colorimetry for a single CCT: reference illuminant SPD,
+/// its 10-deg white point, CES tristimulus values, and CAM02-UCS J'a'b'.
+///
+/// This is exactly the reference-side subset of CesColorimetryResult
+/// (steps 4, 7, 8, 10 of compute_ces_colorimetry_cached) - the part that
+/// depends on the CCT alone, not on any test SPD. Callers that need the
+/// reference side for a CCT without a test SPD (e.g. one already obtained
+/// from some other CCT/Duv computation) can call
+/// compute_reference_colorimetry() directly instead of running the whole
+/// pipeline.
+///
+/// TM-30-20 S3.3 Eq. (13)-(16): reference illuminant SPD.
+/// TM-30-20 S3.6 Eq. (25)-(27): reference CES tristimulus values.
+/// TM-30-20 S3.7.1: reference-adapted CAM02-UCS J'a'b'.
+struct ReferenceColorimetry {
+  std::vector<double> spd;           // Reference illuminant SPD values.
+  XyzTriple white;                   // Reference 10-deg white point XYZ.
+  std::array<XyzTriple, 99> xyz_ces; // Reference CES tristimulus values.
+  std::array<Cam02Ucs, 99> jab_ces;  // Reference-adapted CAM02-UCS J'a'b'.
+};
+
+/// Compute the reference-side colorimetry for `cct` using pre-resampled
+/// `tables` (see prepare_resampled_tables()).
+///
+/// Body is the same statements as steps 4, 7, 8, 10 of
+/// compute_ces_colorimetry_cached(), extracted so both that function and
+/// standalone callers can share them; compute_ces_colorimetry_cached()
+/// calls this and copies its fields into its own result.
+///
+/// @param cct     Correlated color temperature (Kelvin) to generate the
+///                reference illuminant for.
+/// @param tables  Pre-resampled CES/CMF/daylight-basis tables (see
+///                prepare_resampled_tables()), on the same grid `cct` was
+///                derived from.
+///
+/// @return ReferenceColorimetry for `cct` on `tables`' grid.
+ReferenceColorimetry
+compute_reference_colorimetry(double cct, const ResampledTables &tables);
+
 // ==========================================================================
 //  Linear tristimulus maps - unnormalised integrands on an input grid.
 // ==========================================================================

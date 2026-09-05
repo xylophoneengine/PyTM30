@@ -1009,5 +1009,49 @@ TEST_CASE("Tables immutability - unrelated compute_ces_colorimetry call "
   check_results_identical(result_1, result_2, "tables-immutability");
 }
 
+// -------------------------------------------------------------------------
+// compute_reference_colorimetry() must reproduce, bit-for-bit, the
+// reference-side fields (reference SPD, reference CES XYZ, reference
+// CAM02-UCS J'a'b') that compute_ces_colorimetry_cached() computes inline -
+// it is the same statements, extracted, not a re-derivation.
+// -------------------------------------------------------------------------
+
+TEST_CASE("compute_reference_colorimetry matches the reference-side fields "
+          "of compute_ces_colorimetry_cached (D65, F1)",
+          "[reference][slice05]") {
+  auto &G = GlobalFixtures::instance();
+  auto wl = wl_1nm();
+  ResampledTables tables = prepare_resampled_tables(wl, G.cmf_2deg, G.cmf_10deg,
+                                                    G.ces, G.daylight_basis);
+
+  auto check_one = [&](const std::vector<double> &spd,
+                       const std::string &label) {
+    CesColorimetryResult full = run_cached(spd, tables, G);
+    ReferenceColorimetry ref = compute_reference_colorimetry(full.cct, tables);
+
+    INFO(label);
+    REQUIRE(ref.spd.size() == full.reference_spd_values.size());
+    for (std::size_t i = 0; i < ref.spd.size(); ++i) {
+      CHECK(ref.spd[i] == full.reference_spd_values[i]);
+    }
+    for (std::size_t i = 0; i < 99; ++i) {
+      CHECK(ref.xyz_ces[i].X == full.xyz_ref_ces[i].X);
+      CHECK(ref.xyz_ces[i].Y == full.xyz_ref_ces[i].Y);
+      CHECK(ref.xyz_ces[i].Z == full.xyz_ref_ces[i].Z);
+      CHECK(ref.jab_ces[i].J_prime == full.jab_ref_ces[i].J_prime);
+      CHECK(ref.jab_ces[i].a_prime == full.jab_ref_ces[i].a_prime);
+      CHECK(ref.jab_ces[i].b_prime == full.jab_ref_ces[i].b_prime);
+    }
+  };
+
+  auto [d65_wl, d65_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+  REQUIRE(d65_wl == wl);
+  check_one(d65_vals, "D65");
+
+  auto [f1_wl, f1_vals] = load_spd_csv(data_path("fl1_1nm.csv"));
+  REQUIRE(f1_wl == wl);
+  check_one(f1_vals, "F1");
+}
+
 } // namespace
 } // namespace tm30::test
