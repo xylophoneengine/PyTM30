@@ -16,6 +16,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tm30 {
@@ -171,13 +172,15 @@ compute_reference_colorimetry(double cct, const ResampledTables &tables) {
   const CesData &ces_resampled = tables.ces;
   const CmfData &cmf10 = tables.cmf_10deg;
 
+  ReferenceColorimetry result;
+
   // -- Step 4: Generate reference illuminant SPD -------------------------
   // TM-30-20 S3.3 Eq. (13)-(16). Daylight basis is already resampled to
   // spd_wavelengths (tables.daylight_basis), so skip the internal
   // interpolation that generate_cie_d() would otherwise redo. Likewise the
   // grid-fixed lambda^(-5) factor of Eq. (6) is precomputed on the tables,
   // so generate_planckian() does not rebuild it per SPD.
-  const std::vector<double> ref_spd = generate_reference_spd(
+  result.spd = generate_reference_spd(
       cct, spd_wavelengths, tables.daylight_basis, cmf10.y_bar,
       /*already_resampled=*/true, &tables.lambda_pow_m5);
   // TM-30-20 S3.3
@@ -185,18 +188,16 @@ compute_reference_colorimetry(double cct, const ResampledTables &tables) {
   // -- Step 7: Compute reference source 10-deg XYZ -> normalisation kr -------
   // TM-30-20 S3.6: Reference illuminant uses same normalisation formula
   const SourceXyz ref_10deg = compute_source_xyz(
-      spd_wavelengths, ref_spd, cmf10.x_bar, cmf10.y_bar, cmf10.z_bar);
+      spd_wavelengths, result.spd, cmf10.x_bar, cmf10.y_bar, cmf10.z_bar);
   // TM-30-20 S3.6
 
   // -- Step 8: Compute CES XYZ under reference illuminant ----------------
   // TM-30-20 S3.6 Eq. (25)-(27)
-  const auto xyz_ref = compute_ces_xyz(spd_wavelengths, ref_spd, ces_resampled,
-                                       cmf10.x_bar, cmf10.y_bar, cmf10.z_bar,
-                                       ref_10deg.k, &tables.trapezoidal_w);
+  const auto xyz_ref = compute_ces_xyz(
+      spd_wavelengths, result.spd, ces_resampled, cmf10.x_bar, cmf10.y_bar,
+      cmf10.z_bar, ref_10deg.k, &tables.trapezoidal_w);
   // TM-30-20 S3.6
 
-  ReferenceColorimetry result;
-  result.spd = ref_spd; // TM-30-20 S3.3
   result.white = XyzTriple{ref_10deg.X, ref_10deg.Y, ref_10deg.Z};
   result.xyz_ces = xyz_ref; // TM-30-20 S3.6 Eq. (25)-(27)
 
@@ -230,8 +231,7 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   // -- Steps 4, 7, 8, 10: Reference-side colorimetry ----------------------
   // (reference SPD, reference source XYZ, reference CES XYZ, reference
   // CAM02-UCS J'a'b') - see compute_reference_colorimetry().
-  const ReferenceColorimetry ref =
-      compute_reference_colorimetry(cct_duv.cct, tables);
+  ReferenceColorimetry ref = compute_reference_colorimetry(cct_duv.cct, tables);
 
   // -- Step 5: Compute test source 10-deg XYZ -> normalisation constant kt ---
   // TM-30-20 S3.2 Eq. (4): kt = 100 / integral St(lambda) * ybar10(lambda)
@@ -250,11 +250,11 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
 
   // -- Assemble result ---------------------------------------------------
   CesColorimetryResult result;
-  result.cct = cct_duv.cct;              // TM-30-20 S3.3
-  result.duv = cct_duv.duv;              // TM-30-20 S3.3
-  result.reference_spd_values = ref.spd; // TM-30-20 S3.3
-  result.xyz_test_ces = xyz_test;        // TM-30-20 S3.6 Eq. (21)-(23)
-  result.xyz_ref_ces = ref.xyz_ces;      // TM-30-20 S3.6 Eq. (25)-(27)
+  result.cct = cct_duv.cct;                         // TM-30-20 S3.3
+  result.duv = cct_duv.duv;                         // TM-30-20 S3.3
+  result.reference_spd_values = std::move(ref.spd); // TM-30-20 S3.3
+  result.xyz_test_ces = xyz_test;   // TM-30-20 S3.6 Eq. (21)-(23)
+  result.xyz_ref_ces = ref.xyz_ces; // TM-30-20 S3.6 Eq. (25)-(27)
 
   // -- Step 9: CIECAM02 J'a'b' under test source adaptation --------------
   // TM-30-20 S3.7.1: Adapting to test source white point (10-deg XYZ)

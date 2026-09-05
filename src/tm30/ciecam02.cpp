@@ -8,7 +8,6 @@
 
 #include "tm30/ciecam02.hpp"
 
-#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -274,49 +273,13 @@ inline double compute_c_paren() { // not constexpr: see kNbb above
 // TM-30-20 S3.7.1 Eq. (42)
 inline const double kCParen = compute_c_paren();
 
-} // anonymous namespace
-
 // -------------------------------------------------------------------------
-// Public API
+// Shared forward-transform loop: writes directly into `out`, so neither
+// caller-facing overload below needs an intermediate allocation.
 // -------------------------------------------------------------------------
-
-double ciecam02_compute_aw(const XyzTriple &xyz_white) {
-  // Step 1: XYZ -> RGB (CAT02) for the white point
-  // TM-30-20 S3.7.1 Eq. (29)-(30)
-  double Rw, Gw, Bw;
-  mat3_mul(kMCAT02_00, kMCAT02_01, kMCAT02_02, kMCAT02_10, kMCAT02_11,
-           kMCAT02_12, kMCAT02_20, kMCAT02_21, kMCAT02_22, xyz_white.X,
-           xyz_white.Y, xyz_white.Z, Rw, Gw, Bw);
-  // TM-30-20 S3.7.1 Eq. (29)-(30)
-
-  // Step 2: For the white point itself, chromatic adaptation gives
-  // RC = 100, GC = 100, BC = 100 (since we divide by Rw and multiply by 100)
-  // TM-30-20 S3.7.1 Eq. (31)-(33)
-  const double RC = kJScale; // 100.0
-  const double GC = kJScale;
-  const double BC = kJScale;
-
-  // Step 3: Convert to HPE cone space
-  // TM-30-20 S3.7.1 Eq. (34)-(35)
-  double Rp, Gp, Bp;
-  mat3_mul(kCOMBINED_00, kCOMBINED_01, kCOMBINED_02, kCOMBINED_10, kCOMBINED_11,
-           kCOMBINED_12, kCOMBINED_20, kCOMBINED_21, kCOMBINED_22, RC, GC, BC,
-           Rp, Gp, Bp);
-  // TM-30-20 S3.7.1 Eq. (34)-(35)
-
-  // Step 4: Luminance-level adaptation
-  // TM-30-20 S3.7.1 Eq. (36)-(38)
-  const double Ra = luminance_adapt(Rp);
-  const double Ga = luminance_adapt(Gp);
-  const double Ba = luminance_adapt(Bp);
-
-  // Step 6: Achromatic response
-  // TM-30-20 S3.7.1 Eq. (44)
-  return (2.0 * Ra + Ga + (1.0 / 20.0) * Ba - kAOffset) * kNbb;
-}
-
-std::vector<Cam02Ucs> ciecam02_forward(const XyzTriple &xyz_white,
-                                       std::span<const XyzTriple> xyz_samples) {
+void ciecam02_forward_into(const XyzTriple &xyz_white,
+                           std::span<const XyzTriple> xyz_samples,
+                           Cam02Ucs *out) {
 
   // -- Precompute white-point values ----------------------------------
 
@@ -341,8 +304,6 @@ std::vector<Cam02Ucs> ciecam02_forward(const XyzTriple &xyz_white,
   const double FL_025 = std::pow(kFL, kMExpFL);
 
   // -- Process each CES sample ----------------------------------------
-
-  std::vector<Cam02Ucs> result(xyz_samples.size());
 
   for (std::size_t i = 0; i < xyz_samples.size(); ++i) {
     const auto &xyz = xyz_samples[i];
@@ -454,19 +415,64 @@ std::vector<Cam02Ucs> ciecam02_forward(const XyzTriple &xyz_white,
     const double a_prime = M_prime * cos_h;
     const double b_prime = M_prime * sin_h;
 
-    result[i] = Cam02Ucs{J_prime, a_prime, b_prime};
+    out[i] = Cam02Ucs{J_prime, a_prime, b_prime};
   }
+}
 
+} // anonymous namespace
+
+// -------------------------------------------------------------------------
+// Public API
+// -------------------------------------------------------------------------
+
+double ciecam02_compute_aw(const XyzTriple &xyz_white) {
+  // Step 1: XYZ -> RGB (CAT02) for the white point
+  // TM-30-20 S3.7.1 Eq. (29)-(30)
+  double Rw, Gw, Bw;
+  mat3_mul(kMCAT02_00, kMCAT02_01, kMCAT02_02, kMCAT02_10, kMCAT02_11,
+           kMCAT02_12, kMCAT02_20, kMCAT02_21, kMCAT02_22, xyz_white.X,
+           xyz_white.Y, xyz_white.Z, Rw, Gw, Bw);
+  // TM-30-20 S3.7.1 Eq. (29)-(30)
+
+  // Step 2: For the white point itself, chromatic adaptation gives
+  // RC = 100, GC = 100, BC = 100 (since we divide by Rw and multiply by 100)
+  // TM-30-20 S3.7.1 Eq. (31)-(33)
+  const double RC = kJScale; // 100.0
+  const double GC = kJScale;
+  const double BC = kJScale;
+
+  // Step 3: Convert to HPE cone space
+  // TM-30-20 S3.7.1 Eq. (34)-(35)
+  double Rp, Gp, Bp;
+  mat3_mul(kCOMBINED_00, kCOMBINED_01, kCOMBINED_02, kCOMBINED_10, kCOMBINED_11,
+           kCOMBINED_12, kCOMBINED_20, kCOMBINED_21, kCOMBINED_22, RC, GC, BC,
+           Rp, Gp, Bp);
+  // TM-30-20 S3.7.1 Eq. (34)-(35)
+
+  // Step 4: Luminance-level adaptation
+  // TM-30-20 S3.7.1 Eq. (36)-(38)
+  const double Ra = luminance_adapt(Rp);
+  const double Ga = luminance_adapt(Gp);
+  const double Ba = luminance_adapt(Bp);
+
+  // Step 6: Achromatic response
+  // TM-30-20 S3.7.1 Eq. (44)
+  return (2.0 * Ra + Ga + (1.0 / 20.0) * Ba - kAOffset) * kNbb;
+}
+
+std::vector<Cam02Ucs> ciecam02_forward(const XyzTriple &xyz_white,
+                                       std::span<const XyzTriple> xyz_samples) {
+  std::vector<Cam02Ucs> result(xyz_samples.size());
+  ciecam02_forward_into(xyz_white, xyz_samples, result.data());
   return result;
 }
 
 std::array<Cam02Ucs, 99>
 ciecam02_forward(const XyzTriple &xyz_white,
                  const std::array<XyzTriple, 99> &xyz_samples) {
-  auto samples =
-      ciecam02_forward(xyz_white, std::span<const XyzTriple>(xyz_samples));
   std::array<Cam02Ucs, 99> result;
-  std::copy(samples.begin(), samples.end(), result.begin());
+  ciecam02_forward_into(xyz_white, std::span<const XyzTriple>(xyz_samples),
+                        result.data());
   return result;
 }
 
