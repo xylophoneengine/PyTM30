@@ -1451,6 +1451,43 @@ class TM30Calc:
         result = self._ctx.xyz_to_Yuv(matrix)
         return result[0] if single else result
 
+    def xyz_to_jab_ucs(self, xyz: np.ndarray, xyzw: np.ndarray) -> np.ndarray:
+        """Convert CIE XYZ tristimulus values to CAM02-UCS J'a'b'.
+
+        Runs the CIECAM02 forward transform under fixed TM-30-20 S3.7
+        viewing conditions (LA=100, Yb=20, c=0.69, Nc=1, F=1, D=1), the
+        same conditions ``eval()`` uses internally for every CES sample.
+
+        Parameters
+        ----------
+        xyz : np.ndarray, shape (..., 3)
+            XYZ tristimulus values, any number of leading batch dimensions.
+            Returns an array of the same shape with [J', a', b'] in place
+            of [X, Y, Z].
+        xyzw : np.ndarray, shape (3,)
+            Adapting white point XYZ, shared by every sample in `xyz`.
+            Must be scaled so Yw=100 - i.e. exactly what ``k * W @ s``
+            (see `source_xyz_matrix`) or ``spd_to_xyz(s)`` gives for a
+            white/source spectrum `s` (both normalise Y=100). This is not
+            validated here; an unscaled white silently gives wrong J'.
+
+        Returns
+        -------
+        np.ndarray, shape (..., 3)
+        """
+        xyz = np.ascontiguousarray(xyz, dtype=np.float64)
+        if xyz.shape[-1] != 3:
+            raise ValueError(
+                f"xyz must have shape (..., 3), got {xyz.shape}"
+            )
+        xyzw = np.ascontiguousarray(xyzw, dtype=np.float64)
+        if xyzw.shape != (3,):
+            raise ValueError(f"xyzw must have shape (3,), got {xyzw.shape}")
+
+        matrix = xyz.reshape(-1, 3)
+        result = self._ctx.xyz_to_jab_ucs(matrix, xyzw)
+        return result.reshape(xyz.shape)
+
     def cct_to_xyz(
         self,
         cct,

@@ -11,6 +11,8 @@
 
 #include <array>
 #include <cstddef>
+#include <span>
+#include <vector>
 
 #include "tm30/xyz.hpp" // XyzTriple
 
@@ -77,6 +79,22 @@ struct Cam02Ucs {
 std::array<Cam02Ucs, 99>
 ciecam02_forward(const XyzTriple &xyz_white,
                  const std::array<XyzTriple, 99> &xyz_samples);
+
+/// Run the CIECAM02 forward transform for an arbitrary number of sample
+/// XYZ values under a given adapting white point.
+///
+/// Same 12-step pipeline as the 99-sample overload above (TM-30-20
+/// S3.7.1), generalised to any sample count; the fixed-size overload is a
+/// thin wrapper around this one.
+///
+/// @param xyz_white   Adapting white point XYZ (10-deg observer).
+/// @param xyz_samples Sample XYZ values, any length (including 0).
+///
+/// @return Vector of Cam02Ucs values, one per input sample.
+///
+/// TM-30-20 S3.7.1
+std::vector<Cam02Ucs> ciecam02_forward(const XyzTriple &xyz_white,
+                                       std::span<const XyzTriple> xyz_samples);
 
 /// Compute the achromatic response Aw for a given white point.
 ///

@@ -315,9 +315,8 @@ double ciecam02_compute_aw(const XyzTriple &xyz_white) {
   return (2.0 * Ra + Ga + (1.0 / 20.0) * Ba - kAOffset) * kNbb;
 }
 
-std::array<Cam02Ucs, 99>
-ciecam02_forward(const XyzTriple &xyz_white,
-                 const std::array<XyzTriple, 99> &xyz_samples) {
+std::vector<Cam02Ucs> ciecam02_forward(const XyzTriple &xyz_white,
+                                       std::span<const XyzTriple> xyz_samples) {
 
   // -- Precompute white-point values ----------------------------------
 
@@ -343,9 +342,9 @@ ciecam02_forward(const XyzTriple &xyz_white,
 
   // -- Process each CES sample ----------------------------------------
 
-  std::array<Cam02Ucs, 99> result;
+  std::vector<Cam02Ucs> result(xyz_samples.size());
 
-  for (std::size_t i = 0; i < 99; ++i) {
+  for (std::size_t i = 0; i < xyz_samples.size(); ++i) {
     const auto &xyz = xyz_samples[i];
 
     // -- Step 1: XYZ -> RGB (CAT02) ----------------------------------
@@ -458,6 +457,16 @@ ciecam02_forward(const XyzTriple &xyz_white,
     result[i] = Cam02Ucs{J_prime, a_prime, b_prime};
   }
 
+  return result;
+}
+
+std::array<Cam02Ucs, 99>
+ciecam02_forward(const XyzTriple &xyz_white,
+                 const std::array<XyzTriple, 99> &xyz_samples) {
+  auto samples =
+      ciecam02_forward(xyz_white, std::span<const XyzTriple>(xyz_samples));
+  std::array<Cam02Ucs, 99> result;
+  std::copy(samples.begin(), samples.end(), result.begin());
   return result;
 }
 

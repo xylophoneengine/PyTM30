@@ -415,6 +415,50 @@ TEST_CASE("CIECAM02 - direct transform matches golden fixtures (fixture XYZ)",
 }
 
 // -------------------------------------------------------------------------
+// CIECAM02 - the N-sample span overload is bit-identical to the fixed
+// 99-array overload, and handles 1-sample and 0-sample inputs cleanly.
+// -------------------------------------------------------------------------
+
+TEST_CASE("CIECAM02 - span overload matches array overload exactly",
+          "[ciecam02][slice06]") {
+  const XyzTriple test_white{94.81073156061144, 100.0, 107.30398114475764};
+
+  auto xyz_golden =
+      load_xyz_fixture(fixture_path("D65_1nm", "06_xyz_test_ces"));
+  REQUIRE(xyz_golden.size() == 99);
+
+  std::array<XyzTriple, 99> xyz_arr;
+  for (std::size_t i = 0; i < 99; ++i)
+    xyz_arr[i] = xyz_golden[i];
+
+  auto jab_array = ciecam02_forward(test_white, xyz_arr);
+  auto jab_span =
+      ciecam02_forward(test_white, std::span<const XyzTriple>(xyz_golden));
+
+  REQUIRE(jab_span.size() == 99);
+  for (std::size_t i = 0; i < 99; ++i) {
+    CHECK(jab_span[i].J_prime == jab_array[i].J_prime);
+    CHECK(jab_span[i].a_prime == jab_array[i].a_prime);
+    CHECK(jab_span[i].b_prime == jab_array[i].b_prime);
+  }
+
+  // 1-sample call.
+  std::vector<XyzTriple> one_sample{xyz_golden[0]};
+  auto jab_one =
+      ciecam02_forward(test_white, std::span<const XyzTriple>(one_sample));
+  REQUIRE(jab_one.size() == 1);
+  CHECK(jab_one[0].J_prime == jab_array[0].J_prime);
+  CHECK(jab_one[0].a_prime == jab_array[0].a_prime);
+  CHECK(jab_one[0].b_prime == jab_array[0].b_prime);
+
+  // 0-sample call: empty in, empty out, no crash.
+  std::vector<XyzTriple> no_samples;
+  auto jab_none =
+      ciecam02_forward(test_white, std::span<const XyzTriple>(no_samples));
+  CHECK(jab_none.empty());
+}
+
+// -------------------------------------------------------------------------
 // CIECAM02 - D65_1nm matches golden J'a'b' fixtures (pipeline)
 // -------------------------------------------------------------------------
 

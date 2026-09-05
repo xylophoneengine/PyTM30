@@ -1,4 +1,5 @@
 #include "tm30/cct.hpp"
+#include "tm30/ciecam02.hpp"
 #include "tm30/csv_loader.hpp"
 #include "tm30/errors.hpp"
 #include "tm30/gamut.hpp"
@@ -20,6 +21,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility> // std::move
@@ -1422,6 +1424,43 @@ struct BatchContext {
     return result;
   }
 
+  /// CAM02-UCS J'a'b' under TM-30-20 S3.7 viewing conditions for a batch of
+  /// XYZ samples, given one adapting white point. white must be scaled so
+  /// Y=100 (as the core does via k = 100/(W @ s)).
+  nb::object xyz_to_jab_ucs(nb::ndarray<> xyz_matrix, nb::ndarray<> white) {
+    if (xyz_matrix.ndim() != 2 || xyz_matrix.shape(1) != 3)
+      throw std::invalid_argument("xyz_matrix must be 2-D (N x 3)");
+    require_c_contiguous(xyz_matrix, "xyz_matrix");
+    if (white.ndim() != 1 || white.shape(0) != 3)
+      throw std::invalid_argument("white must be 1-D (3,)");
+    require_c_contiguous(white, "white");
+
+    size_t N = xyz_matrix.shape(0);
+    const double *data = static_cast<const double *>(xyz_matrix.data());
+    const double *w = static_cast<const double *>(white.data());
+    tm30::XyzTriple xyz_white{w[0], w[1], w[2]};
+
+    std::vector<tm30::XyzTriple> xyzs(N);
+    for (size_t i = 0; i < N; ++i) {
+      xyzs[i] =
+          tm30::XyzTriple{data[i * 3 + 0], data[i * 3 + 1], data[i * 3 + 2]};
+    }
+    auto jabs = tm30::ciecam02_forward(xyz_white,
+                                       std::span<const tm30::XyzTriple>(xyzs));
+
+    auto np = nb::module_::import_("numpy");
+    auto result =
+        np.attr("empty")(nb::make_tuple(N, 3), nb::arg("dtype") = "float64");
+    auto nd = nb::cast<nb::ndarray<>>(result);
+    double *buf = static_cast<double *>(nd.data());
+    for (size_t i = 0; i < N; ++i) {
+      buf[i * 3 + 0] = jabs[i].J_prime;
+      buf[i * 3 + 1] = jabs[i].a_prime;
+      buf[i * 3 + 2] = jabs[i].b_prime;
+    }
+    return result;
+  }
+
   /// Compute XYZ for the reference illuminant at each CCT (N,) in,
   /// returns (N, 3). Always uses this context's grid-fixed wavelengths (set
   /// via set_fixed_grid()) - no per-call wavelengths override. cmf_path=None
@@ -1850,6 +1889,13 @@ NB_MODULE(tm30_core, m) {
            "Convert XYZ tristimulus triples to CIE 1976 Y,u',v'. "
            "Input/output shape (N, 3). Pure coordinate transform - no CMF "
            "or wavelength dependency.")
+      .def("xyz_to_jab_ucs", &BatchContext::xyz_to_jab_ucs,
+           nb::arg("xyz_matrix"), nb::arg("white"),
+           "Convert XYZ tristimulus triples to CAM02-UCS J'a'b' under "
+           "TM-30-20 S3.7 viewing conditions (LA=100, Yb=20, c=0.69, "
+           "Nc=1, F=1, D=1). Input xyz_matrix shape (N, 3), white shape "
+           "(3,) shared by all N samples. Output shape (N, 3) with "
+           "[J', a', b']. white must be scaled so Y=100.")
       .def("cct_to_xyz", &BatchContext::cct_to_xyz, nb::arg("cct_array"),
            nb::arg("cmf_path") = nb::none(), nb::arg("K") = nb::none(),
            "Compute XYZ for the TM-30-20 reference illuminant at each CCT. "
