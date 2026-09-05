@@ -145,9 +145,65 @@ def _resolve_cmf(
     return os.path.join(data_dir, f"cmf_{key}.csv")
 
 
+def rf_from_delta_e(dE: np.ndarray) -> np.ndarray:
+    """Convert a color-difference value to a fidelity score.
+
+    Elementwise over any array shape: a scalar dE_avg yields a scalar Rf, a
+    per-sample dE array of shape (99,) yields per-sample Rf,CESi values.
+
+    Parameters
+    ----------
+    dE : array_like
+        Color difference(s) in CAM02-UCS J'a'b' space (TM-30-20 S3.8 Eq. 52).
+
+    Returns
+    -------
+    numpy.ndarray
+        Fidelity score(s): Rf when dE is the average color difference
+        (TM-30-20 S4.1 Eq. 53-54), or Rf,CESi when dE is per-sample
+        (TM-30-20 S4.2 Eq. 55-56).
+    """
+    dE = np.asarray(dE, dtype="float64")
+    return 10.0 * np.log(np.exp((100.0 - 6.73 * dE) / 10.0) + 1.0)
+
+
+def rf_from_jab(jab_test: np.ndarray, jab_ref: np.ndarray) -> np.ndarray:
+    """Compute the fidelity score Rf from test and reference J'a'b' values.
+
+    Averages the Euclidean color difference (TM-30-20 S3.8 Eq. 52) over the
+    99 color evaluation samples (second-to-last axis), then maps it to Rf
+    via rf_from_delta_e (TM-30-20 S4.1 Eq. 53-54).
+
+    Parameters
+    ----------
+    jab_test : array_like, shape (..., 99, 3)
+        CAM02-UCS J'a'b' coordinates under the test source.
+    jab_ref : array_like, shape (..., 99, 3)
+        CAM02-UCS J'a'b' coordinates under the reference illuminant.
+
+    Returns
+    -------
+    numpy.ndarray, shape (...)
+        Fidelity score Rf. Leading dimensions broadcast between jab_test
+        and jab_ref.
+    """
+    jab_test = np.asarray(jab_test, dtype="float64")
+    jab_ref = np.asarray(jab_ref, dtype="float64")
+    dE = np.linalg.norm(jab_test - jab_ref, axis=-1).mean(-1)
+    return rf_from_delta_e(dE)
+
+
 # -- Public re-exports --------------------------------------------------
 
-__all__ = ["TM30Calc", "Tm30Result", "Tm30BatchResult", "to_dataframe", "Cmf"]
+__all__ = [
+    "TM30Calc",
+    "Tm30Result",
+    "Tm30BatchResult",
+    "to_dataframe",
+    "Cmf",
+    "rf_from_delta_e",
+    "rf_from_jab",
+]
 
 
 # -- Multi-level column support ------------------------------------------
