@@ -24,7 +24,8 @@ double trapezoidal_integrate(const std::vector<double> &wavelengths,
                                 "integrand must have the same size");
   }
 
-  // TM-30-20 S3.6: trapezoidal integration for tristimulus values
+  // TM-30-20 S3.6 tristimulus integrals, evaluated by the trapezoidal rule
+  // (an implementation choice; see docs/divergences.md, Quadrature)
   double integral = 0.0;
 
   for (std::size_t i = 0; i < n - 1; ++i) {

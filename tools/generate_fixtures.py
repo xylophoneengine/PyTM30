@@ -158,7 +158,8 @@ _WL5 = _S0.wavelengths
 # slightly different CCT shifts its exact chromaticity). Running the
 # *identical* LUT-based algorithm the C++ engine itself runs eliminates
 # that cross-algorithm noise, leaving only genuine data-precision-level
-# residuals (see PROVENANCE notes for e.g. d65_1nm.csv's ~9e-4 rounding).
+# residuals (see data/README.md for e.g. d65_1nm.csv's ~9e-4 difference
+# from the CIE's own D65 table).
 # ---------------------------------------------------------------------------
 
 def _load_csv_cols(path):
