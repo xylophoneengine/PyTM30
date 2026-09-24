@@ -137,26 +137,16 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 /// Compute CVG-normalized bin-average coordinates.
 ///
 /// Reference polygon is normalized to a unit circle centered at origin.
-/// The reference circle position uses hbar_ref,j = mean of individual CES
-/// hue angles per bin (S4.5). Test coordinates are offset from reference
-/// circle points using the bin-averaged (a',b') displacement scaled by
-/// the reference radial distance.
+/// The reference circle position is the centre of hue bin j (S4.5 Eqs.
+/// (58)-(59) as corrected in TM-30-24). Test coordinates are offset from
+/// reference circle points using the bin-averaged (a',b') displacement scaled
+/// by the reference radial distance.
 ///
 /// @param test_avg  Bin-averaged test coordinates.
 /// @param ref_avg   Bin-averaged reference coordinates.
-/// @param jab_ref   CAM02-UCS for reference illuminant (for mean hue angles).
-/// @param bins      Hue-angle bin assignments.
-/// @param hue_angles
-///                  Optional: the normalized hue angles bin_by_hue()
-///                  already computed for the very same `jab_ref` (see its
-///                  out_hue_angles parameter). When supplied, they are
-///                  read instead of recomputing reference_hue_angle() for
-///                  all 99 CES - a pure performance optimization, exact
-///                  because both paths evaluate one shared expression.
-///                  Must belong to this `jab_ref`; there is no way to
-///                  check that, so pass null unless it does. Defaults to
-///                  null, preserving existing behavior for all current
-///                  callers.
+/// @param jab_ref, bins, hue_angles
+///                  Unused since the reference points became bin centres;
+///                  kept so existing callers still compile.
 /// @return          CVG coordinates for test and reference.
 ///
 /// TM-30-20 S4.5 Eq. (58)-(61)

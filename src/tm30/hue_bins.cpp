@@ -23,8 +23,7 @@ HueBins bin_by_hue(const std::array<Cam02Ucs, 99> &jab_ref,
   for (int i = 0; i < 99; ++i) {
     // TM-30-20 S4.3: hr = atan2(b'r,i, a'r,i) in [-pi, pi], normalized to
     // [0, 2pi). reference_hue_angle() (hue_bins.hpp) is the single
-    // definition of that expression; compute_cvg_coordinates() consumes
-    // the very same values for S4.5 Eqs. (58)-(59).
+    // definition of that expression.
     const double h = reference_hue_angle(jab_ref[i]);
 
     // Hand the angle back if the caller asked for it, so the CVG step does

@@ -110,14 +110,16 @@ keeps both quantities as raw ratios.
 
 ## Colour Vector Graphic coordinates (S4.5)
 
-Eqs. (58)-(59) place each hue bin's reference position on the unit circle
-at the arithmetic mean of the individual CES reference hue angles in the
-bin (each sample weighted equally); Eqs. (60)-(61) offset the test position
-by the bin-averaged coordinate difference divided by the reference bin
-chroma. PyTM30 implements exactly this: unit circle (no display scaling)
-and mean-of-individual-hue-angles. luxpy scales its CVG coordinates by a
+As printed in TM-30-20, Eqs. (58)-(59) place each hue bin's reference
+position on the unit circle at the mean of the bin's CES reference hue
+angles. TM-30-24 (S1.1.3, Eqs. (3-6)-(3-7)) corrects this to the centre of
+the hue bin, (j + 0.5) x 22.5 deg, as the intended definition and the one
+the IES calculators compute; PyTM30 follows the correction. Eqs. (60)-(61)
+offset the test position by the bin-averaged coordinate difference divided
+by the reference bin chroma, unchanged in TM-30-24. PyTM30 uses the unit
+circle with no display scaling. luxpy scales its CVG coordinates by a
 display factor (default 100) and derives the reference angle from the
-bin-averaged coordinates, which weights samples by chroma. PyTM30
+bin-averaged coordinates. PyTM30
 additionally carries the bin-average J' alongside the (x, y) coordinates
 as a convenience; S4.5 is strictly two-dimensional.
 

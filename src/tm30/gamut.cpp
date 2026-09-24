@@ -274,11 +274,11 @@ LocalBinMetrics compute_local_bin_metrics(const BinAverages &test_avg,
 
 // --- CVG Coordinates ------------------------------------------------------
 
-CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
-                                       const BinAverages &ref_avg,
-                                       const std::array<Cam02Ucs, 99> &jab_ref,
-                                       const HueBins &bins,
-                                       const HueAngles *hue_angles) {
+CvgCoordinates compute_cvg_coordinates(
+    const BinAverages &test_avg, const BinAverages &ref_avg,
+    [[maybe_unused]] const std::array<Cam02Ucs, 99> &jab_ref,
+    [[maybe_unused]] const HueBins &bins,
+    [[maybe_unused]] const HueAngles *hue_angles) {
 
   // TM-30-20 S4.5
   CvgCoordinates cvg{};
@@ -301,41 +301,12 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
       continue;
     }
 
-    // TM-30-20 S4.5 Eqs. (58)-(59): the reference circle position for bin j
-    // derives from the arithmetic mean of the individual CES hue angles in
-    // the bin, each taken from that sample's own reference-illuminant
-    // (a', b'). This is distinct from the hue angle of the bin-averaged
-    // coordinates, which would weight samples by chroma; Eqs. (58)-(59)
-    // weight every sample in the bin equally.
-    //
-    // std::atan2 returns [-pi, pi], so samples with negative b' (bins 9-16)
-    // come back negative and a raw mean would be meaningless; normalise
-    // each angle to [0, 2*pi) before averaging - reference_hue_angle()
-    // (hue_bins.hpp) does exactly that and is the single definition of the
-    // angle. After normalisation a plain arithmetic mean suffices: S4.3
-    // places 0 deg on the positive a' axis with 16 bins of 22.5 deg
-    // increasing counterclockwise, and S4.6 confirms 0 deg is the boundary
-    // between bins 1 and 16, so no bin straddles the wrap point and
-    // circular-mean machinery is unnecessary.
-    //
-    // Two spellings of the same accumulation. The first reads the angles
-    // bin_by_hue() already computed for this same jab_ref and handed back;
-    // the second recomputes them, as every caller did before that became
-    // possible. Both add the same doubles in the same order - the stored
-    // angle IS the value reference_hue_angle() returns, not an
-    // approximation of it - so they agree bit-for-bit, asserted in
-    // tests/slice_09_rg_local_cvg_test.cpp.
-    double sum_h = 0.0; // TM-30-20 S4.5 Eqs. (58)-(59) accumulator
-    if (hue_angles != nullptr) {
-      for (int idx : bins[j]) {
-        sum_h += (*hue_angles)[idx];
-      }
-    } else {
-      for (int idx : bins[j]) {
-        sum_h += reference_hue_angle(jab_ref[idx]);
-      }
-    }
-    const double h_bar = sum_h / static_cast<double>(bins[j].size());
+    // TM-30-20 S4.5 Eqs. (58)-(59), as corrected in TM-30-24 (S3.5 Eqs.
+    // (3-6)-(3-7); see its S1.1.3): the reference point for bin j is the
+    // bin centre, the bisector angle (j + 0.5) x 22.5 deg, not the mean hue
+    // of the bin's samples. This is the intended definition and what the
+    // IES calculators compute.
+    const BisectorDirections &dirs = bisector_directions();
 
     // Reference radial distance (for test coordinate offset)
     const double r_ref =
@@ -344,8 +315,8 @@ CvgCoordinates compute_cvg_coordinates(const BinAverages &test_avg,
 
     // Reference circle coordinates: Eq. (58), (59)
     // TM-30-20 S4.5 Eq. (58), (59)
-    const double x_ref_raw = std::cos(h_bar);
-    const double y_ref_raw = std::sin(h_bar);
+    const double x_ref_raw = dirs.cos_theta[j];
+    const double y_ref_raw = dirs.sin_theta[j];
 
     cvg.x_ref[j] = kCvgScale * x_ref_raw; // TM-30-20 S4.5 Eq. (58)
     cvg.y_ref[j] = kCvgScale * y_ref_raw; // TM-30-20 S4.5 Eq. (59)

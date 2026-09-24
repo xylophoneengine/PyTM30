@@ -85,8 +85,8 @@ Mapping onto the 18 pipeline stages:
                         [J'_bin_avg, a'_bin_avg, b'_bin_avg];
                         cvg_test/cvg_ref: the CVG unit-circle display
                         coordinates per TM-30-20 Sec 4.5 Eq. (58)-(61),
-                        with h_bar the arithmetic mean of the individual
-                        CES reference hue angles in the bin
+                        with h_bar the bin centre as corrected in
+                        TM-30-24 Eq. (3-6)-(3-7)
   16_rfi_per_sample  <- delta_E_to_R_f(delta_E) (99,)
   17_rf_skin         <- (R_s[14] + R_s[17]) / 2  (CES15, CES18, 0-indexed)
   18_annex_e         <- static P1/P2/P3 priority-level taxonomy (TM-30-20
@@ -485,15 +485,10 @@ def compute_stages(sd_test):
     Rcs_hj_percent = np.where(r_ref < 1e-12, 0.0, Rcs_hj_percent)
     Rhs_hj = np.where(r_ref < 1e-12, 0.0, Rhs_hj)
 
-    # CVG display coordinates (TM-30-20 Sec 4.5 Eq. 58-61). The reference
-    # circle position for bin j uses h_bar = the arithmetic mean of the
-    # individual CES reference hue angles in the bin (Sec 4.3 Eq. 57,
-    # normalised to [0, 2*pi) -- every sample weighted equally), NOT the
-    # hue angle of the bin-averaged (a', b'), which would weight samples
-    # by chroma. Eq. (58)-(61) place the coordinates on the unit reference
-    # circle; the clause prescribes no display scaling.
-    h_ref_rad = np.arctan2(Jpapbp_ref[:, 2], Jpapbp_ref[:, 1])
-    h_ref_rad = np.where(h_ref_rad < 0.0, h_ref_rad + 2.0 * np.pi, h_ref_rad)
+    # CVG display coordinates (TM-30-20 Sec 4.5 Eq. 58-61, with Eq. 58-59 as
+    # corrected in TM-30-24 Eq. 3-6/3-7): the reference point for bin j is
+    # the bin centre, (j + 0.5) x 22.5 deg (0-indexed), on the unit
+    # reference circle; the clause prescribes no display scaling.
     jab_test_bin_avg = np.column_stack([J_test_bin, avg_test_ab[:, 0], avg_test_ab[:, 1]])
     jab_ref_bin_avg = np.column_stack([J_ref_bin, avg_ref_ab[:, 0], avg_ref_ab[:, 1]])
     cvg_test = np.full((16, 3), np.nan)
@@ -505,7 +500,7 @@ def compute_stages(sd_test):
         if np.isnan(ar) or np.isnan(br):
             continue
         rr = np.hypot(ar, br)
-        h_bar = float(np.mean(h_ref_rad[bins == j]))
+        h_bar = np.deg2rad(22.5 * j + 11.25)
         x_ref_raw, y_ref_raw = np.cos(h_bar), np.sin(h_bar)
         cvg_ref[j, 1] = x_ref_raw
         cvg_ref[j, 2] = y_ref_raw

@@ -124,9 +124,8 @@ CesColorimetryResult compute_ces_colorimetry(
   result.hue_bins = bin_by_hue(result.jab_ref_ces, &hue_angles);
 
   // -- Step 13: Gamut metrics (Rg, local per-bin, CVG) --------------------
-  // TM-30-20 S4.4-S4.8. Handing step 12's hue angles to S4.5 Eqs.
-  // (58)-(59) saves recomputing all 99 atan2 calls; the result is
-  // bit-identical either way (see compute_cvg_coordinates()).
+  // TM-30-20 S4.4-S4.8. (The hue angles argument is unused since the CVG
+  // reference points became bin centres; see compute_cvg_coordinates().)
   result.gamut = compute_gamut(result.jab_test_ces, result.jab_ref_ces,
                                delta_e_array, result.hue_bins, &hue_angles);
 
@@ -287,9 +286,8 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   result.hue_bins = bin_by_hue(result.jab_ref_ces, &hue_angles);
 
   // -- Step 13: Gamut metrics (Rg, local per-bin, CVG) --------------------
-  // TM-30-20 S4.4-S4.8. Handing step 12's hue angles to S4.5 Eqs.
-  // (58)-(59) saves recomputing all 99 atan2 calls; the result is
-  // bit-identical either way (see compute_cvg_coordinates()).
+  // TM-30-20 S4.4-S4.8. (The hue angles argument is unused since the CVG
+  // reference points became bin centres; see compute_cvg_coordinates().)
   result.gamut = compute_gamut(result.jab_test_ces, result.jab_ref_ces,
                                delta_e_array, result.hue_bins, &hue_angles);
 

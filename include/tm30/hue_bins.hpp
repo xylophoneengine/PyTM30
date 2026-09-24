@@ -33,12 +33,8 @@ using HueAngles = std::array<double, 99>;
 /// The reference hue angle hr = atan2(b'r, a'r) of one sample, normalized
 /// to [0, 2pi).
 ///
-/// This is the ONLY definition of that angle in the library. Both
-/// bin_by_hue() (TM-30-20 S4.3, to pick the bin) and
-/// compute_cvg_coordinates() (TM-30-20 S4.5 Eqs. (58)-(59), to average the
-/// angles within a bin) go through it, which is what makes reusing a
-/// binning-time angle in the CVG step bit-identical to recomputing it
-/// there rather than merely close.
+/// This is the ONLY definition of that angle in the library;
+/// bin_by_hue() (TM-30-20 S4.3, to pick the bin) goes through it.
 ///
 /// NaN in: atan2 propagates NaN and the comparison below is false, so NaN
 /// comes back out unchanged - the caller decides what that means (see
@@ -75,9 +71,7 @@ inline double reference_hue_angle(const Cam02Ucs &jab) {
 ///                 Optional output: the normalized hue angles hr this
 ///                 function computes on its way to the bin assignment,
 ///                 one per CES. Supplying it costs one store per CES and
-///                 lets compute_cvg_coordinates() (S4.5 Eqs. (58)-(59))
-///                 skip recomputing the identical 99 atan2 calls. Purely
-///                 a performance affordance with no effect on the bins.
+///                 has no effect on the bins.
 ///                 Defaults to null, preserving existing behavior for all
 ///                 current callers.
 /// @return 16 vectors of 0-based CES indices, one per hue-angle bin.
