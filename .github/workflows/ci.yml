@@ -101,5 +101,8 @@ jobs:
       # tables are intact and the file is a fixed point before the hook runs,
       # so the failure reads as a test name rather than a mangled diff.
       - run: python3 tools/test_fix_unicode.py -v
+      # Every float literal in src/ and include/ carries a TM-30-20 clause
+      # tag, and every tag names a clause in tools/tm30_clause_equations.txt.
+      - run: python3 tools/check_constants.py
       # Runs fix-unicode (ASCII-only gate) and clang-format over the tree.
       - run: pre-commit run --all-files --show-diff-on-failure

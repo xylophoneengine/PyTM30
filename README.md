@@ -47,8 +47,8 @@ agents, and verified every stage against colour-science (and, in the
 initial internal version, luxpy) as an accuracy oracle.
 
 None of the speed comes from touching the mathematics. The numerics are
-derived from the TM-30-20 text, and every numeric constant in the core
-cites its clause, enforced by a CI gate. The speedup is pure data-flow
+derived from the TM-30-20 text, and every float literal in the core
+carries a clause tag, enforced by a CI gate. The speedup is pure data-flow
 organisation: resample once, allocate nothing per SPD, stay native. Two
 implementations can agree to floating-point precision and still sit an
 order of magnitude apart on throughput.
@@ -505,8 +505,12 @@ uses the same oracle to regenerate the golden test fixtures in `tests/fixtures/`
 python3 tools/check_constants.py    # 0 uncited float literals
 ```
 
-Every numeric constant in `src/`/`include/` cites the TM-30-20 spec section
-it comes from; `check_constants.py` enforces this mechanically.
+Every float literal in `src/`/`include/` carries a TM-30-20 clause tag on
+its line or within the five lines above it, and every tag must name a
+clause listed in `tools/tm30_clause_equations.txt`; CI runs
+`check_constants.py` to enforce both. A tag names the clause the
+surrounding computation implements. Values the standard does not supply
+(zero-division guards, clamps) say so in their comment.
 
 ### Formatting
 
