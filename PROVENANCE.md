@@ -9,7 +9,11 @@ PyTM30 implements ANSI/IES TM-30-20 from the published standard:
 
 ## Data
 
-Spectral data is sourced from colour-science (BSD-3-Clause) and CIE publications:
+The spectral data tables in `data/` are CIE datasets, published by the
+International Commission on Illumination (CIE) under CC BY-SA 4.0 and
+distributed here under the same licence, separately from the MIT code.
+`data/README.md` lists each file's source DOI and the changes made. They were
+extracted using colour-science (BSD-3-Clause) as a tool:
 
 > Mansencal, T., Mauderer, M., Parsons, M., et al. (2025). *Colour 0.4.7*
 > [Computer software]. Zenodo. <https://doi.org/10.5281/zenodo.17837391>

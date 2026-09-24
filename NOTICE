@@ -6,14 +6,18 @@ PyTM30 implements ANSI/IES TM-30-20 from the published standard:
     ISBN 978-0-87995-379-9. (IES standards are issued without DOIs.)
 
 Spectral data (CES reflectances, CMFs, daylight basis functions, illuminants)
-is sourced from colour-science (BSD-3-Clause) and CIE publications:
+in data/ are CIE datasets, published by the International Commission on
+Illumination (CIE) under CC BY-SA 4.0 and distributed here under the same
+licence, separately from the MIT code. Per-file source DOIs and the changes
+made are listed in data/README.md. The tables were extracted using
+colour-science (BSD-3-Clause) as a tool:
 
     Mansencal, T., Mauderer, M., Parsons, M., et al. (2025). Colour 0.4.7
     [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.17837391
     Repository: https://github.com/colour-science/colour
     Website: https://www.colour-science.org
 
-See tools/generate_data_colour_science.py for per-table provenance.
+See tools/generate_data_colour_science.py for the extraction of each table.
 
 Numerical accuracy is cross-validated against colour-science (BSD-3-Clause).
 No code from any GPL-licensed project is incorporated.

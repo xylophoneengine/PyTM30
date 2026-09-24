@@ -19,7 +19,7 @@ VIBECODE-ALERT!!! Opencode and Claude did help me.
 
 The two existing Python implementations of TM-30,
 [luxpy](https://github.com/ksmet1977/luxpy) and
-[colour-science](https://github.com/colour-science/colour-science), are both
+[colour-science](https://github.com/colour-science/colour), are both
 mature, well-validated references, but neither is built for **mass
 evaluation**. Their pipelines are geared toward one spectrum (or a modest
 handful) at a time; once you're scoring tens of thousands of SPDs, per-call
@@ -485,18 +485,24 @@ rather than from `atan2`, which is an identity but rounds differently -- see
 | `cmf_1931_2.csv` / `cie_1931_2.csv`                                                                  | CIE 1931 2-deg CMFs (general / CCT-default)                    | 360-830 / 380-780 nm |
 | `cmf_2006_2.csv` / `cmf_2006_10.csv`                                                                 | CIE 2006 physiologically-based CMFs                            | 360-830 nm           |
 | `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                                 | CIE 2015 CMFs                                                  | 360-830 nm           |
-| `daylight_basis.csv`                                                                                 | CIE daylight vectors S0, S1, S2                                | 300-830 nm, 5 nm     |
-| `planckian_uv.csv`                                                                                   | Planckian locus LUT (u,v)                                      | 1000-25000 K         |
+| `daylight_basis.csv`                                                                                 | CIE daylight vectors S0, S1, S2                                | 380-780 nm, 5 nm     |
+| `planckian_uv.csv`                                                                                   | Planckian locus LUT (u,v)                                      | 1000-41073 K         |
 | `d65_1nm.csv`, `fl1_1nm.csv`...`fl12_1nm.csv`, `hp1_5nm.csv`...`hp5_5nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |
 
-All data tables are sourced from **[colour-science](https://github.com/colour-science/colour-science)**
-(BSD-3-Clause), not hand-derived - every one is a universal, published CIE
-standard quantity (color-matching functions, the CIE 2017/TM-30 test-colour
-samples, the daylight-locus basis functions), verified to match to
-floating-point noise against independent computation. `tools/generate_data_colour_science.py`
-and `tools/generate_planckian_lut.py` regenerate every file from scratch and
-document exactly which colour-science API produced each one. `tools/generate_fixtures.py`
-uses the same oracle to regenerate the golden test fixtures in `tests/fixtures/`.
+The spectral tables are CIE datasets (color-matching functions, the CIE
+2017/TM-30 test-colour samples, the daylight basis functions, standard
+illuminants), published by the CIE under CC BY-SA 4.0. They are licensed
+under CC BY-SA 4.0 here too, separately from the MIT code: see
+[data/README.md](data/README.md) for the per-file source DOIs and the
+changes made (for example, the 1 nm FL tables are Sprague-interpolated from
+the CIE's 5 nm data). They were extracted with
+[colour-science](https://github.com/colour-science/colour) 0.4.7 as a tool;
+`tools/generate_data_colour_science.py` and `tools/generate_planckian_lut.py`
+regenerate every file and record which colour-science call produced each
+one. `tools/generate_fixtures.py` regenerates the golden test fixtures in
+`tests/fixtures/`; [docs/divergences.md](docs/divergences.md#what-the-golden-fixtures-validate)
+states which of their quantities colour-science validates independently and
+which are self-consistency checks.
 
 ## Tests
 
@@ -568,4 +574,5 @@ repository" button).
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+Code: MIT - see [LICENSE](LICENSE). Data tables in `data/`: CC BY-SA 4.0 -
+see [data/README.md](data/README.md).
