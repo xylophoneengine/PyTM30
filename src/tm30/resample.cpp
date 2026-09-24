@@ -17,7 +17,8 @@ namespace {
 /// from source wavelengths/values to target_wavelengths.
 ///
 /// TM-30-20 S3.5 requires linear interpolation.
-/// TM-30-20 S1.3 (Errata): flat extrapolation replaces logarithm-based.
+/// TM-30-20 S1.3 (changes from TM-30-15): flat extrapolation replaces
+/// logarithm-based extrapolation for the CES.
 std::vector<double> lerp_vector(const std::vector<double> &target_wl,
                                 const std::vector<double> &source_wl,
                                 const std::vector<double> &source_vals) {

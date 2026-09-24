@@ -35,7 +35,8 @@ void Spd::validate() {
     throw InvalidSpd("Wavelength and value arrays must have the same size");
   }
 
-  // 2. Non-negative values - TM-30-20 S3.2 (spectral power is never negative)
+  // 2. Non-negative values. An input check of this library; TM-30-20 S3.2
+  //    states no such requirement.
   for (std::size_t i = 0; i < values_.size(); ++i) {
     if (values_[i] < 0) {
       std::ostringstream oss;

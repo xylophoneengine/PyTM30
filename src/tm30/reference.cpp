@@ -48,7 +48,7 @@ namespace {
 /// increasing.
 ///
 /// TM-30-20 S3.5 requires linear interpolation.
-/// TM-30-20 S1.3 (Errata): flat extrapolation.
+/// TM-30-20 S1.3 (changes from TM-30-15): flat extrapolation.
 std::vector<double> interpolate_linear(const std::vector<double> &target_wl,
                                        const std::vector<double> &source_wl,
                                        const std::vector<double> &source_vals) {

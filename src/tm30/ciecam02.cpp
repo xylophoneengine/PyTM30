@@ -253,8 +253,8 @@ inline double luminance_adapt(double x) {
   // TM-30-20 S3.7.1 Eq. (36)-(38)
   const double base = kFL * x / kJScale; // FL * R' / 100
   if (base < 0.0) {
-    // Edge case: sign-preserving power for negative values
-    // TM-30-20 S3.7.1 (edge case note)
+    // Edge case: sign-preserving power for negative values. TM-30-20
+    // prints no rule for this; it follows CIE 159:2004 (CIECAM02).
     const double pos_pow = std::pow(-base, kLumExp);
     return -kLumScale * pos_pow / (kLumAdd + pos_pow) + kLumOffset;
   }
