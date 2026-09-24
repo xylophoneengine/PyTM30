@@ -77,9 +77,11 @@ the CIE 1931 2-degree observer. PyTM30 implements the published method: a
 LUT search with the triangular solution below |Duv| = 0.002 and the
 parabolic solution above. Three deliberate choices:
 
-- **No shifted-triangular blend by default.** The calculators supplied
-  with TM-30 and CQS blend the triangular and parabolic solutions below
-  the threshold; that refinement is absent from the published method.
+- **No shifted-triangular blend by default.** luxpy's Ohno implementation
+  blends the triangular and parabolic solutions below the threshold (on by
+  default in its TM-30 configuration) and documents the blend as used by
+  the TM-30 and CQS calculators; that refinement is absent from the
+  published method.
   PyTM30 defaults to the published selection rule and exposes the blend as
   an opt-in flag (`CctOptions::shifted_triangular_blend`).
 - **No `f_corr` correction factor.** Ohno (2014) publishes a constant

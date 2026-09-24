@@ -234,11 +234,11 @@ CctDuvResult compute_cct_duv(double u_test, double v_test,
   // Ohno (2014), as published: below the threshold the triangular
   // solution is used as-is; above it the parabolic one.
   //
-  // Optional refinement (opt-in, default off): the calculators supplied
-  // with TM-30 and CQS apply a shifted-triangular correction below the
-  // threshold, T = T_tri + (T_par - T_tri) * |duv_tri| / threshold. It is
-  // absent from the published method and from Smet et al. 2023's
-  // description of it, so there is nothing to cite; it is computed only
+  // Optional refinement (opt-in, default off): a shifted-triangular
+  // correction below the threshold, T = T_tri + (T_par - T_tri) *
+  // |duv_tri| / threshold. luxpy's Ohno implementation documents it as used
+  // by the TM-30 and CQS calculators; it is absent from the published method
+  // and from Smet et al. 2023, so no clause applies. It is computed only
   // when CctOptions::shifted_triangular_blend is set. The min(..., 1.0)
   // clamp on the blend fraction is an implementation robustness
   // extension.

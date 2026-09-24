@@ -43,8 +43,10 @@ batch API replaces the Python loop over single-SPD calls. The hot path
 allocates nothing on the heap. Domain validity (out-of-range CCT or Duv)
 is modeled as result data rather than as exceptions. I then implemented
 it from the TM-30-20 spec, slice by slice, with the help of AI coding
-agents, and verified every stage against colour-science (and, in the
-initial internal version, luxpy) as an accuracy oracle.
+agents, and verified every stage against luxpy and colour-science as
+accuracy oracles. Early versions followed luxpy's conventions in a few
+places where it departs from the standard; those now follow the spec (see
+[PROVENANCE.md](PROVENANCE.md)).
 
 None of the speed comes from touching the mathematics. The numerics are
 derived from the TM-30-20 text, and every float literal in the core

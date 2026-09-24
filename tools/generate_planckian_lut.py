@@ -19,13 +19,15 @@ so no 560nm normalisation is needed here (unlike the reference-illuminant
 generator in reference.cpp, which needs the actual SPD).
 
 Temperature grid: geometric sequence T[n] = 1000 * 1.0025^n,
-n = 0..1488 (1489 points, 1000K to ~41073K). The grid parameters
-(1000K start, 0.25% geometric increment) follow the LUT used by the
-calculator supplied with ANSI/IES TM-30; see Smet et al., "Recommended
-Method for Determining the Correlated Color Temperature and Distance
-from the Planckian Locus of a Light Source", Leukos 2023,
-doi:10.1080/15502724.2023.2248397, which records the TM-30 calculator
-as using a 0.25% increment LUT.
+n = 0..1488 (1489 points, 1000K to ~41073K). The 0.25% geometric
+increment is the one Smet et al., "Recommended Method for Determining
+the Correlated Color Temperature and Distance from the Planckian Locus
+of a Light Source", Leukos 2023, doi:10.1080/15502724.2023.2248397,
+records for the calculator supplied with ANSI/IES TM-30. The extent
+(1000K to the first point above 41000K) is luxpy's default TM-30 LUT
+(1000-41000K at 0.25%), which this project's earlier, luxpy-derived table
+used; the grid was kept and the (u,v) values here are computed
+independently.
 
 Output is cross-checked against colour.temperature.CCT_to_uv_Planck1900
 (colour-science's own Planckian (u,v) utility) at several sample points

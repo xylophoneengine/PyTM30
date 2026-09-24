@@ -51,10 +51,10 @@ struct CctOptions {
   /// Apply the shifted-triangular correction below the |Duv| selection
   /// threshold: T = T_tri + (T_par - T_tri) * |Duv_tri| / threshold.
   ///
-  /// This refinement is present in the calculators supplied with TM-30
-  /// and CQS but is absent from the published Ohno (2014) method (and
-  /// from Smet et al. 2023's description of it), so there is nothing to
-  /// cite for it. It is therefore opt-in and OFF by default; the default
+  /// luxpy's Ohno implementation documents this refinement as used by the
+  /// TM-30 and CQS calculators; it is absent from the published Ohno
+  /// (2014) method (and from Smet et al. 2023's description of it), so no
+  /// clause applies. It is therefore opt-in and OFF by default; the default
   /// follows the published method exactly.
   bool shifted_triangular_blend = false;
 };

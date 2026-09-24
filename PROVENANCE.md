@@ -44,11 +44,32 @@ and by what.
 
 ## Development history
 
-During early development, luxpy (GPL-3.0) was used privately as an accuracy oracle
-alongside colour-science. No luxpy code or data is present in this repository; all
-data tables were regenerated from colour-science and CIE sources, and all
-implementation decisions are derived from the TM-30-20 text with the relevant clause
-cited at each site.
+PyTM30 was first developed outside this repository, with luxpy (GPL-3.0) as
+its main accuracy oracle: the C++ implementation and its test suite were
+validated against fixtures generated with luxpy. Before the first commit here
+(35848d4), the data tables and fixtures were regenerated from CIE data using
+colour-science, so that commit already contains a finished implementation.
+
+Until 2026-08-14, some sites followed luxpy's conventions where luxpy departs
+from TM-30-20: the Rcs/Rhs scaling, the CVG display scale and reference hue
+angle, and a shifted-triangular CCT blend that was always on. A remediation
+series merged that day (3505b16) changed those sites to follow the standard,
+regenerated the fixtures, recomputed the test literals that were still luxpy
+output values (e49e69f), and replaced luxpy-based justifications in comments
+with citations to TM-30-20 and its normative references. Most clause
+citations were attached to existing code in that series: they record which
+clause each site implements, not the order in which the code was written.
+
+Where the standard is silent, two choices still follow luxpy's TM-30
+configuration: the extent of the Planckian LUT (tools/generate_planckian_lut.py)
+and the optional shifted-triangular blend, now off by default. The Python
+layer's result names follow luxpy's spd_to_tm30() for compatibility. Other
+implementation choices the standard does not dictate are listed in
+docs/divergences.md.
+
+luxpy is still used from time to time as a comparison oracle during
+development. It is not a dependency, and no luxpy code is present in this
+repository or its history.
 
 ## Documented divergences
 
