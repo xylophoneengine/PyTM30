@@ -22,9 +22,10 @@ inline constexpr double Tol_Xyz = 5e-5; // absolute
 // CCT / Duv: Smet et al. 2023 (doi:10.1080/15502724.2023.2248397) bound
 // the Ohno (2014) LUT method's maximum CCT error at ~0.4 K for a 0.25%
 // LUT step; Tol_Cct = 0.5 K covers that method bound. Duv golden values
-// are recomputed to 8 decimals (tools/oracle_recompute_12.py); 5e-4
-// absorbs cross-implementation solver noise while staying an order of
-// magnitude below the 0.002 triangular/parabolic switching threshold.
+// are recomputed to 8 decimals by a same-algorithm port
+// (tools/oracle_recompute_12.py); 5e-4 leaves room for a different Ohno
+// solver (e.g. colour-science's) while staying an order of magnitude
+// below the 0.002 triangular/parabolic switching threshold.
 inline constexpr double Tol_Cct = 0.5;  // absolute (K)
 inline constexpr double Tol_Duv = 5e-4; // absolute
 

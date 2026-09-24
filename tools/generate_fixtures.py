@@ -51,10 +51,12 @@ XYZ_to_CIECAM02, Y_b=20/L_A=100/Average surround/discount_illuminant=True,
 matching colour-science's own TM-30-18 viewing conditions), CAM02-UCS
 (colour.JMh_CIECAM02_to_CAM02UCS), and the CFI/Rf/Rg scalar math
 (colour.quality.tm3018.delta_E_to_R_f / averages_area, both pure,
-generic, spec-derived formulas with no data dependence). Only the
-reference-illuminant *spectral reconstruction* step is done by hand, to
-match the spec (and the C++ implementation) instead of colour-science's
-library default.
+generic, spec-derived formulas with no data dependence). Done by hand
+instead: the reference-illuminant spectral reconstruction (to match the
+spec instead of colour-science's library default), hue-bin assignment,
+the CVG coordinates and the Rcs/Rhs projections, and CCT/Duv, which is a
+port of src/tm30/cct.cpp and so checks self-consistency only (see
+docs/divergences.md, "What the golden fixtures validate").
 
 Mapping onto the 18 pipeline stages:
   01_resampled_spd   <- sd_test itself, on its native 380-780nm grid
@@ -120,7 +122,9 @@ DATA_DIR = os.path.join(REPO, "data")
 COLOUR_VERSION = colour.__version__
 GENERATED_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 STANDARD_ID = "ANSI/IES TM-30-20"
-METHOD_NOTE = "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant"
+METHOD_NOTE = ("colour-science primitives (tristimulus/CIECAM02/CAM02-UCS/Rf/Rg area) + "
+               "hand-built TM-30-20 Sec 3.3 reference illuminant, hue bins, CVG, Rcs/Rhs; "
+               "CCT/Duv by a port of src/tm30/cct.cpp (self-consistency)")
 
 CMFS_10 = colour.MSDS_CMFS["CIE 1964 10 Degree Standard Observer"].copy()
 SURROUND_AVERAGE = VIEWING_CONDITIONS_CIECAM02["Average"]

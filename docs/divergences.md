@@ -225,13 +225,16 @@ that "validated against colour-science" is claimed only where it holds:
   integration (`sd_to_XYZ`/`msds_to_XYZ`), CIECAM02, CAM02-UCS, per-sample
   Delta E', Rf, Rf,CESi, Rf,hj (`delta_E_to_R_f`), and Rg's polygon areas
   (`averages_area`).
-- **Independent from-spec re-derivation (not colour-science output):** the
+- **Separate from-spec re-derivation (not colour-science output):** the
   reference illuminant's spectral reconstruction (S3.3 with S3.5's linear
   interpolation of the daylight basis -- colour-science's own D-series
   generator uses Sprague interpolation for those datasets, which S3.5 does
   not permit here), the CVG coordinates (S4.5), and the Rcs,hj/Rhs,hj
   projections (S4.6/S4.7). These are computed in the generator from the
-  cited equations, independently of the C++ code.
+  cited equations, in separate code from the C++. They are not an
+  independent reading of the standard: the same author wrote both, and the
+  reference SPD follows the same formula as src/tm30/reference.cpp, so a
+  shared misreading would not show up here.
 - **Same-algorithm port (self-consistency, not independent validation):**
   the CCT/Duv LUT search. The generator runs the same published Ohno
   (2014) method against the same LUT the C++ engine uses; an earlier
@@ -239,3 +242,8 @@ that "validated against colour-science" is claimed only where it holds:
   to within ~0.06 K but injected enough reference-illuminant noise to
   obscure the tighter fixture tolerances (see the docstring in
   tools/generate_fixtures.py).
+  The CCT/Duv literals in tests/slice_03_cct_test.cpp and
+  tests/slice_05_ces_colorimetry_test.cpp come from the same kind of port
+  (tools/oracle_recompute_12.py) and carry the same caveat. Every
+  reference-side fixture (stage 03 onward) is built at this CCT, so the
+  reference side is validated conditional on a self-consistent CCT.

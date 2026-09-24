@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-oracle_recompute_12.py -- Independent recomputation of the golden test
+oracle_recompute_12.py -- Out-of-process recomputation of the golden test
 literals in tests/slice_02_xyz_test.cpp, slice_03_cct_test.cpp, and
 tests/slice_05_ces_colorimetry_test.cpp. (Originally written for 12
 literals, hence the name; it now recomputes every CCT/Duv literal in
@@ -13,10 +13,12 @@ colour-science-sourced CSV files in data/ directly and re-implements, from
 scratch in plain numpy, the two algorithms needed:
 
   1. CCT/Duv via the Ohno (2014) triangular+parabolic LUT search against
-     planckian_uv.csv (this is a straight, from-spec re-implementation of
-     the same public-domain algorithm pytm30's src/tm30/cct.cpp implements
-     -- it is independent in the sense that matters: it is driven purely by
-     the CSV data on disk, not by pytm30's own computed output).
+     planckian_uv.csv. This is a line-for-line port of src/tm30/cct.cpp,
+     including its implementation-only guards (denominator floor, x and
+     T_par clamps), so the CCT/Duv literals it produces check that the C++
+     still computes what the algorithm computes on the same LUT. They are a
+     self-consistency check, not independent validation: a shared
+     misreading of Ohno (2014) would pass.
   2. Plain trapezoidal integration of SPD * CMF for source XYZ (X, Z),
      matching TM-30-20 Sec 3.2 Eq (1)-(4) exactly (also what
      src/tm30/xyz.cpp implements, and what the existing test comment
@@ -62,7 +64,8 @@ def load_csv_cols(path):
 
 
 # ---------------------------------------------------------------------------
-# CCT/Duv oracle (exact port of src/tm30/cct.cpp's Ohno LUT search)
+# CCT/Duv oracle (exact port of src/tm30/cct.cpp's Ohno LUT search;
+# self-consistency, not independent validation -- see module docstring)
 # ---------------------------------------------------------------------------
 
 _LUT = load_csv_cols(os.path.join(DATA, "planckian_uv.csv"))

@@ -2,8 +2,8 @@
   "spd_name": "planckian_4999.9K",
   "standard": "ANSI/IES TM-30-20",
   "colour_science_version": "0.4.7",
-  "method": "colour-science primitives (CCT/CIECAM02/CAM02-UCS/CFI math) + hand-built TM-30-20 Sec 3.3 reference illuminant",
-  "generated": "2026-08-14",
+  "method": "colour-science primitives (tristimulus/CIECAM02/CAM02-UCS/Rf/Rg area) + hand-built TM-30-20 Sec 3.3 reference illuminant, hue bins, CVG, Rcs/Rhs; CCT/Duv by a port of src/tm30/cct.cpp (self-consistency)",
+  "generated": "2026-09-24",
   "stage": "01_resampled_spd",
   "wavelengths": [
     380.0,

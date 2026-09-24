@@ -325,8 +325,8 @@ TEST_CASE("CES colorimetry - F1 matches golden fixtures",
                               G.daylight_basis, G.planckian_lut);
 
   // F1: cct ~= 6425.40, duv ~= 0.00719 (recomputed against the current,
-  // colour-science-sourced fl1_1nm.csv; independent oracle, see
-  // tools/oracle_recompute_12.py)
+  // colour-science-sourced fl1_1nm.csv by the same-algorithm port in
+  // tools/oracle_recompute_12.py -- a self-consistency check)
   REQUIRE_THAT(result.cct, WithinTolerance(Tol_Cct, 6425.401524207265));
   REQUIRE_THAT(result.duv, WithinTolerance(Tol_Duv, 0.007191972077681352));
 
