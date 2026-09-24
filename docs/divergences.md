@@ -37,7 +37,10 @@ environment.
 S3.5 requires linear interpolation where interpolation is needed and states
 that the test source SPD is never interpolated or extrapolated. PyTM30
 resamples the CES reflectances and CMFs onto the test SPD's grid and leaves
-the test SPD untouched. luxpy cubic-interpolates the test SPD by default.
+the test SPD untouched. luxpy 1.12.5 does the same by default
+(`spd_to_xyz(interpolate_to='spd')`, and its TM-30 entry points default to
+`wl=None`); it cubic-interpolates the test SPD only when the caller passes a
+target grid `wl`.
 
 ## Range and increment enforcement (S3.5)
 
@@ -53,9 +56,11 @@ the zeros but not their grid alignment.
 ## Resampling once per grid is spec-neutral (S3.5)
 
 PyTM30 resamples the CES/CMF/daylight-basis tables to a grid once and
-caches them, instead of re-interpolating per SPD as luxpy and
-colour-science do. S3.5 governs what is interpolated and how, not how
-often. Identical results, a fraction of the work.
+caches them, instead of re-interpolating per SPD as luxpy does.
+colour-science avoids re-interpolating the CES by accepting only 1 nm or
+5 nm SPDs and loading pre-tabulated CES at that step. S3.5 governs what is
+interpolated and how, not how often. Identical results, a fraction of the
+work.
 
 ## Reference blend Y-normalisation uses the 1964 10-degree observer (S3.1, S3.3)
 
