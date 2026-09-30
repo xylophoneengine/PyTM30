@@ -48,6 +48,10 @@ import tm30_core
 from enum import Enum
 from functools import lru_cache
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 # -- CMF Observer Enum --------------------------------------------------
@@ -581,23 +585,31 @@ class Tm30Result:
         ----------
         arrays : bool
             If True, include rf_cesi, rcs_hj, rhs_hj as list columns.
+            Fields absent from this result (not requested via
+            eval(samples=...) / eval(bins=...)) are omitted.
             Default False - scalars only.
         """
-        d = {k: getattr(self, k) for k in self._SCALAR_KEYS}
+        d: dict[str, float | list[float]] = {
+            k: getattr(self, k) for k in self._SCALAR_KEYS
+        }
         if arrays:
-            d["rf_cesi"] = list(self.rf_cesi)
-            d["rcs_hj"] = list(self.rcs_hj)
-            d["rhs_hj"] = list(self.rhs_hj)
+            for k in self._SAMPLES_ARRAY_KEYS + self._BINS_ARRAY_KEYS:
+                if k in self._d:
+                    d[k] = list(getattr(self, k))
         return d
 
-    def to_dataframe(self, *, arrays: bool = False, multiindex: bool = False):
+    def to_dataframe(
+        self, *, arrays: bool = False, multiindex: bool = False
+    ) -> pd.DataFrame:
         """Return a 1-row pandas DataFrame.
 
         Parameters
         ----------
         arrays : bool
-            If True, include array columns as lists.  Default False.
-            Ignored if multiindex=True.
+            If True, include rf_cesi, rcs_hj, rhs_hj as list columns;
+            fields absent from this result (not requested via
+            eval(samples=...) / eval(bins=...)) are omitted.  Default
+            False.  Ignored if multiindex=True.
         multiindex : bool
             If True, return a DataFrame with a multi-level pd.MultiIndex
             for its columns, backwards-compatible with lx_util.py's
@@ -935,14 +947,16 @@ class Tm30BatchResult:
         arrays: bool = False,
         expand_arrays: bool = False,
         multiindex: bool = False,
-    ):
+    ) -> pd.DataFrame:
         """Return an N-row pandas DataFrame - one row per input SPD.
 
         Parameters
         ----------
         arrays : bool
-            If True, include rf_cesi, rcs_hj, rhs_hj as list-of-float columns.
-            Ignored if multiindex=True.
+            If True, include rf_cesi, rcs_hj, rhs_hj as list-of-float columns;
+            fields absent from this result (not requested via
+            eval(samples=...) / eval(bins=...)) are omitted.  Ignored if
+            multiindex=True.
         expand_arrays : bool
             If True, expand rf_cesi into 99 individual columns
             (rf_cesi_1 ... rf_cesi_99).  Implies arrays=True.  Ignored if
@@ -974,13 +988,15 @@ class Tm30BatchResult:
         data["valid"] = self.valid
 
         if arrays or expand_arrays:
-            data["rcs_hj"] = list(self.rcs_hj)
-            data["rhs_hj"] = list(self.rhs_hj)
-        if expand_arrays:
-            for i in range(99):
-                data[f"rf_cesi_{i + 1}"] = self.rf_cesi[:, i]
-        elif arrays:
-            data["rf_cesi"] = list(self.rf_cesi)
+            for k in Tm30Result._BINS_ARRAY_KEYS:
+                if k in self._d:
+                    data[k] = list(getattr(self, k))
+        if "rf_cesi" in self._d:
+            if expand_arrays:
+                for i in range(99):
+                    data[f"rf_cesi_{i + 1}"] = self.rf_cesi[:, i]
+            elif arrays:
+                data["rf_cesi"] = list(self.rf_cesi)
 
         return pd.DataFrame(data)
 
@@ -991,7 +1007,7 @@ def to_dataframe(
     arrays: bool = False,
     expand_arrays: bool = False,
     multiindex: bool = False,
-):
+) -> pd.DataFrame:
     """Convert a list of individually-collected Tm30Result objects to a
     pandas DataFrame - e.g. if you called calc.eval() once per SPD yourself
     and gathered the single-SPD results into your own list.
@@ -1007,8 +1023,10 @@ def to_dataframe(
     results : list[Tm30Result]
         Individually-collected single-SPD results.
     arrays : bool
-        If True, include rf_cesi, rcs_hj, rhs_hj as list-of-float columns.
-        Ignored if multiindex=True.
+        If True, include rf_cesi, rcs_hj, rhs_hj as list-of-float columns;
+        fields absent from the results (not requested via
+        eval(samples=...) / eval(bins=...)) are omitted, judged from
+        results[0].  Ignored if multiindex=True.
     expand_arrays : bool
         If True, expand rf_cesi into 99 individual columns
         (rf_cesi_1 ... rf_cesi_99).  Implies arrays=True.  Ignored if
@@ -1051,17 +1069,20 @@ def to_dataframe(
             (r._d[key] for r in results), dtype=np.float64, count=n
         )
 
+    present: dict = results[0]._d
     if arrays or expand_arrays:
-        data["rcs_hj"] = [list(r.rcs_hj) for r in results]
-        data["rhs_hj"] = [list(r.rhs_hj) for r in results]
+        for key in Tm30Result._BINS_ARRAY_KEYS:
+            if key in present:
+                data[key] = [list(getattr(r, key)) for r in results]
 
-    if expand_arrays:
-        # rf_cesi -> 99 individual columns
-        cesi_matrix = np.array([r.rf_cesi for r in results], dtype=np.float64)
-        for i in range(99):
-            data[f"rf_cesi_{i + 1}"] = cesi_matrix[:, i]
-    elif arrays:
-        data["rf_cesi"] = [list(r.rf_cesi) for r in results]
+    if "rf_cesi" in present:
+        if expand_arrays:
+            # rf_cesi -> 99 individual columns
+            cesi_matrix = np.array([r.rf_cesi for r in results], dtype=np.float64)
+            for i in range(99):
+                data[f"rf_cesi_{i + 1}"] = cesi_matrix[:, i]
+        elif arrays:
+            data["rf_cesi"] = [list(r.rf_cesi) for r in results]
 
     return pd.DataFrame(data)
 
