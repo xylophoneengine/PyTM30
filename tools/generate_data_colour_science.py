@@ -119,15 +119,12 @@ report("cie_1931_2.csv",
 
 
 # -------------------------------------------------------------------------
-# 4. CMF 2015 (== 2006 physiologically-based) 2-degree / 10-degree
+# 4. CMF 2015 (physiologically-based) 2-degree / 10-degree
 #    Native colour-science domain is 390-830nm; original repo zero-pads
 #    360-389nm (cone fundamentals are defined as zero outside their
 #    390-830 support in this dataset, not linearly/constant-extrapolated).
 #    Cross-derive via the LMS-to-XYZ transform (per task instructions) and
-#    confirm it reproduces the native 'CIE 2015 ...' dataset exactly, which
-#    also demonstrates CIE2006 == CIE2015 for this observer (the 2015
-#    standard formally adopted the 2006 physiologically-based proposal
-#    unchanged).
+#    confirm it reproduces the native 'CIE 2015 ...' dataset exactly.
 # -------------------------------------------------------------------------
 from colour.colorimetry.transformations import (
     LMS_2_degree_cmfs_to_XYZ_2_degree_cmfs,
@@ -145,7 +142,7 @@ native_10 = colour.MSDS_CMFS["CIE 2015 10 Degree Standard Observer"].values
 delta_10 = float(np.max(np.abs(derived_10 - native_10)))
 
 print(f"LMS->XYZ transform cross-check: 2deg max|delta|={delta_2:.3e}, "
-      f"10deg max|delta|={delta_10:.3e} (confirms CIE2006 == CIE2015 for this observer)")
+      f"10deg max|delta|={delta_10:.3e}")
 
 
 def zero_pad_cmf_360_830(native_wl, native_vals):
@@ -157,36 +154,32 @@ def zero_pad_cmf_360_830(native_wl, native_vals):
     return full_wl, full_vals
 
 
-for tag_2015, tag_2006 in [("2015_2", "2006_2")]:
+for tag_2015 in ["2015_2"]:
     wl_pad, v_pad = zero_pad_cmf_360_830(native_wl_2, native_2)
-    for fname in (f"cmf_{tag_2015}.csv", f"cmf_{tag_2006}.csv"):
-        write_csv(fname, ["wavelength", "x_bar", "y_bar", "z_bar"], wl_pad,
-                  [v_pad[:, 0], v_pad[:, 1], v_pad[:, 2]])
-    report(f"cmf_{tag_2015}.csv / cmf_{tag_2006}.csv",
+    write_csv(f"cmf_{tag_2015}.csv", ["wavelength", "x_bar", "y_bar", "z_bar"],
+              wl_pad, [v_pad[:, 0], v_pad[:, 1], v_pad[:, 2]])
+    report(f"cmf_{tag_2015}.csv",
            "colour.MSDS_CMFS['CIE 2015 2 Degree Standard Observer'] (native 390-830nm @1nm), "
            "zero-padded to 360-389nm; cross-derived via "
            "colour.colorimetry.transformations.LMS_2_degree_cmfs_to_XYZ_2_degree_cmfs "
            f"(matches native dataset, max|delta|={delta_2:.3e})",
-           "Original repo's cmf_2006_2.csv and cmf_2015_2.csv are already bit-identical to "
-           "each other (CIE formally standardized the 2006 physiological proposal as the "
-           "2015 observer, unchanged). Verified bit-identical (max|delta|=0.0) to both "
-           "original files at 390-830nm, and zero below 390nm matches the original's "
+           "Verified bit-identical (max|delta|=0.0) to the original "
+           "cmf_2015_2.csv at 390-830nm, and zero below 390nm matches the original's "
            "zero-fill convention exactly (colour-science's default .align() would instead "
            "hold the 390nm edge value constant, which does NOT match -- explicit zero-fill "
            "was required).")
 
-for tag_2015, tag_2006 in [("2015_10", "2006_10")]:
+for tag_2015 in ["2015_10"]:
     wl_pad, v_pad = zero_pad_cmf_360_830(native_wl_10, native_10)
-    for fname in (f"cmf_{tag_2015}.csv", f"cmf_{tag_2006}.csv"):
-        write_csv(fname, ["wavelength", "x_bar", "y_bar", "z_bar"], wl_pad,
-                  [v_pad[:, 0], v_pad[:, 1], v_pad[:, 2]])
-    report(f"cmf_{tag_2015}.csv / cmf_{tag_2006}.csv",
+    write_csv(f"cmf_{tag_2015}.csv", ["wavelength", "x_bar", "y_bar", "z_bar"],
+              wl_pad, [v_pad[:, 0], v_pad[:, 1], v_pad[:, 2]])
+    report(f"cmf_{tag_2015}.csv",
            "colour.MSDS_CMFS['CIE 2015 10 Degree Standard Observer'] (native 390-830nm @1nm), "
            "zero-padded to 360-389nm; cross-derived via "
            "colour.colorimetry.transformations.LMS_10_degree_cmfs_to_XYZ_10_degree_cmfs "
            f"(matches native dataset, max|delta|={delta_10:.3e})",
            "Same as the 2-degree case: verified bit-identical (max|delta|=0.0) to original "
-           "repo's cmf_2006_10.csv / cmf_2015_10.csv.")
+           "repo's cmf_2015_10.csv.")
 
 
 # -------------------------------------------------------------------------

@@ -337,7 +337,7 @@ TEST_CASE("Reference - daylight Tr map gives CCT == Tt in the CCT observer",
 
   bool printed_misses = false;
   for (const char *file :
-       {"cmf_1964_10.csv", "cmf_2006_2.csv", "cmf_2015_10.csv"}) {
+       {"cmf_1964_10.csv", "cmf_2015_2.csv", "cmf_2015_10.csv"}) {
     CAPTURE(file);
     const CmfData cmf = load_cmf_10deg(data_path(file));
     const PlanckianLut lut = build_planckian_lut(cmf);
@@ -359,7 +359,7 @@ TEST_CASE("Reference - daylight Tr map gives CCT == Tt in the CCT observer",
 }
 
 // The blend of a Planckian and a daylight SPD, both at CCT T, is not
-// guaranteed to sit at exactly T. Measured (1964_10, 2006_2, 2015_10, T in
+// guaranteed to sit at exactly T. Measured (1964_10, 2015_2, 2015_10, T in
 // {4200, 4500, 4800}) it stays within ~0.1 K; the bound leaves margin.
 TEST_CASE("Reference - daylight Tr map in the blend region",
           "[reference][slice04][trmap]") {
@@ -368,7 +368,7 @@ TEST_CASE("Reference - daylight Tr map in the blend region",
   const CmfData y10 =
       resample_cmf(wl, load_cmf_10deg(data_path("cmf_1964_10.csv")));
   for (const char *file :
-       {"cmf_1964_10.csv", "cmf_2006_2.csv", "cmf_2015_10.csv"}) {
+       {"cmf_1964_10.csv", "cmf_2015_2.csv", "cmf_2015_10.csv"}) {
     CAPTURE(file);
     const CmfData cmf = load_cmf_10deg(data_path(file));
     const PlanckianLut lut = build_planckian_lut(cmf);

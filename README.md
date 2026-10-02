@@ -198,8 +198,8 @@ calc = TM30Calc(cmf='data/my_cmf.csv') # custom CSV path
 calc = TM30Calc(cmf_cct=Cmf.CIE_2015_2)   # observer for CCT/Duv (default 1931 2-deg)
 ```
 
-Available: `CIE_1931_2`, `CIE_1964_10`, `CIE_2006_2`, `CIE_2006_10`,
-`CIE_2015_2`, `CIE_2015_10`.
+Available: `CIE_1931_2`, `CIE_1964_10`, `CIE_2015_2`,
+`CIE_2015_10`.
 
 `cmf_cct` defaults to CIE 1931 2-deg, which TM-30-20 S3.1 requires for CCT.
 The Planckian locus is built from the same CMF, so source and locus always
@@ -496,8 +496,7 @@ rather than from `atan2`, which is an identity but rounds differently -- see
 | `ces.csv` / `ces_5nm.csv`                                                                            | 99 CES reflectance spectra                                     | 380-780 nm           |
 | `cmf_1964_10.csv`                                                                                    | CIE 1964 10-deg CMFs (default observer)                        | 360-830 nm, 1 nm     |
 | `cmf_1931_2.csv` / `cie_1931_2.csv`                                                                  | CIE 1931 2-deg CMFs (`cmf_`: default CCT; `cie_`: C++ tests/tools)| 360-830 / 380-780 nm |
-| `cmf_2006_2.csv` / `cmf_2006_10.csv`                                                                 | CIE 2006 physiologically-based CMFs                            | 360-830 nm           |
-| `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                                 | CIE 2015 CMFs                                                  | 360-830 nm           |
+| `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                                 | CIE 2015 cone-fundamental-based CMFs (CIE 170-2:2015)          | 360-830 nm           |
 | `daylight_basis.csv`                                                                                 | CIE daylight vectors S0, S1, S2                                | 380-780 nm, 5 nm     |
 | `planckian_uv.csv`                                                                                   | Planckian locus LUT (u,v)                                      | 1000-41073 K         |
 | `d65_1nm.csv`, `fl1_1nm.csv`...`fl12_1nm.csv`, `hp1_5nm.csv`...`hp5_5nm.csv`, `illuminant_a_1nm.csv` | Standard illuminant/lamp spectra, used in tests and benchmarks | 380-780 nm           |

@@ -66,8 +66,6 @@ class Cmf(Enum):
     -- Standard observers --
     CIE_1931_2      - CIE 1931 2-deg (luxpy default)
     CIE_1964_10     - CIE 1964 10-deg (TM-30-20 standard, pytm30 default)
-    CIE_2006_2      - CIE 2006 2-deg
-    CIE_2006_10     - CIE 2006 10-deg
     CIE_2015_2      - CIE 2015 2-deg
     CIE_2015_10     - CIE 2015 10-deg
 
@@ -79,8 +77,6 @@ class Cmf(Enum):
 
     CIE_1931_2 = "1931_2"
     CIE_1964_10 = "1964_10"
-    CIE_2006_2 = "2006_2"
-    CIE_2006_10 = "2006_10"
     CIE_2015_2 = "2015_2"
     CIE_2015_10 = "2015_10"
 
@@ -1102,7 +1098,7 @@ class TM30Calc:
     cmf : Cmf, str, Path, or None
         CIE observer for tristimulus integration (10-deg CMF).
         - Cmf.CIE_1964_10 (default) - TM-30-20 standard
-        - Cmf.CIE_1931_2, Cmf.CIE_2006_10, Cmf.CIE_2015_2, Cmf.CIE_2015_10
+        - Cmf.CIE_1931_2, Cmf.CIE_2015_2, Cmf.CIE_2015_10
         - '1931_2' (string lookup, case-insensitive)
         - '/path/to/my_cmf.csv' (custom CSV)
         Default: CIE 1964 10-deg (cmf='1964_10').

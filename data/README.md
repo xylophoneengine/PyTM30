@@ -23,8 +23,8 @@ reference/regression table.
 | `cmf_1931_2.csv` | CIE 2019, Colour-matching functions of CIE 1931 standard colorimetric observer, [10.25039/CIE.DS.xvudnb9b](https://doi.org/10.25039/CIE.DS.xvudnb9b) | none (360-830 nm, 1 nm) |
 | `cie_1931_2.csv` | as above | trimmed to 380-780 nm |
 | `cmf_1964_10.csv` | CIE 2019, Colour-matching functions of CIE 1964 standard colorimetric observer, [10.25039/CIE.DS.sqksu2n5](https://doi.org/10.25039/CIE.DS.sqksu2n5) | z-bar entries the CIE leaves empty (560-830 nm) written as 0 or as float noise of order 1e-20 |
-| `cmf_2006_2.csv`, `cmf_2015_2.csv` | CIE 2015, Cone-fundamental-based spectral tristimulus values, 2 deg (CIE 170-2:2015, Table 10.7a), [10.25039/CIE.DS.548rw69q](https://doi.org/10.25039/CIE.DS.548rw69q) | zero-padded 360-389 nm; the same table is stored under both names |
-| `cmf_2006_10.csv`, `cmf_2015_10.csv` | CIE 2015, Cone-fundamental-based spectral tristimulus values, 10 deg (CIE 170-2:2015, Table 10.8), [10.25039/CIE.DS.dm6qiig7](https://doi.org/10.25039/CIE.DS.dm6qiig7) | zero-padded 360-389 nm; the same table is stored under both names |
+| `cmf_2015_2.csv` | CIE 2015, Cone-fundamental-based spectral tristimulus values, 2 deg (CIE 170-2:2015, Table 10.7a), [10.25039/CIE.DS.548rw69q](https://doi.org/10.25039/CIE.DS.548rw69q) | zero-padded 360-389 nm |
+| `cmf_2015_10.csv` | CIE 2015, Cone-fundamental-based spectral tristimulus values, 10 deg (CIE 170-2:2015, Table 10.8), [10.25039/CIE.DS.dm6qiig7](https://doi.org/10.25039/CIE.DS.dm6qiig7) | zero-padded 360-389 nm |
 | `daylight_basis.csv` | CIE 2018, Components of relative spectral distribution of daylight (CIE 015:2018, Table 6), [10.25039/CIE.DS.w7zunnny](https://doi.org/10.25039/CIE.DS.w7zunnny) | trimmed to 380-780 nm |
 | `d65_1nm.csv` | computed from `daylight_basis.csv` by the CIE D-series method; compare CIE D65, [10.25039/CIE.DS.hjfjmt59](https://doi.org/10.25039/CIE.DS.hjfjmt59) | recomputed with linear interpolation of the basis (agrees with the CIE table to 9e-4) |
 | `illuminant_a_1nm.csv` | CIE standard illuminant A, [10.25039/CIE.DS.8jsxjrsn](https://doi.org/10.25039/CIE.DS.8jsxjrsn) | evaluated from the ISO/CIE 11664-2 formula (agrees with the CIE table to 5e-4) |
@@ -38,7 +38,7 @@ reference/regression table.
 and is covered by the MIT licence.
 
 Further credit, not required by any licence: the 99 colour evaluation
-samples originate with ANSI/IES TM-30 (IES), and the CIE 2006/2015
+samples originate with ANSI/IES TM-30 (IES), and the CIE 2015
 physiologically based CMFs derive from Stockman & Sharpe (2000), as
 distributed by the Colour & Vision Research Laboratory (CVRL,
 <http://www.cvrl.org>).
