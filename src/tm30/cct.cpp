@@ -11,6 +11,8 @@
 #include "tm30/cct.hpp"
 #include "tm30/chromaticity.hpp"
 #include "tm30/csv_loader.hpp"
+#include "tm30/integrate.hpp"
+#include "tm30/reference.hpp"
 #include "tm30/xyz.hpp"
 
 #include <algorithm>
@@ -56,7 +58,6 @@ PlanckianLut load_planckian_lut(const std::string &filepath) {
 }
 
 PlanckianLut build_planckian_lut(const CmfData &cmf) {
-  constexpr double kC2 = 1.4388e-2;     // TM-30-20 S3.3 Eq. (6), m*K
   constexpr std::size_t kPoints = 1489; // 1000 K .. ~41073 K at 0.25 %
   const std::size_t n = cmf.wavelengths.size();
   if (n < 2 || cmf.x_bar.size() != n || cmf.y_bar.size() != n ||
@@ -83,31 +84,21 @@ PlanckianLut build_planckian_lut(const CmfData &cmf) {
   lut.u.reserve(kPoints);
   lut.v.reserve(kPoints);
 
-  std::vector<double> wl_m(n);
-  for (std::size_t i = 0; i < n; ++i)
-    wl_m[i] = cmf.wavelengths[i] * 1e-9;
-
   for (std::size_t k = 0; k < kPoints; ++k) {
     const double T = 1000.0 * std::pow(1.0025, static_cast<double>(k));
-    double X = 0.0, Y = 0.0, Z = 0.0;
-    double prev_x = 0.0, prev_y = 0.0, prev_z = 0.0;
+    // Planckian SPD (TM-30-20 S3.3 Eq. (6)); the 560 nm normalisation is a
+    // common factor and cancels in u, v.
+    const std::vector<double> spd = generate_planckian(T, cmf.wavelengths);
+    std::vector<double> fx(n), fy(n), fz(n);
     for (std::size_t i = 0; i < n; ++i) {
-      const double L =
-          std::pow(wl_m[i], -5.0) / (std::exp(kC2 / (wl_m[i] * T)) - 1.0);
-      const double fx = L * cmf.x_bar[i];
-      const double fy = L * cmf.y_bar[i];
-      const double fz = L * cmf.z_bar[i];
-      if (i > 0) {
-        const double h = 0.5 * (cmf.wavelengths[i] - cmf.wavelengths[i - 1]);
-        X += h * (prev_x + fx);
-        Y += h * (prev_y + fy);
-        Z += h * (prev_z + fz);
-      }
-      prev_x = fx;
-      prev_y = fy;
-      prev_z = fz;
+      fx[i] = spd[i] * cmf.x_bar[i];
+      fy[i] = spd[i] * cmf.y_bar[i];
+      fz[i] = spd[i] * cmf.z_bar[i];
     }
-    const double denom = X + 15.0 * Y + 3.0 * Z;
+    const double X = trapezoidal_integrate(cmf.wavelengths, fx);
+    const double Y = trapezoidal_integrate(cmf.wavelengths, fy);
+    const double Z = trapezoidal_integrate(cmf.wavelengths, fz);
+    const double denom = X + 15.0 * Y + 3.0 * Z; // TM-30-20 S3.1 denominator
     const UvCoord uv = xyz_to_uv(X, Y, Z);
     if (!(denom > 0.0) || !std::isfinite(uv.u) || !std::isfinite(uv.v)) {
       throw std::invalid_argument(

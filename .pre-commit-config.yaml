@@ -26,3 +26,15 @@ repos:
     hooks:
       - id: clang-format
         types_or: [c++, c]
+
+  # Runs after clang-format: tools/check_constants_whitelist.txt pins
+  # exemptions to file:line, so it must see the formatted file. Same gate as
+  # the CI lint job.
+  - repo: local
+    hooks:
+      - id: check-constants
+        name: cite every float literal (TM-30-20 clause or whitelist)
+        entry: python3 tools/check_constants.py
+        language: system
+        pass_filenames: false
+        files: ^(src/|include/).*\.(cpp|cc|cxx|hpp|h)$|^tools/(check_constants\.py|check_constants_whitelist\.txt|tm30_clause_equations\.txt)$

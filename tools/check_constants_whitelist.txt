@@ -28,4 +28,38 @@ src/tm30/tm30.cpp:38
 # as used by the TM-30 and CQS calculators; it is absent from the published
 # Ohno (2014) method, so no clause applies; the clamp itself
 # is an implementation robustness extension.
-src/tm30/cct.cpp:251
+src/tm30/cct.cpp:347
+
+# Planckian LUT temperature grid in build_planckian_lut (1000 K start,
+# 0.25 % geometric step). TM-30-20 S3.3 incorporates the Ohno CCT method by
+# normative reference but prints no LUT grid; this grid is PyTM30's own
+# choice (mirrors tools/generate_planckian_lut.py and data/planckian_uv.csv).
+src/tm30/cct.cpp:88
+
+# Observer-consistent daylight Tr map (build_daylight_tr_map): Tr sweep
+# start 3000 K / 0.25 % step / stop 60000 K, the 1e-6 K LUT-saturation
+# tolerance, and the 4000 / 25000 K coverage requirement. All are PyTM30
+# choices for an extension (overridden CCT observer, docs/divergences.md
+# "Overridden CCT observer (`cmf_cct`)"); TM-30-20 prints none of them
+# (4000/5000 K in Eq. (14)-(16) are blend thresholds, not a sweep range, and
+# 25000 K appears nowhere in the standard).
+src/tm30/cct.cpp:126
+src/tm30/cct.cpp:127
+src/tm30/cct.cpp:135
+src/tm30/cct.cpp:145
+
+# DaylightTrMap::operator(): linear interpolation in reciprocal temperature
+# (1/T) between CCT and Tr nodes. This is the lookup half of the same PyTM30
+# extension (docs/divergences.md "Overridden CCT observer (`cmf_cct`)"); the
+# 1.0 literals are the reciprocals, with no TM-30-20 clause behind them.
+src/tm30/reference.cpp:305
+src/tm30/reference.cpp:306
+src/tm30/reference.cpp:307
+src/tm30/reference.cpp:308
+src/tm30/reference.cpp:309
+src/tm30/reference.cpp:310
+
+# Input-validation guard in build_planckian_lut (wavelength > 0 so that
+# lambda^-5 and the Planck exponent are defined). Pure sanity check on the
+# caller's CMF, not a TM-30-20 quantity.
+src/tm30/cct.cpp:69
