@@ -20,6 +20,7 @@
 /// method by normative reference. Per TM-30-20 S3.1, CCT determination
 /// uses the CIE 1931 2-deg observer.
 
+#include "tm30/reference.hpp"
 #include "tm30/resample.hpp"
 
 #include <string>
@@ -44,6 +45,10 @@ struct PlanckianLut {
   std::vector<double> T; // Temperatures (K), monotonically increasing
   std::vector<double> u; // CIE 1960 UCS u coordinate
   std::vector<double> v; // CIE 1960 UCS v coordinate
+  /// Daylight Tr map for the observer this LUT was built with. Empty (the
+  /// default, and what load/build_planckian_lut leave) = printed TM-30-20
+  /// S3.3 Tr = Tt. Fill with build_daylight_tr_map().
+  DaylightTrMap daylight_tr;
 };
 
 /// Load a Planckian locus LUT from a CSV file.
@@ -67,6 +72,20 @@ PlanckianLut load_planckian_lut(const std::string &filepath);
 ///   strictly increasing, the CMF does not cover 380-780 nm (TM-30-20 S3.5),
 ///   or the integration yields a degenerate (u, v).
 PlanckianLut build_planckian_lut(const CmfData &cmf);
+
+/// Build the daylight Tr map that makes the CIE daylight reference have
+/// CCT == Tt in the observer `cmf`/`lut` were built with.
+///
+/// For Tr_k = 3000 * 1.0025^k (up to 60000 K) the printed xD/yD/M1/M2
+/// daylight SPD is generated on a 380-780 nm, 1 nm grid, integrated with
+/// `cmf` and run through the CCT solver with `lut`, giving g_k = CCT of
+/// daylight(Tr_k) in that observer. The map is T = g_k -> Tr = Tr_k, so
+/// feeding Tr(Tt) to the printed formula yields a daylight SPD of CCT Tt.
+/// TM-30-20 S3.5 range; `lut` must come from build_planckian_lut(cmf).
+/// @throws std::invalid_argument if g_k is not strictly increasing or does
+///   not span at least 4000-25000 K.
+DaylightTrMap build_daylight_tr_map(const CmfData &cmf, const PlanckianLut &lut,
+                                    const DaylightBasis &basis);
 
 /// Options for the CCT/Duv solver.
 struct CctOptions {

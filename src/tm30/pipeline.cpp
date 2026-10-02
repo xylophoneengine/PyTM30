@@ -51,7 +51,9 @@ CesColorimetryResult compute_ces_colorimetry(
   // -- Step 4: Generate reference illuminant SPD -------------------------
   // TM-30-20 S3.3 Eq. (13)-(16)
   const std::vector<double> ref_spd = generate_reference_spd(
-      cct_duv.cct, spd_wavelengths, daylight_basis, cmf10.y_bar);
+      cct_duv.cct, spd_wavelengths, daylight_basis, cmf10.y_bar,
+      /*already_resampled=*/false, /*lambda_pow_m5=*/nullptr,
+      planckian_lut.daylight_tr);
   // TM-30-20 S3.3
 
   // -- Step 5: Compute test source 10-deg XYZ -> normalisation constant kt ---
@@ -166,7 +168,8 @@ prepare_resampled_tables(const std::vector<double> &target_wavelengths,
 }
 
 ReferenceColorimetry
-compute_reference_colorimetry(double cct, const ResampledTables &tables) {
+compute_reference_colorimetry(double cct, const ResampledTables &tables,
+                              const DaylightTrMap &tr_map) {
   const std::vector<double> &spd_wavelengths = tables.wavelengths;
   const CesData &ces_resampled = tables.ces;
   const CmfData &cmf10 = tables.cmf_10deg;
@@ -181,7 +184,7 @@ compute_reference_colorimetry(double cct, const ResampledTables &tables) {
   // so generate_planckian() does not rebuild it per SPD.
   result.spd = generate_reference_spd(
       cct, spd_wavelengths, tables.daylight_basis, cmf10.y_bar,
-      /*already_resampled=*/true, &tables.lambda_pow_m5);
+      /*already_resampled=*/true, &tables.lambda_pow_m5, tr_map);
   // TM-30-20 S3.3
 
   // -- Step 7: Compute reference source 10-deg XYZ -> normalisation kr -------
@@ -230,7 +233,8 @@ compute_ces_colorimetry_cached(const std::vector<double> &spd_values,
   // -- Steps 4, 7, 8, 10: Reference-side colorimetry ----------------------
   // (reference SPD, reference source XYZ, reference CES XYZ, reference
   // CAM02-UCS J'a'b') - see compute_reference_colorimetry().
-  ReferenceColorimetry ref = compute_reference_colorimetry(cct_duv.cct, tables);
+  ReferenceColorimetry ref = compute_reference_colorimetry(
+      cct_duv.cct, tables, planckian_lut.daylight_tr);
 
   // -- Step 5: Compute test source 10-deg XYZ -> normalisation constant kt ---
   // TM-30-20 S3.2 Eq. (4): kt = 100 / integral St(lambda) * ybar10(lambda)

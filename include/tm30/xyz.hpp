@@ -248,10 +248,13 @@ std::vector<YuvTriple> xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs);
 /// @param cmf_data     CMF data (will be resampled to `wavelengths`).
 /// @param K            Normalisation constant - see spd_to_xyz(). nullopt
 ///                     (default): auto-normalize Y=100.
+/// @param tr_map       Daylight Tr map, see generate_reference_spd();
+///                     the batch variants take it too. Default: empty.
 /// @return             XyzTriple for the reference illuminant at this CCT.
 XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
                      const DaylightBasis &basis, const CmfData &cmf_data,
-                     std::optional<double> K = std::nullopt);
+                     std::optional<double> K = std::nullopt,
+                     const DaylightTrMap &tr_map = {});
 
 /// Compute XYZ for the reference illuminant at each of several CCTs,
 /// sharing one wavelength grid and one resampled CMF across the batch.
@@ -266,7 +269,8 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
                                         const std::vector<double> &wavelengths,
                                         const DaylightBasis &basis,
                                         const CmfData &cmf_data,
-                                        std::optional<double> K = std::nullopt);
+                                        std::optional<double> K = std::nullopt,
+                                        const DaylightTrMap &tr_map = {});
 
 /// cct_to_xyz_batch() with the CMF already resampled to `wavelengths`,
 /// for callers that already hold it (e.g. the bindings' fixed-grid
@@ -274,7 +278,7 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
 std::vector<XyzTriple> cct_to_xyz_batch_prepared(
     const std::vector<double> &ccts, const std::vector<double> &wavelengths,
     const DaylightBasis &basis, const CmfData &cmf_resampled,
-    std::optional<double> K = std::nullopt);
+    std::optional<double> K = std::nullopt, const DaylightTrMap &tr_map = {});
 
 /// Compute CCT and Duv from an SPD, with automatic CMF resampling.
 ///

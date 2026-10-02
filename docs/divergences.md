@@ -99,6 +99,18 @@ parabolic solution above. Three deliberate choices:
   calculation range (380-780 nm). The two ranges serve different objects
   and are intentionally different.
 
+### Overridden CCT observer (`cmf_cct`)
+
+S3.3 sets the daylight reference's nominal temperature Tr = Tt, and the
+printed xD/yD/M1/M2 formula is based on the CIE 1931 2-degree observer. With
+another CCT observer the daylight SPD built that way would not have CCT Tt
+in that observer. When `cmf_cct` is overridden, PyTM30 therefore feeds the
+formula a Tr (tabulated once, interpolated in reciprocal temperature) chosen
+so the daylight SPD's CCT in the overridden observer equals Tt; the
+Planckian part already does. The blend weights and the 4000/5000 K
+thresholds still use the test CCT. The default observer keeps the printed
+formula exactly.
+
 ## Rcs,hj is a percentage; Rhs,hj is a ratio (S4.6, S4.7)
 
 S4.6 computes the local chroma shift as a ratio (Eq. (62)) and requires

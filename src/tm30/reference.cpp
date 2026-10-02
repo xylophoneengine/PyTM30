@@ -289,14 +289,40 @@ std::vector<double> generate_cie_d(double cct,
 }
 
 // -------------------------------------------------------------------------
+// DaylightTrMap
+// -------------------------------------------------------------------------
+
+double DaylightTrMap::operator()(double cct) const {
+  const std::size_t n = T.size();
+  if (n < 2 || Tr.size() != n) {
+    return cct;
+  }
+  // First index with T[i] >= cct, clamped so [i-1, i] is a valid segment
+  // (end segments extrapolate).
+  std::size_t i = static_cast<std::size_t>(
+      std::lower_bound(T.begin(), T.end(), cct) - T.begin());
+  i = std::min(std::max<std::size_t>(i, 1), n - 1);
+  const double x0 = 1.0 / T[i - 1];
+  const double x1 = 1.0 / T[i];
+  const double y0 = 1.0 / Tr[i - 1];
+  const double y1 = 1.0 / Tr[i];
+  const double w = (1.0 / cct - x0) / (x1 - x0);
+  return 1.0 / (y0 + w * (y1 - y0));
+}
+
+// -------------------------------------------------------------------------
 // generate_reference_spd
 // -------------------------------------------------------------------------
 
 std::vector<double> generate_reference_spd(
     double cct, const std::vector<double> &wavelengths,
     const DaylightBasis &basis, const std::vector<double> &cmf_y_bar,
-    bool already_resampled, const std::vector<double> *lambda_pow_m5) {
+    bool already_resampled, const std::vector<double> *lambda_pow_m5,
+    const DaylightTrMap &tr_map) {
   const std::size_t n = wavelengths.size();
+  // Tr for the daylight formula: Tr = Tt as printed in TM-30-20 S3.3 when
+  // the map is empty, observer-consistent Tr otherwise.
+  const double tr = tr_map(cct);
 
   // TM-30-20 S3.3 Eq. (14): Tt <= 4000 K -> pure Planckian
   if (cct <= 4000.0) { // TM-30-20 S3.3 Eq. (14)
@@ -305,7 +331,7 @@ std::vector<double> generate_reference_spd(
 
   // TM-30-20 S3.3 Eq. (16): Tt >= 5000 K -> pure D-series
   if (cct >= 5000.0) { // TM-30-20 S3.3 Eq. (16)
-    return generate_cie_d(cct, wavelengths, basis, already_resampled);
+    return generate_cie_d(tr, wavelengths, basis, already_resampled);
   }
 
   // TM-30-20 S3.3 Eq. (15): 4000 K < Tt < 5000 K -> proportional blend
@@ -321,7 +347,7 @@ std::vector<double> generate_reference_spd(
   std::vector<double> planck = generate_planckian(
       cct, wavelengths, lambda_pow_m5); // TM-30-20 S3.3 Eq. (5)
   std::vector<double> daylight = generate_cie_d(
-      cct, wavelengths, basis, already_resampled); // TM-30-20 S3.3 Eq. (7)
+      tr, wavelengths, basis, already_resampled); // TM-30-20 S3.3 Eq. (7)
 
   // Compute Y for each component via trapezoidal integration.
   // TM-30-20 S3.3: the blend components are Y-normalised before mixing;

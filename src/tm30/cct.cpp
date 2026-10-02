@@ -11,6 +11,7 @@
 #include "tm30/cct.hpp"
 #include "tm30/chromaticity.hpp"
 #include "tm30/csv_loader.hpp"
+#include "tm30/xyz.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -118,6 +119,44 @@ PlanckianLut build_planckian_lut(const CmfData &cmf) {
     lut.v.push_back(uv.v);
   }
   return lut;
+}
+
+DaylightTrMap build_daylight_tr_map(const CmfData &cmf, const PlanckianLut &lut,
+                                    const DaylightBasis &basis) {
+  // TM-30-20 S3.5 calculation range, 1 nm.
+  std::vector<double> wl;
+  for (int w = 380; w <= 780; ++w)
+    wl.push_back(static_cast<double>(w));
+  const CmfData c = resample_cmf(wl, cmf);
+  const DaylightBasis b = resample_daylight_basis(wl, basis);
+
+  DaylightTrMap map;
+  for (int k = 0;; ++k) {
+    const double tr = 3000.0 * std::pow(1.0025, static_cast<double>(k));
+    if (tr > 60000.0)
+      break;
+    // TM-30-20 S3.3 Eq. (7)-(12) at nominal Tr, CCT as in the pipeline.
+    const std::vector<double> spd = generate_cie_d(tr, wl, b, true);
+    const SourceXyz s = compute_source_xyz(wl, spd, c.x_bar, c.y_bar, c.z_bar);
+    const double g = compute_cct_duv_from_xyz(s.X, s.Y, s.Z, lut).cct;
+    // The solver saturates at the LUT's hot end; later points carry no
+    // information, so stop there.
+    if (g >= lut.T.back() - 1e-6)
+      break;
+    if (!map.T.empty() && !(g > map.T.back())) {
+      throw std::invalid_argument(
+          "build_daylight_tr_map: daylight CCT is not strictly increasing in "
+          "Tr");
+    }
+    map.T.push_back(g);
+    map.Tr.push_back(tr);
+  }
+  if (map.T.front() > 4000.0 || map.T.back() < 25000.0) {
+    throw std::invalid_argument(
+        "build_daylight_tr_map: CCT range of the daylight series does not "
+        "cover 4000-25000 K (LUT range too small?)");
+  }
+  return map;
 }
 
 // -------------------------------------------------------------------------

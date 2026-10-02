@@ -204,7 +204,11 @@ Available: `CIE_1931_2`, `CIE_1964_10`, `CIE_2006_2`, `CIE_2006_10`,
 `cmf_cct` defaults to CIE 1931 2-deg, which TM-30-20 S3.1 requires for CCT.
 The Planckian locus is built from the same CMF, so source and locus always
 share an observer. Any other observer changes the CCT, hence the reference
-illuminant, hence Rf/Rg: results are then not TM-30-conformant.
+illuminant, hence Rf/Rg: results are then not TM-30-conformant. With an
+override the observer is used throughout: CCT, Planckian locus, and the
+daylight reference, whose CIE daylight phase is chosen so its CCT in that
+observer equals the test CCT. The default keeps the printed TM-30-20 S3.3
+formula.
 
 ### Configure Integration Range
 

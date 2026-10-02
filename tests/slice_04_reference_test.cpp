@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -299,6 +300,102 @@ TEST_CASE("Reference - daylight basis loads correctly",
   REQUIRE_THAT(basis.S0[36], WithinTolerance(0.1, 100.0));
   REQUIRE_THAT(basis.S1[36], WithinTolerance(0.01, 0.0));
   REQUIRE_THAT(basis.S2[36], WithinTolerance(0.01, 0.0));
+}
+
+// -- Observer-consistent daylight Tr map ------------------------------
+
+// CCT of `spd` (on wl) measured with `cmf` and its own locus `lut`.
+double measured_cct(const std::vector<double> &wl,
+                    const std::vector<double> &spd, const CmfData &cmf,
+                    const PlanckianLut &lut) {
+  const CmfData c = resample_cmf(wl, cmf);
+  const SourceXyz s = compute_source_xyz(wl, spd, c.x_bar, c.y_bar, c.z_bar);
+  return compute_cct_duv_from_xyz(s.X, s.Y, s.Z, lut).cct;
+}
+
+TEST_CASE("Reference - empty DaylightTrMap is bit-identical to the default",
+          "[reference][slice04][trmap]") {
+  auto wl = wl_1nm();
+  auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  auto cmf = load_cmf_10deg(data_path("cmf_1964_10.csv"));
+  const DaylightTrMap empty;
+  // Planckian, blend and daylight branches.
+  for (double cct : {2700.0, 4200.0, 4800.0, 5000.0, 6500.0, 12000.0}) {
+    const auto a = generate_reference_spd(cct, wl, basis, cmf.y_bar);
+    const auto b = generate_reference_spd(cct, wl, basis, cmf.y_bar, false,
+                                          nullptr, empty);
+    REQUIRE(a == b);
+  }
+}
+
+TEST_CASE("Reference - daylight Tr map gives CCT == Tt in the CCT observer",
+          "[reference][slice04][trmap]") {
+  auto wl = wl_1nm();
+  auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  auto cmf10 = load_cmf_10deg(data_path("cmf_1964_10.csv"));
+  const CmfData y10 = resample_cmf(wl, cmf10);
+
+  bool printed_misses = false;
+  for (const char *file :
+       {"cmf_1964_10.csv", "cmf_2006_2.csv", "cmf_2015_10.csv"}) {
+    CAPTURE(file);
+    const CmfData cmf = load_cmf_10deg(data_path(file));
+    const PlanckianLut lut = build_planckian_lut(cmf);
+    const DaylightTrMap map = build_daylight_tr_map(cmf, lut, basis);
+
+    for (double T : {5000.0, 6500.0, 10000.0, 20000.0, 25000.0}) {
+      CAPTURE(T);
+      const auto ref =
+          generate_reference_spd(T, wl, basis, y10.y_bar, false, nullptr, map);
+      REQUIRE(std::abs(measured_cct(wl, ref, cmf, lut) - T) < 0.5);
+
+      const auto printed = generate_reference_spd(T, wl, basis, y10.y_bar);
+      if (std::abs(measured_cct(wl, printed, cmf, lut) - T) > 0.5)
+        printed_misses = true;
+    }
+  }
+  // The check above can fail: the printed formula misses for some observer.
+  REQUIRE(printed_misses);
+}
+
+// The blend of a Planckian and a daylight SPD, both at CCT T, is not
+// guaranteed to sit at exactly T. Measured (1964_10, 2006_2, 2015_10, T in
+// {4200, 4500, 4800}) it stays within ~0.1 K; the bound leaves margin.
+TEST_CASE("Reference - daylight Tr map in the blend region",
+          "[reference][slice04][trmap]") {
+  auto wl = wl_1nm();
+  auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  const CmfData y10 =
+      resample_cmf(wl, load_cmf_10deg(data_path("cmf_1964_10.csv")));
+  for (const char *file :
+       {"cmf_1964_10.csv", "cmf_2006_2.csv", "cmf_2015_10.csv"}) {
+    CAPTURE(file);
+    const CmfData cmf = load_cmf_10deg(data_path(file));
+    const PlanckianLut lut = build_planckian_lut(cmf);
+    const DaylightTrMap map = build_daylight_tr_map(cmf, lut, basis);
+    for (double T : {4200.0, 4500.0, 4800.0}) {
+      CAPTURE(T);
+      const auto ref =
+          generate_reference_spd(T, wl, basis, y10.y_bar, false, nullptr, map);
+      const double got = measured_cct(wl, ref, cmf, lut);
+      REQUIRE(std::abs(got - T) < 1.0);
+    }
+  }
+}
+
+TEST_CASE("Reference - build_daylight_tr_map rejects a LUT with too small a "
+          "range",
+          "[reference][slice04][trmap]") {
+  auto basis = load_daylight_basis(data_path("daylight_basis.csv"));
+  const CmfData cmf = load_cmf_10deg(data_path("cmf_2015_10.csv"));
+  PlanckianLut lut = build_planckian_lut(cmf);
+  // Keep only T < ~5000 K: daylight CCTs above that clamp at the LUT end.
+  const std::size_t keep = 600;
+  lut.T.resize(keep);
+  lut.u.resize(keep);
+  lut.v.resize(keep);
+  REQUIRE_THROWS_AS(build_daylight_tr_map(cmf, lut, basis),
+                    std::invalid_argument);
 }
 
 } // namespace

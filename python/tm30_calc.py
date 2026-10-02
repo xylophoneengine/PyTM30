@@ -1111,7 +1111,14 @@ class TM30Calc:
         requires).  Same format as `cmf`; any observer is accepted and the
         Planckian locus is built from the same CMF.  Any other observer
         changes the CCT, hence the reference illuminant, hence Rf/Rg, so
-        the results are then not TM-30-conformant.  The locus is integrated over the CMF's own wavelength range, so it depends on that range, not only on the observer (a 380-780 nm trimmed file gives a slightly different locus than the 360-830 nm file).
+        the results are then not TM-30-conformant.  With an override the
+        observer is used throughout: CCT, Planckian locus, and the daylight
+        reference, whose CIE daylight phase is chosen so its CCT in that
+        observer equals the test CCT.  The default keeps the printed
+        TM-30-20 S3.3 formula.  The locus is integrated over the CMF's own
+        wavelength range, so it depends on that range, not only on the
+        observer (a 380-780 nm trimmed file gives a slightly different
+        locus than the 360-830 nm file).
         Default: cmf_cct='1931_2'.
     wavelengths : np.ndarray or None
         Fixed wavelength grid (nm) this calculator is bound to.  Defaults to
@@ -1176,8 +1183,17 @@ class TM30Calc:
         # Use the explicit-CMF constructor (n_workers/persistent_workers
         # handled inside BatchContext: pool created eagerly when
         # persistent_workers && n_workers > 1, else inert).
+        # An overridden CCT observer also drives the daylight reference.
+        cct_override: bool = os.path.realpath(path_cct) != os.path.realpath(
+            _resolve_cmf(None, data_dir, suffix="cct")
+        )
         self._ctx = tm30_core.BatchContext(
-            data_dir, path_cct, path_10deg, n_workers, persistent_workers
+            data_dir,
+            path_cct,
+            path_10deg,
+            n_workers,
+            persistent_workers,
+            cct_override,
         )
         self._data_dir = data_dir
         self._cmf = cmf

@@ -523,7 +523,8 @@ struct BatchContext {
   /// data_dir is used for the non-CMF tables only.
   BatchContext(const std::string &data_dir, const std::string &cmf_cct_path,
                const std::string &cmf_10deg_path, int n_workers = 1,
-               bool persistent_workers = false) {
+               bool persistent_workers = false,
+               bool cct_observer_daylight = false) {
     init_pool(n_workers, persistent_workers);
     auto df = [&](const std::string &name) {
       return data_dir.empty() ? name : data_dir + "/" + name;
@@ -533,6 +534,10 @@ struct BatchContext {
     ces_data = load_ces(df("ces.csv"));
     daylight_basis = tm30::load_daylight_basis(df("daylight_basis.csv"));
     planckian_lut = tm30::build_planckian_lut(cmf_cct);
+    if (cct_observer_daylight) {
+      planckian_lut.daylight_tr =
+          tm30::build_daylight_tr_map(cmf_cct, planckian_lut, daylight_basis);
+    }
   }
 
   nb::object prepare_batch(nb::ndarray<> spd_matrix, nb::object wl_arg) {
@@ -1551,7 +1556,8 @@ struct BatchContext {
 
     for (size_t i = 0; i < N; ++i) {
       const tm30::ReferenceColorimetry ref =
-          tm30::compute_reference_colorimetry(cct_data[i], *fixed_tables_);
+          tm30::compute_reference_colorimetry(cct_data[i], *fixed_tables_,
+                                              planckian_lut.daylight_tr);
       std::copy(ref.spd.begin(), ref.spd.end(), spd_buf + i * n_conf);
       for (size_t j = 0; j < 99; ++j) {
         jab_buf[(i * 99 + j) * 3 + 0] = ref.jab_ces[j].J_prime;
@@ -1605,14 +1611,14 @@ struct BatchContext {
     if (cmf_path_arg.is_none()) {
       // fixed_tables_ already holds the 10-deg CMF resampled to exactly
       // this grid; reuse it instead of resampling per call.
-      xyzs = tm30::cct_to_xyz_batch_prepared(ccts, fixed_tables_->wavelengths,
-                                             fixed_tables_->daylight_basis,
-                                             fixed_tables_->cmf_10deg, K_opt);
+      xyzs = tm30::cct_to_xyz_batch_prepared(
+          ccts, fixed_tables_->wavelengths, fixed_tables_->daylight_basis,
+          fixed_tables_->cmf_10deg, K_opt, planckian_lut.daylight_tr);
     } else {
       tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
       xyzs = tm30::cct_to_xyz_batch(ccts, fixed_tables_->wavelengths,
                                     fixed_tables_->daylight_basis, fresh_cmf,
-                                    K_opt);
+                                    K_opt, planckian_lut.daylight_tr);
     }
 
     auto np = nb::module_::import_("numpy");
@@ -1938,10 +1944,11 @@ NB_MODULE(tm30_core, m) {
            "persistent_workers with n_workers<=1 is silently inert.")
       .def(
           nb::init<const std::string &, const std::string &,
-                   const std::string &, int, bool>(),
+                   const std::string &, int, bool, bool>(),
           nb::arg("data_dir"), nb::arg("cmf_cct_path"),
           nb::arg("cmf_10deg_path"), nb::arg("n_workers") = 1,
           nb::arg("persistent_workers") = false,
+          nb::arg("cct_observer_daylight") = false,
           "Create a batch context with explicit CMF file paths.\n"
           "cmf_cct_path: CMF CSV used for CCT/Duv (default CIE 1931 2-deg per\n"
           "TM-30-20 S3.1); the Planckian locus is built from it.\n"
@@ -1949,7 +1956,10 @@ NB_MODULE(tm30_core, m) {
           "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
           "persistent_workers=true (with n_workers>1) keeps the worker\n"
           "threads alive across calls instead of spawning per call;\n"
-          "persistent_workers with n_workers<=1 is silently inert.")
+          "persistent_workers with n_workers<=1 is silently inert.\n"
+          "cct_observer_daylight=true: choose the CIE daylight reference's\n"
+          "phase so its CCT in the cmf_cct_path observer equals the test CCT\n"
+          "(default false: printed TM-30-20 S3.3 Tr = Tt).")
       .def("prepare_batch", &BatchContext::prepare_batch, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(),
            "Load SPDs from a 2-D numpy array (N_spds x N_wl). "

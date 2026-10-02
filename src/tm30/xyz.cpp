@@ -424,12 +424,13 @@ std::vector<YuvTriple> xyz_to_Yuv_batch(const std::vector<XyzTriple> &xyzs) {
 
 XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
                      const DaylightBasis &basis, const CmfData &cmf_data,
-                     std::optional<double> K) {
+                     std::optional<double> K, const DaylightTrMap &tr_map) {
   // Resample exactly once - reused for both the reference-SPD
   // Y-normalization blend step and the final XYZ integration below.
   CmfData cmf_resampled = resample_cmf(wavelengths, cmf_data);
   std::vector<double> ref_spd =
-      generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar);
+      generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar,
+                             /*already_resampled=*/false, nullptr, tr_map);
 
   SourceXyz src = compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
                                      cmf_resampled.y_bar, cmf_resampled.z_bar);
@@ -443,7 +444,7 @@ XyzTriple cct_to_xyz(double cct, const std::vector<double> &wavelengths,
 std::vector<XyzTriple> cct_to_xyz_batch_prepared(
     const std::vector<double> &ccts, const std::vector<double> &wavelengths,
     const DaylightBasis &basis, const CmfData &cmf_resampled,
-    std::optional<double> K) {
+    std::optional<double> K, const DaylightTrMap &tr_map) {
   if (cmf_resampled.y_bar.size() != wavelengths.size()) {
     throw std::invalid_argument(
         "cmf_resampled does not match the wavelength grid: expected " +
@@ -462,9 +463,9 @@ std::vector<XyzTriple> cct_to_xyz_batch_prepared(
   std::vector<XyzTriple> results;
   results.reserve(ccts.size());
   for (double cct : ccts) {
-    std::vector<double> ref_spd =
-        generate_reference_spd(cct, wavelengths, basis, cmf_resampled.y_bar,
-                               /*already_resampled=*/false, &lambda_pow_m5);
+    std::vector<double> ref_spd = generate_reference_spd(
+        cct, wavelengths, basis, cmf_resampled.y_bar,
+        /*already_resampled=*/false, &lambda_pow_m5, tr_map);
     SourceXyz src =
         compute_source_xyz(wavelengths, ref_spd, cmf_resampled.x_bar,
                            cmf_resampled.y_bar, cmf_resampled.z_bar);
@@ -482,9 +483,10 @@ std::vector<XyzTriple> cct_to_xyz_batch(const std::vector<double> &ccts,
                                         const std::vector<double> &wavelengths,
                                         const DaylightBasis &basis,
                                         const CmfData &cmf_data,
-                                        std::optional<double> K) {
-  return cct_to_xyz_batch_prepared(ccts, wavelengths, basis,
-                                   resample_cmf(wavelengths, cmf_data), K);
+                                        std::optional<double> K,
+                                        const DaylightTrMap &tr_map) {
+  return cct_to_xyz_batch_prepared(
+      ccts, wavelengths, basis, resample_cmf(wavelengths, cmf_data), K, tr_map);
 }
 
 CctDuvResult spd_to_cct(const std::vector<double> &spd_wavelengths,

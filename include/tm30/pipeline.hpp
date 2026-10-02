@@ -198,10 +198,13 @@ struct ReferenceColorimetry {
 /// @param tables  Pre-resampled CES/CMF/daylight-basis tables (see
 ///                prepare_resampled_tables()), on the same grid `cct` was
 ///                derived from.
+/// @param tr_map  Daylight Tr map (see generate_reference_spd()); empty =
+///                printed TM-30-20 Tr = Tt.
 ///
 /// @return ReferenceColorimetry for `cct` on `tables`' grid.
 ReferenceColorimetry
-compute_reference_colorimetry(double cct, const ResampledTables &tables);
+compute_reference_colorimetry(double cct, const ResampledTables &tables,
+                              const DaylightTrMap &tr_map = {});
 
 // ==========================================================================
 //  Linear tristimulus maps - unnormalised integrands on an input grid.

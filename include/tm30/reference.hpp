@@ -23,6 +23,23 @@ struct DaylightBasis {
   std::vector<double> S2;
 };
 
+/// Maps a target CCT to the nominal temperature Tr fed to the CIE daylight
+/// xD/yD/M1/M2 formula (TM-30-20 S3.3 Eq. (7)-(12)).
+///
+/// TM-30-20 S3.3 sets Tr = Tt, and the printed formula is based on the
+/// CIE 1931 2-deg observer. With another CCT observer the daylight SPD
+/// built that way no longer has CCT Tt in that observer; this table holds
+/// the Tr that does. Empty (default) = identity = the printed TM-30-20
+/// behaviour. See build_daylight_tr_map().
+struct DaylightTrMap {
+  std::vector<double> T;  // target CCT (K), strictly increasing
+  std::vector<double> Tr; // nominal temperature for the printed formula (K)
+
+  /// Linear interpolation in reciprocal temperature (1/T -> 1/Tr), linear
+  /// extrapolation in reciprocal space outside the range. Identity if empty.
+  double operator()(double cct) const;
+};
+
 /// Load daylight basis vectors from a CSV file.
 ///
 /// Expected columns: wavelength, S0, S1, S2.
@@ -130,6 +147,10 @@ std::vector<double> generate_cie_d(double cct,
 /// @param lambda_pow_m5
 ///                    Forwarded to generate_planckian() - see its docs.
 ///                    Defaults to null, preserving existing behavior.
+/// @param tr_map      Tr for the daylight component: generate_cie_d() gets
+///                    tr_map(cct) instead of cct. The Planckian component
+///                    and the blend weights/thresholds keep using `cct`.
+///                    Defaults to empty (Tr = Tt, as printed).
 /// @return            Reference illuminant SPD, normalized at 560 nm.
 ///
 /// TM-30-20 S3.3 Eq. (13)-(16)
@@ -138,6 +159,7 @@ generate_reference_spd(double cct, const std::vector<double> &wavelengths,
                        const DaylightBasis &basis,
                        const std::vector<double> &cmf_y_bar,
                        bool already_resampled = false,
-                       const std::vector<double> *lambda_pow_m5 = nullptr);
+                       const std::vector<double> *lambda_pow_m5 = nullptr,
+                       const DaylightTrMap &tr_map = {});
 
 } // namespace tm30
