@@ -13,7 +13,10 @@ Creator of all source datasets: International Commission on Illumination
 The tables were extracted with colour-science 0.4.7 (BSD-3-Clause), used as
 a tool; see `tools/generate_data_colour_science.py` for the exact calls. The
 numbers themselves are the CIE's. `planckian_uv.csv` is computed by
-`tools/generate_planckian_lut.py`.
+`tools/generate_planckian_lut.py`. At runtime the Python bindings build the
+Planckian locus from the CMF used for CCT (`build_planckian_lut`), so source
+and locus share an observer; `planckian_uv.csv` remains as the 1931 2-deg
+reference/regression table.
 
 | File | Source dataset (CIE, CC BY-SA 4.0) | Changes made here |
 |---|---|---|

@@ -114,7 +114,7 @@ void require_c_contiguous(const nb::ndarray<> &arr, const char *name) {
 // ==========================================================================
 
 struct PyTm30 {
-  tm30::CmfData cmf_2deg_;
+  tm30::CmfData cmf_cct_;
   tm30::CmfData cmf_10deg_;
   tm30::CesData ces_data_;
   tm30::DaylightBasis daylight_basis_;
@@ -164,17 +164,16 @@ struct PyTm30 {
 
     // -- Load data tables -------------------------------------------
     std::string dir = data_dir_arg.empty() ? TM30_DATA_DIR : data_dir_arg;
-    cmf_2deg_ = load_cmf(data_file(dir, "cie_1931_2.csv"));
+    cmf_cct_ = load_cmf(data_file(dir, "cmf_1931_2.csv"));
     cmf_10deg_ = load_cmf(data_file(dir, "cmf_1964_10.csv"));
     ces_data_ = load_ces(data_file(dir, "ces.csv"));
     daylight_basis_ =
         tm30::load_daylight_basis(data_file(dir, "daylight_basis.csv"));
-    planckian_lut_ =
-        tm30::load_planckian_lut(data_file(dir, "planckian_uv.csv"));
+    planckian_lut_ = tm30::build_planckian_lut(cmf_cct_);
 
     // -- Create Tm30 handle (validates SPD, computes nothing) -------
     tm30_ = std::make_unique<tm30::Tm30>(
-        tm30::Spd(std::move(wl), std::move(vals)), cmf_2deg_, cmf_10deg_,
+        tm30::Spd(std::move(wl), std::move(vals)), cmf_cct_, cmf_10deg_,
         ces_data_, daylight_basis_, planckian_lut_);
   }
 
@@ -425,7 +424,7 @@ struct PyTm30 {
 // ======================================================================
 
 struct BatchContext {
-  tm30::CmfData cmf_2deg;
+  tm30::CmfData cmf_cct;
   tm30::CmfData cmf_10deg;
   tm30::CesData ces_data;
   tm30::DaylightBasis daylight_basis;
@@ -474,7 +473,7 @@ struct BatchContext {
     }
   };
 
-  // 2-deg CMF resampled to the S3.5-conformed form of the grid, keyed by
+  // CCT CMF resampled to the S3.5-conformed form of the grid, keyed by
   // the raw grid (spd_to_cct).
   ResampledCmfCache cct2_cache_;
   // 10-deg CMF resampled to the call grid, unclipped
@@ -513,27 +512,27 @@ struct BatchContext {
     auto df = [&](const std::string &name) {
       return data_dir.empty() ? name : data_dir + "/" + name;
     };
-    cmf_2deg = load_cmf(df("cie_1931_2.csv"));
+    cmf_cct = load_cmf(df("cmf_1931_2.csv"));
     cmf_10deg = load_cmf(df("cmf_1964_10.csv"));
     ces_data = load_ces(df("ces.csv"));
     daylight_basis = tm30::load_daylight_basis(df("daylight_basis.csv"));
-    planckian_lut = tm30::load_planckian_lut(df("planckian_uv.csv"));
+    planckian_lut = tm30::build_planckian_lut(cmf_cct);
   }
 
   /// Constructor with explicit CMF file paths.
   /// data_dir is used for the non-CMF tables only.
-  BatchContext(const std::string &data_dir, const std::string &cmf_2deg_path,
+  BatchContext(const std::string &data_dir, const std::string &cmf_cct_path,
                const std::string &cmf_10deg_path, int n_workers = 1,
                bool persistent_workers = false) {
     init_pool(n_workers, persistent_workers);
     auto df = [&](const std::string &name) {
       return data_dir.empty() ? name : data_dir + "/" + name;
     };
-    cmf_2deg = load_cmf(cmf_2deg_path);
+    cmf_cct = load_cmf(cmf_cct_path);
     cmf_10deg = load_cmf(cmf_10deg_path);
     ces_data = load_ces(df("ces.csv"));
     daylight_basis = tm30::load_daylight_basis(df("daylight_basis.csv"));
-    planckian_lut = tm30::load_planckian_lut(df("planckian_uv.csv"));
+    planckian_lut = tm30::build_planckian_lut(cmf_cct);
   }
 
   nb::object prepare_batch(nb::ndarray<> spd_matrix, nb::object wl_arg) {
@@ -632,9 +631,8 @@ struct BatchContext {
     // time, as InvalidSpd -> ValueError.
     const tm30::Spd grid_probe(wl_vec, std::vector<double>(wl_vec.size(), 1.0));
 
-    fixed_tables_ =
-        tm30::prepare_resampled_tables(grid_probe.wavelengths(), cmf_2deg,
-                                       cmf_10deg, ces_data, daylight_basis);
+    fixed_tables_ = tm30::prepare_resampled_tables(
+        grid_probe.wavelengths(), cmf_cct, cmf_10deg, ces_data, daylight_basis);
     fixed_grid_raw_ = std::move(wl_vec);
   }
 
@@ -943,7 +941,7 @@ struct BatchContext {
     auto results = [&]() {
       nb::gil_scoped_release release;
       return tm30::try_evaluate(
-          views, cmf_2deg, cmf_10deg, ces_data, daylight_basis, planckian_lut,
+          views, cmf_cct, cmf_10deg, ces_data, daylight_basis, planckian_lut,
           req, static_cast<std::size_t>(n_workers), pool_.get());
     }();
     if (columnar) {
@@ -1497,7 +1495,7 @@ struct BatchContext {
 
       const tm30::Spd probe(wl_vec, std::vector<double>(wl_vec.size(), 1.0));
       local_tables = tm30::prepare_resampled_tables(
-          probe.wavelengths(), cmf_2deg, cmf_10deg, ces_data, daylight_basis);
+          probe.wavelengths(), cmf_cct, cmf_10deg, ces_data, daylight_basis);
       tables = &*local_tables;
     }
 
@@ -1712,8 +1710,8 @@ struct BatchContext {
   /// duv. Uses the pre-loaded CIE 1931 2-deg CMFs by default (TM-30-20
   /// S3.1 exception - CCT determination is the one calculation that uses
   /// the 2-deg, not 10-deg, observer). cmf_path=None: use this context's
-  /// bound cmf_2deg. cmf_path=str: load+resample a different 2-deg CMF for
-  /// this call only.
+  /// bound CCT CMF. cmf_path=str: load a different CMF (any observer) for
+  /// this call only; the Planckian locus is rebuilt from it.
   nb::object spd_to_cct(nb::ndarray<> spd_matrix, nb::object wl_arg,
                         nb::object cmf_path_arg) {
     if (spd_matrix.ndim() != 2)
@@ -1749,7 +1747,7 @@ struct BatchContext {
 
     std::vector<tm30::CctDuvResult> results;
     if (cmf_path_arg.is_none()) {
-      // Per-grid cache: the S3.5 grid probe and the 2-deg CMF resample
+      // Per-grid cache: the S3.5 grid probe and the CCT-CMF resample
       // depend only on the grid, so repeated calls on one grid (the
       // common case: the calculator's own fixed grid) skip both. The
       // cache is keyed on the raw grid and bypassed for per-call custom
@@ -1757,14 +1755,15 @@ struct BatchContext {
       if (!cct2_cache_.hit(wl)) {
         // TM-30-20 S3.5: unit-value probe conforms the grid once.
         const tm30::Spd probe(wl, std::vector<double>(wl.size(), 1.0));
-        cct2_cache_.store(wl,
-                          tm30::resample_cmf(probe.wavelengths(), cmf_2deg));
+        cct2_cache_.store(wl, tm30::resample_cmf(probe.wavelengths(), cmf_cct));
       }
       results = tm30::spd_to_cct_batch_prepared(wl, spd_vecs, cct2_cache_.cmf,
                                                 planckian_lut);
     } else {
       tm30::CmfData fresh_cmf = load_cmf(nb::cast<std::string>(cmf_path_arg));
-      results = tm30::spd_to_cct_batch(wl, spd_vecs, fresh_cmf, planckian_lut);
+      // Locus in the same observer as the test-source XYZ.
+      const tm30::PlanckianLut fresh_lut = tm30::build_planckian_lut(fresh_cmf);
+      results = tm30::spd_to_cct_batch(wl, spd_vecs, fresh_cmf, fresh_lut);
     }
 
     auto np = nb::module_::import_("numpy");
@@ -1932,23 +1931,25 @@ NB_MODULE(tm30_core, m) {
            nb::arg("data_dir") = std::string(TM30_DATA_DIR),
            nb::arg("n_workers") = 1, nb::arg("persistent_workers") = false,
            "Create a batch context with pre-loaded data tables.\n"
-           "CMF paths default to cmf_1964_10.csv / cie_1931_2.csv.\n"
+           "CMF paths default to cmf_1964_10.csv / cmf_1931_2.csv.\n"
            "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
            "persistent_workers=true (with n_workers>1) keeps the worker\n"
            "threads alive across calls instead of spawning per call;\n"
            "persistent_workers with n_workers<=1 is silently inert.")
-      .def(nb::init<const std::string &, const std::string &,
-                    const std::string &, int, bool>(),
-           nb::arg("data_dir"), nb::arg("cmf_2deg_path"),
-           nb::arg("cmf_10deg_path"), nb::arg("n_workers") = 1,
-           nb::arg("persistent_workers") = false,
-           "Create a batch context with explicit CMF file paths.\n"
-           "cmf_2deg_path: path to the 2-deg CMF CSV (for CCT).\n"
-           "cmf_10deg_path: path to the 10-deg CMF CSV (for tristimulus).\n"
-           "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
-           "persistent_workers=true (with n_workers>1) keeps the worker\n"
-           "threads alive across calls instead of spawning per call;\n"
-           "persistent_workers with n_workers<=1 is silently inert.")
+      .def(
+          nb::init<const std::string &, const std::string &,
+                   const std::string &, int, bool>(),
+          nb::arg("data_dir"), nb::arg("cmf_cct_path"),
+          nb::arg("cmf_10deg_path"), nb::arg("n_workers") = 1,
+          nb::arg("persistent_workers") = false,
+          "Create a batch context with explicit CMF file paths.\n"
+          "cmf_cct_path: CMF CSV used for CCT/Duv (default CIE 1931 2-deg per\n"
+          "TM-30-20 S3.1); the Planckian locus is built from it.\n"
+          "cmf_10deg_path: path to the 10-deg CMF CSV (for tristimulus).\n"
+          "n_workers>1 parallelizes across SPDs (bit-identical results);\n"
+          "persistent_workers=true (with n_workers>1) keeps the worker\n"
+          "threads alive across calls instead of spawning per call;\n"
+          "persistent_workers with n_workers<=1 is silently inert.")
       .def("prepare_batch", &BatchContext::prepare_batch, nb::arg("spd_matrix"),
            nb::arg("wavelengths") = nb::none(),
            "Load SPDs from a 2-D numpy array (N_spds x N_wl). "

@@ -54,6 +54,72 @@ PlanckianLut load_planckian_lut(const std::string &filepath) {
   return lut;
 }
 
+PlanckianLut build_planckian_lut(const CmfData &cmf) {
+  constexpr double kC2 = 1.4388e-2;     // TM-30-20 S3.3 Eq. (6), m*K
+  constexpr std::size_t kPoints = 1489; // 1000 K .. ~41073 K at 0.25 %
+  const std::size_t n = cmf.wavelengths.size();
+  if (n < 2 || cmf.x_bar.size() != n || cmf.y_bar.size() != n ||
+      cmf.z_bar.size() != n) {
+    throw std::invalid_argument("build_planckian_lut: malformed CMF");
+  }
+  for (std::size_t i = 0; i < n; ++i) {
+    const double w = cmf.wavelengths[i];
+    if (!std::isfinite(w) || w <= 0.0 ||
+        (i > 0 && w <= cmf.wavelengths[i - 1])) {
+      throw std::invalid_argument(
+          "build_planckian_lut: wavelengths must be finite, > 0 and strictly "
+          "increasing");
+    }
+  }
+  // TM-30-20 S3.5 calculation range.
+  if (cmf.wavelengths.front() > 380.0 || cmf.wavelengths.back() < 780.0) {
+    throw std::invalid_argument(
+        "build_planckian_lut: CMF must cover at least 380-780 nm");
+  }
+
+  PlanckianLut lut;
+  lut.T.reserve(kPoints);
+  lut.u.reserve(kPoints);
+  lut.v.reserve(kPoints);
+
+  std::vector<double> wl_m(n);
+  for (std::size_t i = 0; i < n; ++i)
+    wl_m[i] = cmf.wavelengths[i] * 1e-9;
+
+  for (std::size_t k = 0; k < kPoints; ++k) {
+    const double T = 1000.0 * std::pow(1.0025, static_cast<double>(k));
+    double X = 0.0, Y = 0.0, Z = 0.0;
+    double prev_x = 0.0, prev_y = 0.0, prev_z = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      const double L =
+          std::pow(wl_m[i], -5.0) / (std::exp(kC2 / (wl_m[i] * T)) - 1.0);
+      const double fx = L * cmf.x_bar[i];
+      const double fy = L * cmf.y_bar[i];
+      const double fz = L * cmf.z_bar[i];
+      if (i > 0) {
+        const double h = 0.5 * (cmf.wavelengths[i] - cmf.wavelengths[i - 1]);
+        X += h * (prev_x + fx);
+        Y += h * (prev_y + fy);
+        Z += h * (prev_z + fz);
+      }
+      prev_x = fx;
+      prev_y = fy;
+      prev_z = fz;
+    }
+    const double denom = X + 15.0 * Y + 3.0 * Z;
+    const UvCoord uv = xyz_to_uv(X, Y, Z);
+    if (!(denom > 0.0) || !std::isfinite(uv.u) || !std::isfinite(uv.v)) {
+      throw std::invalid_argument(
+          "build_planckian_lut: degenerate CMF (non-positive X+15Y+3Z or "
+          "non-finite u,v)");
+    }
+    lut.T.push_back(T);
+    lut.u.push_back(uv.u);
+    lut.v.push_back(uv.v);
+  }
+  return lut;
+}
+
 // -------------------------------------------------------------------------
 // Ohno 2014 triangular + parabolic CCT solver
 // -------------------------------------------------------------------------

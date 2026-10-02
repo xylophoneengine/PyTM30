@@ -15,6 +15,7 @@
 #include "tm30/xyz.hpp"
 #include "tolerances.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -45,8 +46,8 @@ load_spd_csv(const std::string &path) {
   return {wl, vals};
 }
 
-/// Load CIE 1931 2-deg CMF data from CSV (wavelength, x_bar, y_bar, z_bar).
-CmfData load_cmf_2deg(const std::string &path) {
+/// Load CMF data (any observer) from CSV (wavelength, x_bar, y_bar, z_bar).
+CmfData load_cmf_csv(const std::string &path) {
   CsvTable table = load_csv(path);
   CmfData data;
   for (const auto &row : table.rows) {
@@ -152,7 +153,7 @@ TEST_CASE("CCT - LUT loading fails on missing file", "[cct][slice03]") {
 
 TEST_CASE("CCT - D65 (2-deg observer)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -166,7 +167,7 @@ TEST_CASE("CCT - D65 (2-deg observer)", "[cct][slice03]") {
 
 TEST_CASE("CCT - Illuminant A (2-deg observer)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
@@ -184,7 +185,7 @@ TEST_CASE("CCT - Illuminant A (2-deg observer)", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL1", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl1_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -195,7 +196,7 @@ TEST_CASE("CCT - FL1", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL2", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl2_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -206,7 +207,7 @@ TEST_CASE("CCT - FL2", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL3", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl3_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -217,7 +218,7 @@ TEST_CASE("CCT - FL3", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL4", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl4_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -228,7 +229,7 @@ TEST_CASE("CCT - FL4", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL5", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl5_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -239,7 +240,7 @@ TEST_CASE("CCT - FL5", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL6", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl6_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -250,7 +251,7 @@ TEST_CASE("CCT - FL6", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL7", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl7_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -261,7 +262,7 @@ TEST_CASE("CCT - FL7", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL8", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl8_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -272,7 +273,7 @@ TEST_CASE("CCT - FL8", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL9", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl9_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -283,7 +284,7 @@ TEST_CASE("CCT - FL9", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL10", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl10_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -294,7 +295,7 @@ TEST_CASE("CCT - FL10", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL11", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl11_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -305,7 +306,7 @@ TEST_CASE("CCT - FL11", "[cct][slice03]") {
 
 TEST_CASE("CCT - FL12", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl12_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -320,7 +321,7 @@ TEST_CASE("CCT - FL12", "[cct][slice03]") {
 
 TEST_CASE("CCT - HP1 (high-pressure sodium, narrowband)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -331,7 +332,7 @@ TEST_CASE("CCT - HP1 (high-pressure sodium, narrowband)", "[cct][slice03]") {
 
 TEST_CASE("CCT - HP2", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp2_5nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -342,7 +343,7 @@ TEST_CASE("CCT - HP2", "[cct][slice03]") {
 
 TEST_CASE("CCT - HP3", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp3_5nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -353,7 +354,7 @@ TEST_CASE("CCT - HP3", "[cct][slice03]") {
 
 TEST_CASE("CCT - HP4", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp4_5nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -364,7 +365,7 @@ TEST_CASE("CCT - HP4", "[cct][slice03]") {
 
 TEST_CASE("CCT - HP5", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp5_5nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
   XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
   CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut);
@@ -378,7 +379,7 @@ TEST_CASE("CCT - HP5", "[cct][slice03]") {
 // -------------------------------------------------------------------------
 
 TEST_CASE("CCT - self-consistency: Planckian at 3000 K", "[cct][slice03]") {
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   // For a pure Planckian radiator, the (u,v) is exactly on the locus.
@@ -500,7 +501,7 @@ TEST_CASE("CCT - Duv is signed distance", "[cct][slice03]") {
 TEST_CASE("CCT - spd_to_cct matches the manual resample+compute chain (D65)",
           "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
@@ -513,7 +514,7 @@ TEST_CASE("CCT - spd_to_cct matches the manual resample+compute chain (D65)",
 
 TEST_CASE("CCT - spd_to_cct matches the manual chain (FL1)", "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("fl1_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
@@ -526,7 +527,7 @@ TEST_CASE("CCT - spd_to_cct matches the manual chain (FL1)", "[cct][slice03]") {
 TEST_CASE("CCT - spd_to_cct matches the manual chain (HP1, narrowband)",
           "[cct][slice03]") {
   auto [spd_wl, spd_vals] = load_spd_csv(data_path("hp1_5nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   CctDuvResult r = spd_to_cct(spd_wl, spd_vals, cmf, lut);
@@ -538,7 +539,7 @@ TEST_CASE("CCT - spd_to_cct matches the manual chain (HP1, narrowband)",
 
 TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
           "[cct][slice03]") {
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   auto [wl_d65, vals_d65] = load_spd_csv(data_path("d65_1nm.csv"));
@@ -574,7 +575,7 @@ TEST_CASE("CCT - spd_to_cct_batch matches per-SPD spd_to_cct bit-for-bit",
 TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per TM-30-20 3.5",
           "[cct][slice03]") {
   auto [wl_full, vals_full] = load_spd_csv(data_path("d65_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   // Slice the bundled D65 down to the S3.5 minimum range 400-700 nm.
@@ -607,7 +608,7 @@ TEST_CASE("CCT - spd_to_cct zero-fills a 400-700 nm SPD per TM-30-20 3.5",
 TEST_CASE("CCT - spd_to_cct rejects a wavelength step above 5 nm "
           "(TM-30-20 3.5)",
           "[cct][slice03]") {
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   std::vector<double> wl, vals;
@@ -624,7 +625,7 @@ TEST_CASE("CCT - spd_to_cct_batch matches spd_to_cct on a 400-700 nm grid",
           "[cct][slice03]") {
   auto [wl_full, vals_d65] = load_spd_csv(data_path("d65_1nm.csv"));
   auto [wl_a, vals_a] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   std::vector<double> wl_narrow;
@@ -654,7 +655,7 @@ TEST_CASE("CCT - spd_to_cct_batch_prepared matches spd_to_cct_batch "
           "[cct][slice03]") {
   auto [wl_full, vals_d65] = load_spd_csv(data_path("d65_1nm.csv"));
   auto [wl_a, vals_a] = load_spd_csv(data_path("illuminant_a_1nm.csv"));
-  CmfData cmf = load_cmf_2deg(data_path("cie_1931_2.csv"));
+  CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
   PlanckianLut lut = load_planckian_lut(data_path("planckian_uv.csv"));
 
   // Narrow grid so the S3.5 conform is not the identity.
@@ -690,6 +691,92 @@ TEST_CASE("CCT - spd_to_cct_batch_prepared matches spd_to_cct_batch "
   CmfData cmf_81 = resample_cmf(wl_5nm, cmf);
   REQUIRE_THROWS_AS(spd_to_cct_batch_prepared(wl_narrow, batch, cmf_81, lut),
                     std::invalid_argument);
+}
+
+TEST_CASE("CCT - runtime-built Planckian LUT is observer-consistent",
+          "[cct][slice03]") {
+  CmfData cmf_full = load_cmf_csv(data_path("cmf_1931_2.csv"));
+  PlanckianLut csv_lut = load_planckian_lut(data_path("planckian_uv.csv"));
+  PlanckianLut built = build_planckian_lut(cmf_full);
+
+  SECTION("1931 2-deg build matches planckian_uv.csv point-for-point") {
+    REQUIRE(built.T.size() == csv_lut.T.size());
+    double max_du = 0.0;
+    double max_dv = 0.0;
+    double max_dT = 0.0;
+    for (std::size_t i = 0; i < built.T.size(); ++i) {
+      max_dT = std::max(max_dT, std::abs(built.T[i] - csv_lut.T[i]));
+      max_du = std::max(max_du, std::abs(built.u[i] - csv_lut.u[i]));
+      max_dv = std::max(max_dv, std::abs(built.v[i] - csv_lut.v[i]));
+    }
+    INFO("max |dT|=" << max_dT << " |du|=" << max_du << " |dv|=" << max_dv);
+    REQUIRE(max_dT < 1e-9);
+    REQUIRE(max_du < 1e-12);
+    REQUIRE(max_dv < 1e-12);
+  }
+
+  SECTION("2-deg CCT with built LUT equals CSV-LUT result") {
+    auto [spd_wl, spd_vals] = load_spd_csv(data_path("d65_1nm.csv"));
+    CmfData cmf = load_cmf_csv(data_path("cie_1931_2.csv"));
+    XyzTriple xyz = compute_xyz_2deg(spd_wl, spd_vals, cmf);
+    CctDuvResult ref = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, csv_lut);
+    CctDuvResult got = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, built);
+    REQUIRE_THAT(got.cct, Catch::Matchers::WithinAbs(ref.cct, 1e-9));
+    REQUIRE_THAT(got.duv, Catch::Matchers::WithinAbs(ref.duv, 1e-12));
+  }
+
+  SECTION("10-deg build: Planck SPD on the 10-deg grid recovers T, Duv~0") {
+    CmfData cmf10 = load_cmf_csv(data_path("cmf_1964_10.csv"));
+    PlanckianLut lut10 = build_planckian_lut(cmf10);
+    constexpr double kC2 = 1.4388e-2; // TM-30-20 S3.3 Eq. (6)
+    double max_dT = 0.0;
+    double max_duv = 0.0;
+    double min_duv_2deg_lut = 1.0;
+    for (double T : {2700.0, 4000.0, 6500.0, 10000.0}) {
+      std::vector<double> wl = cmf10.wavelengths;
+      std::vector<double> spd(wl.size());
+      for (std::size_t i = 0; i < wl.size(); ++i) {
+        const double l = wl[i] * 1e-9;
+        spd[i] = std::pow(l, -5.0) / (std::exp(kC2 / (l * T)) - 1.0);
+      }
+      XyzTriple xyz = compute_xyz_2deg(wl, spd, cmf10);
+      CctDuvResult r = compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, lut10);
+      CctDuvResult r_csv =
+          compute_cct_duv_from_xyz(xyz.X, xyz.Y, xyz.Z, csv_lut);
+      max_dT = std::max(max_dT, std::abs(r.cct - T));
+      max_duv = std::max(max_duv, std::abs(r.duv));
+      min_duv_2deg_lut = std::min(min_duv_2deg_lut, std::abs(r_csv.duv));
+    }
+    INFO("max |CCT-T|=" << max_dT << " K, max |Duv|=" << max_duv
+                        << ", min |Duv| vs 1931 LUT=" << min_duv_2deg_lut);
+    REQUIRE(max_dT < 0.1);
+    REQUIRE(max_duv < 1e-5);
+    // The same 10-deg XYZ against the 1931 LUT is visibly off the locus.
+    REQUIRE(min_duv_2deg_lut > 10.0 * max_duv);
+  }
+
+  SECTION("rejects non-increasing wavelengths") {
+    CmfData bad = cmf_full;
+    std::swap(bad.wavelengths[100], bad.wavelengths[101]);
+    REQUIRE_THROWS_AS(build_planckian_lut(bad), std::invalid_argument);
+    bad = cmf_full;
+    bad.wavelengths[101] = bad.wavelengths[100];
+    REQUIRE_THROWS_AS(build_planckian_lut(bad), std::invalid_argument);
+  }
+
+  SECTION("rejects a CMF not covering 380-780 nm") {
+    CmfData narrow;
+    for (std::size_t i = 0; i < cmf_full.wavelengths.size(); ++i) {
+      const double w = cmf_full.wavelengths[i];
+      if (w >= 400.0 && w <= 700.0) {
+        narrow.wavelengths.push_back(w);
+        narrow.x_bar.push_back(cmf_full.x_bar[i]);
+        narrow.y_bar.push_back(cmf_full.y_bar[i]);
+        narrow.z_bar.push_back(cmf_full.z_bar[i]);
+      }
+    }
+    REQUIRE_THROWS_AS(build_planckian_lut(narrow), std::invalid_argument);
+  }
 }
 
 } // namespace

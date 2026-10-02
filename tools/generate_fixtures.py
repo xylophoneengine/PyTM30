@@ -238,7 +238,7 @@ def compute_cct_duv(u_test, v_test):
 
 def compute_cct_duv_from_sd(sd):
     """CCT/Duv for a test SPD, using the CIE 1931 2-degree observer (matching
-    pytm30's own cmf_2deg convention for CCT, per tm30_calc.py)."""
+    pytm30's own cmf_cct convention for CCT, per tm30_calc.py)."""
     wl = sd.wavelengths
     idx = np.searchsorted(_CMF2_WL, wl)
     xb, yb, zb = _CMF2_X[idx], _CMF2_Y[idx], _CMF2_Z[idx]

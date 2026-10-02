@@ -27,11 +27,10 @@ Python overhead and repeated table resampling dominate the runtime.
 
 That ceiling matters as soon as TM-30 stops being a one-off report figure
 and becomes the inner loop of a workflow. Sweeping an LED mixing space,
-Monte-Carlo tolerancing of a design, optimising a spectrum against Rf/Rg
-targets, or scoring a large measured dataset all mean running the full
-pipeline thousands to millions of times and at that point per-SPD
-milliseconds are the difference between an interactive tool and an
-overnight job.
+Monte-Carlo tolerancing of a design, or scoring a large measured
+dataset all mean running the full pipeline thousands to millions of
+times and at that point per-SPD milliseconds are the difference
+between an interactive tool and an overnight job.
 
 That was exactly the workload I needed: evaluating huge batches of
 spectra, fast. The existing implementations could not be tuned into that
@@ -196,11 +195,16 @@ from tm30_calc import Cmf
 calc = TM30Calc(cmf=Cmf.CIE_1964_10)   # default, enum tab-complete
 calc = TM30Calc(cmf='1931_2')          # string, case-insensitive
 calc = TM30Calc(cmf='data/my_cmf.csv') # custom CSV path
-calc = TM30Calc(cmf_2deg=Cmf.CIE_2015_2)  # separate 2-deg observer for CCT
+calc = TM30Calc(cmf_cct=Cmf.CIE_2015_2)   # observer for CCT/Duv (default 1931 2-deg)
 ```
 
 Available: `CIE_1931_2`, `CIE_1964_10`, `CIE_2006_2`, `CIE_2006_10`,
 `CIE_2015_2`, `CIE_2015_10`.
+
+`cmf_cct` defaults to CIE 1931 2-deg, which TM-30-20 S3.1 requires for CCT.
+The Planckian locus is built from the same CMF, so source and locus always
+share an observer. Any other observer changes the CCT, hence the reference
+illuminant, hence Rf/Rg: results are then not TM-30-conformant.
 
 ### Configure Integration Range
 
@@ -222,11 +226,14 @@ also directly available with zero Python involvement:
 #include "tm30/csv_loader.hpp"
 
 // Load data tables once
-auto cmf2  = load_cmf("data/cie_1931_2.csv");
+auto cmf2  = load_cmf("data/cmf_1931_2.csv");
 auto cmf10 = load_cmf("data/cmf_1964_10.csv");
 auto ces   = load_ces("data/ces.csv");
 auto basis = load_daylight_basis("data/daylight_basis.csv");
 auto lut   = load_planckian_lut("data/planckian_uv.csv");
+// Or, observer-consistent for any CCT CMF (same table for 1931 2-deg;
+// the locus depends on the CMF's own wavelength range, not only the observer):
+// auto lut = tm30::build_planckian_lut(cmf2);
 
 // Evaluate one SPD
 std::vector<double> wl(401), spd(401);  // ... populate ...
@@ -484,7 +491,7 @@ rather than from `atan2`, which is an identity but rounds differently -- see
 | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------- |
 | `ces.csv` / `ces_5nm.csv`                                                                            | 99 CES reflectance spectra                                     | 380-780 nm           |
 | `cmf_1964_10.csv`                                                                                    | CIE 1964 10-deg CMFs (default observer)                        | 360-830 nm, 1 nm     |
-| `cmf_1931_2.csv` / `cie_1931_2.csv`                                                                  | CIE 1931 2-deg CMFs (general / CCT-default)                    | 360-830 / 380-780 nm |
+| `cmf_1931_2.csv` / `cie_1931_2.csv`                                                                  | CIE 1931 2-deg CMFs (`cmf_`: default CCT; `cie_`: C++ tests/tools)| 360-830 / 380-780 nm |
 | `cmf_2006_2.csv` / `cmf_2006_10.csv`                                                                 | CIE 2006 physiologically-based CMFs                            | 360-830 nm           |
 | `cmf_2015_2.csv` / `cmf_2015_10.csv`                                                                 | CIE 2015 CMFs                                                  | 360-830 nm           |
 | `daylight_basis.csv`                                                                                 | CIE daylight vectors S0, S1, S2                                | 380-780 nm, 5 nm     |

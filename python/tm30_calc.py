@@ -112,19 +112,19 @@ def _resolve_cmf(
         - str matching an enum value -> same
         - str containing '/' or '.csv' -> treated as file path
         - None -> defaults to 'data/cmf_1964_10.csv' (for 10-deg) or
-                 'data/cie_1931_2.csv' (for 2-deg, if suffix='2deg')
+                 'data/cmf_1931_2.csv' (for the CCT CMF, if suffix='cct')
     data_dir : str
         Path to the data directory.
     suffix : str
-        '2deg' -> default cmf_2deg path. Empty -> default cmf_10deg path.
+        'cct' -> default cmf_cct path. Empty -> default cmf_10deg path.
 
     Returns
     -------
     str - absolute path to the CSV file.
     """
     if cmf is None:
-        if suffix == "2deg":
-            path = os.path.join(data_dir, "cie_1931_2.csv")
+        if suffix == "cct":
+            path = os.path.join(data_dir, "cmf_1931_2.csv")
         else:
             path = os.path.join(data_dir, "cmf_1964_10.csv")
         return path
@@ -1097,7 +1097,8 @@ class TM30Calc:
     ----------
     data_dir : str or None
         Directory containing the TM-30 data CSV files.
-        Defaults to the built-in path.
+        Defaults to the built-in path.  A custom data_dir must contain
+        cmf_1931_2.csv; planckian_uv.csv is no longer read.
     cmf : Cmf, str, Path, or None
         CIE observer for tristimulus integration (10-deg CMF).
         - Cmf.CIE_1964_10 (default) - TM-30-20 standard
@@ -1105,9 +1106,13 @@ class TM30Calc:
         - '1931_2' (string lookup, case-insensitive)
         - '/path/to/my_cmf.csv' (custom CSV)
         Default: CIE 1964 10-deg (cmf='1964_10').
-    cmf_2deg : Cmf, str, Path, or None
-        CIE observer for CCT computation (2-deg CMF).
-        Same format as `cmf`.  Default: CIE 1931 2-deg (cmf_2deg='1931_2').
+    cmf_cct : Cmf, str, Path, or None
+        CMF used for CCT/Duv (default CIE 1931 2-deg, which TM-30-20 S3.1
+        requires).  Same format as `cmf`; any observer is accepted and the
+        Planckian locus is built from the same CMF.  Any other observer
+        changes the CCT, hence the reference illuminant, hence Rf/Rg, so
+        the results are then not TM-30-conformant.  The locus is integrated over the CMF's own wavelength range, so it depends on that range, not only on the observer (a 380-780 nm trimmed file gives a slightly different locus than the 360-830 nm file).
+        Default: cmf_cct='1931_2'.
     wavelengths : np.ndarray or None
         Fixed wavelength grid (nm) this calculator is bound to.  Defaults to
         380-780 nm at 1 nm steps (401 points, the implicit default used
@@ -1139,7 +1144,7 @@ class TM30Calc:
         data_dir: str | None = None,
         *,
         cmf: Cmf | str | os.PathLike | None = None,
-        cmf_2deg: Cmf | str | os.PathLike | None = None,
+        cmf_cct: Cmf | str | os.PathLike | None = None,
         wavelengths: np.ndarray | None = None,
         n_workers: int = 1,
         persistent_workers: bool = False,
@@ -1165,18 +1170,18 @@ class TM30Calc:
                 )
 
         # Resolve CMF paths
-        path_2deg = _resolve_cmf(cmf_2deg, data_dir, suffix="2deg")
+        path_cct = _resolve_cmf(cmf_cct, data_dir, suffix="cct")
         path_10deg = _resolve_cmf(cmf, data_dir)
 
         # Use the explicit-CMF constructor (n_workers/persistent_workers
         # handled inside BatchContext: pool created eagerly when
         # persistent_workers && n_workers > 1, else inert).
         self._ctx = tm30_core.BatchContext(
-            data_dir, path_2deg, path_10deg, n_workers, persistent_workers
+            data_dir, path_cct, path_10deg, n_workers, persistent_workers
         )
         self._data_dir = data_dir
         self._cmf = cmf
-        self._cmf_2deg = cmf_2deg
+        self._cmf_cct = cmf_cct
 
         # -- Fixed wavelength grid: normalize, cache, precompute tables --
         if wavelengths is None:
@@ -1194,9 +1199,9 @@ class TM30Calc:
         return self._cmf
 
     @property
-    def cmf_2deg(self) -> Cmf | str | os.PathLike | None:
-        """Configured 2-deg CMF observer (CCT computation)."""
-        return self._cmf_2deg
+    def cmf_cct(self) -> Cmf | str | os.PathLike | None:
+        """Configured CMF observer for CCT/Duv (default CIE 1931 2-deg)."""
+        return self._cmf_cct
 
     @property
     def wavelengths(self) -> np.ndarray:
@@ -1325,14 +1330,14 @@ class TM30Calc:
         if self._cmf is not None:
             cmf_str = self._cmf.value if isinstance(self._cmf, Cmf) else str(self._cmf)
             parts.append(f"cmf={cmf_str}")
-        if self._cmf_2deg is not None:
-            cmf2_str = (
-                self._cmf_2deg.value
-                if isinstance(self._cmf_2deg, Cmf)
-                else str(self._cmf_2deg)
+        if self._cmf_cct is not None:
+            cct_str = (
+                self._cmf_cct.value
+                if isinstance(self._cmf_cct, Cmf)
+                else str(self._cmf_cct)
             )
-            if cmf2_str != "1931_2":  # only show if non-default
-                parts.append(f"cmf_2deg={cmf2_str}")
+            if cct_str != "1931_2":  # only show if non-default
+                parts.append(f"cmf_cct={cct_str}")
         return f"TM30Calc({', '.join(parts)})"
 
     # -- Convenience: SPD -> XYZ / Yuv --------------------------------
@@ -1793,9 +1798,9 @@ class TM30Calc:
     ) -> np.ndarray:
         """Compute CCT and Duv for one or many SPDs.
 
-        Uses the CIE 1931 2-deg CMFs and the Ohno 2014 method (TM-30-20
-        S3.1 exception, S3.3) -- this is the one calculation in TM-30-20
-        that uses the 2-deg, not 10-deg, observer.
+        Uses the calculator's cmf_cct (default CIE 1931 2-deg, TM-30-20
+        S3.1) and the Ohno 2014 method (S3.3) -- by default this is the one
+        calculation in TM-30-20 that uses the 2-deg, not 10-deg, observer.
 
         Parameters
         ----------
@@ -1808,9 +1813,9 @@ class TM30Calc:
             calculator's fixed wavelength grid. Explicit array: a
             one-off different grid for this call only.
         cmf : Cmf, str, Path, or None
-            2-deg CIE observer for this call. None (default): use this
-            calculator's bound cmf_2deg. Explicit value: load+resample a
-            different 2-deg CMF for this call only.
+            CIE observer for this call. None (default): use this
+            calculator's bound cmf_cct. Explicit value: use a different
+            CMF for this call only; the Planckian locus is rebuilt from it.
 
         Returns
         -------
@@ -1835,7 +1840,7 @@ class TM30Calc:
             wavelengths = np.ascontiguousarray(wavelengths)
 
         cmf_path = (
-            None if cmf is None else _resolve_cmf(cmf, self._data_dir, suffix="2deg")
+            None if cmf is None else _resolve_cmf(cmf, self._data_dir, suffix="cct")
         )
         result = self._ctx.spd_to_cct(matrix, wavelengths, cmf_path)
         return result[:, 0] if single else result
